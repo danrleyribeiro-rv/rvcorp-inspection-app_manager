@@ -1,0 +1,1 @@
+export default function EditInspectionDialog({ inspection, onClose }) {}
