@@ -1,10 +1,9 @@
-// src/app/(dashboard)/inspectors/page.js
+// app/(dashboard)/inspectors/page.js
 "use client";
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { collection, query, where, getDocs } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { supabase } from "@/lib/supabase";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { 
@@ -29,110 +28,182 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import RatingDialog from "./components/RatingDialog";
+import { useToast } from "@/hooks/use-toast";
 import InspectorCard from "./components/InspectorCard";
+import RatingDialog from "./components/RatingDialog";
 
 export default function InspectorsPage() {
-    const [inspectors, setInspectors] = useState([]);
-    const [filteredInspectors, setFilteredInspectors] = useState([]);
-    const [states, setStates] = useState([]);
-    const [cities, setCities] = useState([]);
-    const [selectedInspector, setSelectedInspector] = useState(null);
-    const [search, setSearch] = useState("");
-    const [filters, setFilters] = useState({
-        state: "all",
-        city: "all",
-        rating: "all",
+  const [inspectors, setInspectors] = useState([]);
+  const [filteredInspectors, setFilteredInspectors] = useState([]);
+  const [states, setStates] = useState([]);
+  const [cities, setCities] = useState([]);
+  const [selectedInspector, setSelectedInspector] = useState(null);
+  const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [filters, setFilters] = useState({
+    state: "all",
+    city: "all",
+    rating: "all",
+  });
+  const router = useRouter();
+  const { toast } = useToast();
+
+  useEffect(() => {
+    fetchInspectors();
+  }, []);
+
+  useEffect(() => {
+    if (inspectors.length > 0) {
+      updateLocationFilters();
+      applyFilters();
+    }
+  }, [inspectors, search, filters]);
+
+  useEffect(() => {
+    if (filters.state !== "all") {
+      updateCities(filters.state);
+    }
+  }, [filters.state]);
+
+  const fetchInspectors = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('inspectors')
+        .select('*, profile_images(url)')
+        .is('deleted_at', null)
+        .order('name');
+      
+      if (error) throw error;
+      setInspectors(data || []);
+      setFilteredInspectors(data || []);
+    } catch (error) {
+      console.error("Error fetching inspectors:", error);
+      toast({
+        title: "Erro ao buscar vistoriadores",
+        description: error.message,
+        variant: "destructive"
       });
-  
-    useEffect(() => {
-      fetchInspectors();
-    }, []);
-  
-    useEffect(() => {
-      if (inspectors.length > 0) {
-        updateLocationFilters();
-      }
-    }, [inspectors]);
-  
-    useEffect(() => {
-      if (filters.state) {
-        updateCities(filters.state);
-      }
-    }, [filters.state]);
-  
-    const fetchInspectors = async () => {
-      const inspectorsRef = collection(db, "inspectors");
-      const inspectorsSnap = await getDocs(inspectorsRef);
-      const inspectorsData = inspectorsSnap.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setInspectors(inspectorsData);
-      setFilteredInspectors(inspectorsData);
-    };
-  
-    const updateLocationFilters = () => {
-      // Extrair estados únicos dos inspetores
-      const uniqueStates = [...new Set(inspectors.map(inspector => inspector.state))]
-        .filter(Boolean) // Remove valores null/undefined
-        .sort(); // Ordena alfabeticamente
-      setStates(uniqueStates);
-    };
-  
-    const updateCities = (selectedState) => {
-      // Extrair cidades únicas do estado selecionado
-      const uniqueCities = [...new Set(
-        inspectors
-          .filter(inspector => inspector.state === selectedState)
-          .map(inspector => inspector.city)
-      )]
-        .filter(Boolean)
-        .sort();
-      setCities(uniqueCities);
-  
-      // Resetar cidade selecionada se ela não existe no novo estado
-      if (!uniqueCities.includes(filters.city)) {
-        setFilters(prev => ({ ...prev, city: "" }));
-      }
-    };
-  
-    const applyFilters = () => {
-        let filtered = [...inspectors];
-      
-        if (search) {
-          filtered = filtered.filter(
-            (inspector) =>
-              inspector.name.toLowerCase().includes(search.toLowerCase()) ||
-              inspector.email.toLowerCase().includes(search.toLowerCase())
-          );
-        }
-      
-        if (filters.state && filters.state !== "todos") {
-          filtered = filtered.filter(
-            (inspector) => inspector.state === filters.state
-          );
-        }
-        
-        if (filters.city && filters.city !== "todas") {
-          filtered = filtered.filter(
-            (inspector) => inspector.city === filters.city
-          );
-        }
-        
-        if (filters.rating && filters.rating !== "todas") {
-          const ratingValue = parseInt(filters.rating);
-          filtered = filtered.filter(
-            (inspector) => (inspector.rating || 0) >= ratingValue
-          );
-        }
-      
-        setFilteredInspectors(filtered);
-      };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateLocationFilters = () => {
+    // Extract unique states from inspectors
+    const uniqueStates = [...new Set(inspectors
+      .map(inspector => inspector.state)
+      .filter(Boolean))]
+      .sort();
+    
+    setStates(uniqueStates);
+  };
+
+  const updateCities = (selectedState) => {
+    // Extract unique cities from the selected state
+    const uniqueCities = [...new Set(
+      inspectors
+        .filter(inspector => inspector.state === selectedState)
+        .map(inspector => inspector.city)
+    )]
+      .filter(Boolean)
+      .sort();
+    
+    setCities(uniqueCities);
+    
+    // Reset selected city if it doesn't exist in the new state
+    if (!uniqueCities.includes(filters.city)) {
+      setFilters(prev => ({ ...prev, city: "all" }));
+    }
+  };
+
+  const applyFilters = () => {
+    let filtered = [...inspectors];
+    
+    // Search filter
+    if (search) {
+      filtered = filtered.filter(
+        (inspector) =>
+          inspector.name?.toLowerCase().includes(search.toLowerCase()) ||
+          inspector.last_name?.toLowerCase().includes(search.toLowerCase()) ||
+          inspector.email?.toLowerCase().includes(search.toLowerCase())
+      );
+    }
+    
+    // State filter
+    if (filters.state && filters.state !== "all") {
+      filtered = filtered.filter(
+        (inspector) => inspector.state === filters.state
+      );
+    }
+    
+    // City filter
+    if (filters.city && filters.city !== "all") {
+      filtered = filtered.filter(
+        (inspector) => inspector.city === filters.city
+      );
+    }
+    
+    // Rating filter
+    if (filters.rating && filters.rating !== "all") {
+      const ratingValue = parseInt(filters.rating);
+      filtered = filtered.filter(
+        (inspector) => (parseFloat(inspector.rating) || 0) >= ratingValue
+      );
+    }
+    
+    setFilteredInspectors(filtered);
+  };
 
   const openChat = (inspector) => {
+    // Navigate to chat with selected inspector
     router.push(`/chats?inspector=${inspector.id}`);
+  };
+
+  const handleRateInspector = async (inspector, rating, comment) => {
+    try {
+      // Calculate new average rating
+      const currentRating = parseFloat(inspector.rating) || 0;
+      const ratingCount = inspector.rating_count || 0;
+      
+      const newRatingCount = ratingCount + 1;
+      const newAverageRating = ((currentRating * ratingCount) + rating) / newRatingCount;
+      
+      // Update inspector rating
+      const { error } = await supabase
+        .from('inspectors')
+        .update({
+          rating: newAverageRating.toFixed(1),
+          rating_count: newRatingCount
+        })
+        .eq('id', inspector.id);
+      
+      if (error) throw error;
+      
+      // Store rating record
+      await supabase
+        .from('inspector_ratings')
+        .insert({
+          inspector_id: inspector.id,
+          rater_id: null, // Could be the manager's ID if needed
+          rating,
+          comment,
+          created_at: new Date()
+        });
+      
+      toast({
+        title: "Avaliação enviada com sucesso"
+      });
+      
+      fetchInspectors();
+    } catch (error) {
+      console.error("Error rating inspector:", error);
+      toast({
+        title: "Erro ao enviar avaliação",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
   };
 
   return (
@@ -147,70 +218,70 @@ export default function InspectorsPage() {
             </Button>
           </SheetTrigger>
           <SheetContent>
-        <SheetHeader>
-          <SheetTitle>Filtros</SheetTitle>
-        </SheetHeader>
-        <div className="mt-6 space-y-4">
-        <div className="space-y-2">
-            <label className="text-sm">Estado</label>
-            <Select
-                value={filters.state}
-                onValueChange={(value) => setFilters({ ...filters, state: value, city: "all" })}
-            >
-                <SelectTrigger>
-                <SelectValue placeholder="Selecione um estado" />
-                </SelectTrigger>
-                <SelectContent>
-                <SelectItem value="all">Todos os estados</SelectItem>
-                {states.map((state) => (
-                    <SelectItem key={state} value={state}>
-                    {state}
-                    </SelectItem>
-                ))}
-                </SelectContent>
-            </Select>
-            </div>
+            <SheetHeader>
+              <SheetTitle>Filtros</SheetTitle>
+            </SheetHeader>
+            <div className="mt-6 space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm">Estado</label>
+                <Select
+                  value={filters.state}
+                  onValueChange={(value) => setFilters({ ...filters, state: value, city: "all" })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione um estado" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os estados</SelectItem>
+                    {states.map((state) => (
+                      <SelectItem key={state} value={state}>
+                        {state}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-                <div className="space-y-2">
+              <div className="space-y-2">
                 <label className="text-sm">Cidade</label>
                 <Select
-                    value={filters.city}
-                    onValueChange={(value) => setFilters({ ...filters, city: value })}
-                    disabled={filters.state === "all"}
+                  value={filters.city}
+                  onValueChange={(value) => setFilters({ ...filters, city: value })}
+                  disabled={filters.state === "all"}
                 >
-                    <SelectTrigger>
+                  <SelectTrigger>
                     <SelectValue placeholder={filters.state !== "all" ? "Selecione uma cidade" : "Selecione um estado primeiro"} />
-                    </SelectTrigger>
-                    <SelectContent>
+                  </SelectTrigger>
+                  <SelectContent>
                     <SelectItem value="all">Todas as cidades</SelectItem>
                     {cities.map((city) => (
-                        <SelectItem key={city} value={city}>
+                      <SelectItem key={city} value={city}>
                         {city}
-                        </SelectItem>
+                      </SelectItem>
                     ))}
-                    </SelectContent>
+                  </SelectContent>
                 </Select>
-                </div>
+              </div>
 
-                <div className="space-y-2">
+              <div className="space-y-2">
                 <label className="text-sm">Classificação</label>
                 <Select
-                    value={filters.rating}
-                    onValueChange={(value) => setFilters({ ...filters, rating: value })}
+                  value={filters.rating}
+                  onValueChange={(value) => setFilters({ ...filters, rating: value })}
                 >
-                    <SelectTrigger>
+                  <SelectTrigger>
                     <SelectValue placeholder="Selecione uma classificação" />
-                    </SelectTrigger>
-                    <SelectContent>
+                  </SelectTrigger>
+                  <SelectContent>
                     <SelectItem value="all">Todas as classificações</SelectItem>
                     <SelectItem value="5">5 estrelas</SelectItem>
                     <SelectItem value="4">4 estrelas ou mais</SelectItem>
                     <SelectItem value="3">3 estrelas ou mais</SelectItem>
-                    </SelectContent>
+                  </SelectContent>
                 </Select>
-                </div>
-        </div>  
-      </SheetContent>
+              </div>
+            </div>
+          </SheetContent>
         </Sheet>
       </div>
 
@@ -223,23 +294,33 @@ export default function InspectorsPage() {
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredInspectors.map((inspector) => (
-          <InspectorCard
-            key={inspector.id}
-            inspector={inspector}
-            onRate={() => setSelectedInspector(inspector)}
-            onChat={() => openChat(inspector)}
-          />
-        ))}
-      </div>
+      {loading ? (
+        <div className="flex justify-center items-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      ) : filteredInspectors.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground">
+          Nenhum vistoriador encontrado com os filtros atuais.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredInspectors.map((inspector) => (
+            <InspectorCard
+              key={inspector.id}
+              inspector={inspector}
+              onRate={() => setSelectedInspector(inspector)}
+              onChat={() => openChat(inspector)}
+            />
+          ))}
+        </div>
+      )}
 
       {selectedInspector && (
         <RatingDialog
           inspector={selectedInspector}
           open={!!selectedInspector}
           onClose={() => setSelectedInspector(null)}
-          onSuccess={fetchInspectors}
+          onRate={handleRateInspector}
         />
       )}
     </div>

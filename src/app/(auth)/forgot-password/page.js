@@ -1,14 +1,15 @@
-// src/app/(auth)/forgot-password/page.js
+// app/(auth)/forgot-password/page.js
 "use client";
 
 import { useState } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/context/auth-context';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ArrowLeft } from 'lucide-react';
+import Image from "next/image";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -24,12 +25,12 @@ export default function ForgotPasswordPage() {
     const result = await resetPassword(email);
     if (result.success) {
       setMessage({
-        text: 'Password reset email sent. Check your inbox.',
+        text: 'Email de redefinição de senha enviado. Verifique sua caixa de entrada e spam.',
         success: true
       });
     } else {
       setMessage({
-        text: 'Error sending reset email. Please try again.',
+        text: result.error || 'Erro ao enviar email de redefinição. Por favor, tente novamente.',
         success: false
       });
     }
@@ -38,6 +39,16 @@ export default function ForgotPasswordPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <div className="mb-8 absolute top-8">
+        <Image
+          src="/logo.png"
+          alt="RV Corp Logo"
+          width={150}
+          height={150}
+          priority
+        />
+      </div>
+
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold">Redefinir Senha</CardTitle>

@@ -1,90 +1,135 @@
-// src/app/(dashboard)/projects/components/EditProjectDialog.js
-"use client";
+// components/projects/components/EditProjectDialog.js
+"use client"
 
-import { useState, useEffect } from "react";
-import { doc, updateDoc, getDocs, collection } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { useState, useEffect } from "react"
+import { supabase } from "@/lib/supabase"
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
-import { CalendarIcon } from "lucide-react";
-import { toast } from "@/components/ui/use-toast";
+} from "@/components/ui/select"
+import { useToast } from "@/hooks/use-toast"
+// Remove: import { Calendar } from "@/components/ui/calendar"
+// Remove: import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+// Remove: import { format, parseISO } from "date-fns"
+// Remove: import { ptBR } from "date-fns/locale"
+// Remove: import { CalendarIcon } from "lucide-react"
 
-export default function EditProjectDialog({ project, open, onClose }) {
-  const [loading, setLoading] = useState(false);
-  const [clients, setClients] = useState([]);
-  const [inspectors, setInspectors] = useState([]);
+const statusOptions = ["Aguardando", "Em Andamento", "Em Revisão", "Concluído"]
+
+// Add project type options
+const projectTypeOptions = [
+  "Inspeção de Redes",
+  "Inspeção de Obras",
+  "Levantamento Arquitetônico",
+  "Implantação",
+  "Outro"
+];
+
+export default function EditProjectDialog({ project, open, onClose, onSuccess }) {
   const [formData, setFormData] = useState({
     title: project.title,
-    description: project.description,
-    clientId: project.clientId,
-    inspectorId: project.inspectorId,
-    status: project.status,
-    inspectionDate: project.inspectionDate ? new Date(project.inspectionDate) : null
+    description: project.description || "",
+    type: project.type || "", // Use existing type
+    project_price: project.project_price?.toString() || "0",
+    client_id: project.client_id || "",
+    status: project.status || "Aguardando",
+    // Remove inspection_date
   });
+  const [isLoading, setIsLoading] = useState(false)
+  const [clients, setClients] = useState([])
+  const { toast } = useToast()
 
   useEffect(() => {
-    fetchData();
-  }, []);
+        // Update form data when the project prop changes
+        if (project) {
+            setFormData({
+                title: project.title,
+                description: project.description || "",
+                type: project.type || "",
+                project_price: project.project_price?.toString() || "0",
+                client_id: project.client_id || "",
+                status: project.status || "Aguardando",
+            });
+        }
+    }, [project]);
 
-  const fetchData = async () => {
-    const [clientsSnap, inspectorsSnap] = await Promise.all([
-      getDocs(collection(db, "clients")),
-      getDocs(collection(db, "inspectors"))
-    ]);
+  useEffect(() => {
+    fetchClients()
+  }, [])
 
-    setClients(clientsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    setInspectors(inspectorsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-  };
+  const fetchClients = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('clients')
+        .select('id, name')
+        .is('deleted_at', null)
+        .order('name');
+
+      if (error) throw error;
+      setClients(data || []);
+    } catch (error) {
+      console.error("Error fetching clients:", error);
+      toast({
+        title: "Erro ao buscar clientes",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  }
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
+    e.preventDefault()
+    setIsLoading(true)
 
     try {
-      const selectedClient = clients.find(c => c.id === formData.clientId);
-      const selectedInspector = inspectors.find(i => i.id === formData.inspectorId);
+      // Convert project price to number
+      const projectPrice = parseFloat(formData.project_price) || 0;
 
-      await updateDoc(doc(db, "projects", project.id), {
-        ...formData,
-        clientName: selectedClient?.name || "",
-        inspectorName: selectedInspector ? `${selectedInspector.name} ${selectedInspector.surname}` : "",
-        updatedAt: new Date().toISOString()
-      });
+      const { error } = await supabase
+        .from('projects')
+        .update({
+          title: formData.title,
+          description: formData.description,
+          type: formData.type,  // Update the type
+          project_price: projectPrice,
+          client_id: formData.client_id,
+          status: formData.status,
+          // Remove inspection_date
+          updated_at: new Date()
+        })
+        .eq('id', project.id);
+
+      if (error) throw error;
 
       toast({
-        title: "Sucesso",
-        description: "Projeto atualizado com sucesso"
+        title: "Projeto atualizado com sucesso"
       });
+
+      onSuccess();
       onClose();
     } catch (error) {
       console.error("Error updating project:", error);
       toast({
-        title: "Erro",
-        description: "Erro ao atualizar projeto",
+        title: "Erro ao atualizar projeto",
+        description: error.message,
         variant: "destructive"
       });
+    } finally {
+      setIsLoading(false);
     }
-
-    setLoading(false);
-  };
+  }
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -92,129 +137,108 @@ export default function EditProjectDialog({ project, open, onClose }) {
         <DialogHeader>
           <DialogTitle>Editar Projeto</DialogTitle>
         </DialogHeader>
-
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="title">Título</Label>
-            <Input
-              id="title"
-              value={formData.title}
-              onChange={e => setFormData({ ...formData, title: e.target.value })}
-              required
-            />
-          </div>
+          <Input
+            placeholder="Título"
+            value={formData.title}
+            onChange={(e) =>
+              setFormData({ ...formData, title: e.target.value })
+            }
+            required
+            disabled={isLoading}
+          />
+          <Textarea
+            placeholder="Descrição"
+            value={formData.description}
+            onChange={(e) =>
+              setFormData({ ...formData, description: e.target.value })
+            }
+            required
+            disabled={isLoading}
+          />
+          {/* Project Type Select */}
+          <Select
+            value={formData.type}
+            onValueChange={(value) => setFormData({ ...formData, type: value })}
+            disabled={isLoading}
+            required
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione um Tipo de Projeto" />
+            </SelectTrigger>
+            <SelectContent>
+              {projectTypeOptions.map((type) => (
+                <SelectItem key={type} value={type}>
+                  {type}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-          <div className="space-y-2">
-            <Label htmlFor="description">Descrição</Label>
-            <Input
-              id="description"
-              value={formData.description}
-              onChange={e => setFormData({ ...formData, description: e.target.value })}
-              required
-            />
-          </div>
+          <Input
+            type="number"
+            step="0.01"
+            placeholder="Valor do Projeto"
+            value={formData.project_price}
+            onChange={(e) =>
+              setFormData({ ...formData, project_price: e.target.value })
+            }
+            required
+            disabled={isLoading}
+          />
+          <Select
+            value={formData.client_id}
+            onValueChange={(value) =>
+              setFormData({ ...formData, client_id: value })
+            }
+            disabled={isLoading}
+            required
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione um Cliente" />
+            </SelectTrigger>
+            <SelectContent>
+              {clients.map((client) => (
+                <SelectItem key={client.id} value={client.id}>
+                  {client.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={formData.status}
+            onValueChange={(value) =>
+              setFormData({ ...formData, status: value })
+            }
+            disabled={isLoading}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione um Status" />
+            </SelectTrigger>
+            <SelectContent>
+              {statusOptions.map((status) => (
+                <SelectItem key={status} value={status}>
+                  {status}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-          <div className="space-y-2">
-            <Label>Cliente</Label>
-            <Select
-              value={formData.clientId}
-              onValueChange={(value) => setFormData({ ...formData, clientId: value })}
-              required
+          <div className="flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              disabled={isLoading}
             >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione um cliente" />
-              </SelectTrigger>
-              <SelectContent>
-                {clients.map((client) => (
-                  <SelectItem key={client.id} value={client.id}>
-                    {client.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Vistoriador</Label>
-            <Select
-              value={formData.inspectorId}
-              onValueChange={(value) => setFormData({ ...formData, inspectorId: value })}
-              required
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione um vistoriador" />
-              </SelectTrigger>
-              <SelectContent>
-                {inspectors.map((inspector) => (
-                  <SelectItem key={inspector.id} value={inspector.id}>
-                    {`${inspector.name} ${inspector.surname}`}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Status</Label>
-            <Select
-              value={formData.status}
-              onValueChange={(value) => setFormData({ ...formData, status: value })}
-              required
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione o status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="pendente">Pendente</SelectItem>
-                <SelectItem value="em_andamento">Em Andamento</SelectItem>
-                <SelectItem value="concluido">Concluído</SelectItem>
-                <SelectItem value="atrasado">Atrasado</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Data da Vistoria</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={`w-full justify-start text-left font-normal ${
-                    !formData.inspectionDate && "text-muted-foreground"
-                  }`}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {formData.inspectionDate ? (
-                    format(formData.inspectionDate, "PPP", { locale: ptBR })
-                  ) : (
-                    <span>Selecione uma data</span>
-                  )}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={formData.inspectionDate}
-                  onSelect={(date) =>
-                    setFormData({ ...formData, inspectionDate: date })
-                  }
-                  initialFocus
-                  locale={ptBR}
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-
-          <div className="flex justify-end gap-4 pt-4">
-            <Button type="button" variant="outline" onClick={onClose}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? "Salvando..." : "Salvar Alterações"}
+            <Button type="submit" disabled={isLoading}>
+              {isLoading ? "Salvando..." : "Salvar"}
             </Button>
           </div>
         </form>
       </DialogContent>
     </Dialog>
-  );
+  )
 }

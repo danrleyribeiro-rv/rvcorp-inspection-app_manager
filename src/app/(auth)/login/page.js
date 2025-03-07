@@ -1,8 +1,8 @@
-// src/app/(auth)/login/page.js
+// app/(auth)/login/page.js  (Minor change: more robust error message)
 "use client";
 
 import { useState } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/context/auth-context';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ import { ArrowRight } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import Image from 'next/image';
+import { Loader2 } from 'lucide-react';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -25,9 +26,17 @@ export default function LoginPage() {
 
     const result = await signIn(email, password);
     if (!result.success) {
-      setError('Invalid credentials or unauthorized access');
+      // More robust error handling, including Supabase-specific errors
+      if (result.error.includes("Invalid login credentials")) {
+        setError('Email ou senha incorretos. Por favor, verifique suas credenciais.');
+      } else if (result.error.includes("Unauthorized access")) {
+        setError('Você não tem permissão para acessar este sistema. Apenas gerentes podem acessar.');
+      } else {
+        setError(result.error || 'Ocorreu um erro durante o login.');
+      }
+      setLoading(false); // Ensure loading is set to false on error
     }
-    setLoading(false);
+    // No need to set loading to false if successful; onAuthStateChange will handle redirect
   };
 
   return (
@@ -70,14 +79,15 @@ export default function LoginPage() {
                 required
               />
             </div>
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               className="w-full"
               disabled={loading}
             >
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               {loading ? 'Entrando...' : 'Entrar'}
             </Button>
-            <Link 
+            <Link
                 href="/forgot-password"
                 className="text-sm text-primary hover:underline flex items-center gap-1 justify-center"
                 >

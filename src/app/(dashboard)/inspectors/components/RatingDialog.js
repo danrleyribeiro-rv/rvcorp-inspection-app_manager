@@ -1,15 +1,14 @@
-// src/app/(dashboard)/inspectors/components/RatingDialog.js
+
+// app/(dashboard)/inspectors/components/RatingDialog.js
 "use client";
 
 import { useState } from "react";
-import { addDoc, collection } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Star } from "lucide-react";
 
-export default function RatingDialog({ inspector, open, onClose, onSuccess }) {
+export default function RatingDialog({ inspector, open, onClose, onRate }) {
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
   const [hoveredRating, setHoveredRating] = useState(0);
@@ -20,13 +19,7 @@ export default function RatingDialog({ inspector, open, onClose, onSuccess }) {
 
     setLoading(true);
     try {
-      await addDoc(collection(db, "inspector_ratings"), {
-        inspectorId: inspector.id,
-        rating,
-        comment,
-        createdAt: new Date().toISOString()
-      });
-      onSuccess();
+      await onRate(inspector, rating, comment);
       onClose();
     } catch (error) {
       console.error("Error submitting rating:", error);

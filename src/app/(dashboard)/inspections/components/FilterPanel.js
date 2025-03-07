@@ -1,9 +1,9 @@
-// src/app/(dashboard)/inspections/components/FilterPanel.js
+
+// app/(dashboard)/inspections/components/FilterPanel.js
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, getDocs } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { supabase } from "@/lib/supabase";
 import { Label } from "@/components/ui/label";
 import {
   SheetContent,
@@ -19,24 +19,70 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
+import { useAuth } from "@/context/auth-context";
 
-export default function FilterPanel({ filterState, onFilterChange }) {
+export default function FilterPanel({ filterState, onFilterChange, inspections }) {
   const [projects, setProjects] = useState([]);
   const [inspectors, setInspectors] = useState([]);
   const [dateRange, setDateRange] = useState(filterState.dateRange);
+  const { user } = useAuth();
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (user) {
+      fetchProjects();
+      fetchInspectors();
+    }
+  }, [user]);
 
-  const fetchData = async () => {
-    const [projectsSnap, inspectorsSnap] = await Promise.all([
-      getDocs(collection(db, "projects")),
-      getDocs(collection(db, "inspectors"))
-    ]);
+  const fetchProjects = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('projects')
+        .select('id, title')
+        .eq('manager_id', user.id)
+        .is('deleted_at', null);
+      
+      if (error) throw error;
+      setProjects(data || []);
+    } catch (error) {
+      console.error("Error fetching projects:", error);
+    }
+  };
 
-    setProjects(projectsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    setInspectors(inspectorsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+  const fetchInspectors = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('inspectors')
+        .select('id, name, last_name')
+        .is('deleted_at', null);
+      
+      if (error) throw error;
+      setInspectors(data || []);
+    } catch (error) {
+      console.error("Error fetching inspectors:", error);
+    }
+  };
+
+  // Get unique inspector IDs from inspections
+  const getActiveInspectors = () => {
+    const inspectorIds = new Set();
+    inspections.forEach(inspection => {
+      if (inspection.inspector_id) {
+        inspectorIds.add(inspection.inspector_id);
+      }
+    });
+    return inspectors.filter(inspector => inspectorIds.has(inspector.id));
+  };
+
+  // Get unique project IDs from inspections
+  const getActiveProjects = () => {
+    const projectIds = new Set();
+    inspections.forEach(inspection => {
+      if (inspection.project_id) {
+        projectIds.add(inspection.project_id);
+      }
+    });
+    return projects.filter(project => projectIds.has(project.id));
   };
 
   const handleReset = () => {
@@ -90,7 +136,7 @@ export default function FilterPanel({ filterState, onFilterChange }) {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos</SelectItem>
-              {projects.map((project) => (
+              {getActiveProjects().map((project) => (
                 <SelectItem key={project.id} value={project.id}>
                   {project.title}
                 </SelectItem>
@@ -110,9 +156,9 @@ export default function FilterPanel({ filterState, onFilterChange }) {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos</SelectItem>
-              {inspectors.map((inspector) => (
+              {getActiveInspectors().map((inspector) => (
                 <SelectItem key={inspector.id} value={inspector.id}>
-                  {`${inspector.name} ${inspector.surname}`}
+                  {`${inspector.name} ${inspector.last_name || ''}`}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -128,7 +174,7 @@ export default function FilterPanel({ filterState, onFilterChange }) {
               setDateRange(range);
               onFilterChange({ ...filterState, dateRange: range });
             }}
-            numberOfMonths={2}
+            numberOfMonths={1}
             className="rounded-md border"
           />
         </div>

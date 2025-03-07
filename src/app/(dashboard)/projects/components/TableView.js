@@ -1,9 +1,6 @@
-// src/app/(dashboard)/projects/components/TableView.js
+// components/projects/components/TableView.js
 "use client";
 
-import { useState, useEffect } from "react";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 import {
   Table,
   TableBody,
@@ -13,66 +10,155 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { Button } from "@/components/ui/button";
+import { Edit, Trash2, Eye } from "lucide-react";
+import { useState } from "react";
+import EditProjectDialog from "./EditProjectDialog";
+import DeleteProjectDialog from "./DeleteProjectDialog.js";
+import ViewProjectDialog from "./ViewProjectDialog";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const getStatusColor = (status) => {
   const statusColors = {
-    "em_andamento": "yellow",
-    "concluido": "green",
-    "pendente": "gray",
-    "atrasado": "red"
+    "Aguardando": "yellow",
+    "Em Andamento": "blue",
+    "Em Revisão": "purple",
+    "Concluído": "green"
   };
   return statusColors[status] || "gray";
 };
 
-export default function TableView() {
-  const [projects, setProjects] = useState([]);
+export default function TableView({ projects, isLoading, onRefresh }) {
+  const [editingProject, setEditingProject] = useState(null);
+  const [deletingProject, setDeletingProject] = useState(null);
+  const [viewingProject, setViewingProject] = useState(null);
 
-  useEffect(() => {
-    const q = query(collection(db, "projects"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const projectsData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setProjects(projectsData);
-    });
-    return () => unsubscribe();
-  }, []);
+  if (isLoading) {
+    return (
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Título</TableHead>
+              <TableHead>Cliente</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Tipo</TableHead>
+              <TableHead>Valor</TableHead>
+              <TableHead>Ações</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {[...Array(5)].map((_, i) => (
+              <TableRow key={i}>
+                <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
+                <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                <TableCell><Skeleton className="h-8 w-24" /></TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    );
+  }
+
+  const formatCurrency = (value) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(value || 0);
+  };
 
   return (
-    <div className="rounded-md border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Título</TableHead>
-            <TableHead>Cliente</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Vistoriador</TableHead>
-            <TableHead>Data da Vistoria</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {projects.map((project) => (
-            <TableRow key={project.id}>
-              <TableCell>{project.title}</TableCell>
-              <TableCell>{project.clientName}</TableCell>
-              <TableCell>
-                <Badge variant={getStatusColor(project.status)}>
-                  {project.status.replace("_", " ")}
-                </Badge>
-              </TableCell>
-              <TableCell>{project.inspectorName}</TableCell>
-              <TableCell>
-                {project.inspectionDate ? 
-                  format(new Date(project.inspectionDate), "PPP", { locale: ptBR }) 
-                  : "Não agendada"}
-              </TableCell>
+    <>
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Título</TableHead>
+              <TableHead>Cliente</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Tipo</TableHead>
+              <TableHead>Valor</TableHead>
+              <TableHead>Ações</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+          </TableHeader>
+          <TableBody>
+            {projects.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                  Nenhum projeto encontrado
+                </TableCell>
+              </TableRow>
+            ) : (
+              projects.map((project) => (
+                <TableRow key={project.id}>
+                  <TableCell className="font-medium">{project.title}</TableCell>
+                  <TableCell>{project.clients?.name || 'N/A'}</TableCell>
+                  <TableCell>
+                    <Badge variant={getStatusColor(project.status)}>
+                      {project.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>{project.type || 'N/A'}</TableCell>
+                  <TableCell>{formatCurrency(project.project_price)}</TableCell>
+                  <TableCell className="flex gap-2">
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={() => setViewingProject(project)}
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={() => setEditingProject(project)}
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={() => setDeletingProject(project)}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      {editingProject && (
+        <EditProjectDialog
+          project={editingProject}
+          open={!!editingProject}
+          onClose={() => setEditingProject(null)}
+          onSuccess={onRefresh}
+        />
+      )}
+
+      {deletingProject && (
+        <DeleteProjectDialog
+          project={deletingProject}
+          open={!!deletingProject}
+          onClose={() => setDeletingProject(null)}
+          onSuccess={onRefresh}
+        />
+      )}
+
+      {viewingProject && (
+        <ViewProjectDialog
+          project={viewingProject}
+          open={!!viewingProject}
+          onClose={() => setViewingProject(null)}
+        />
+      )}
+    </>
   );
 }

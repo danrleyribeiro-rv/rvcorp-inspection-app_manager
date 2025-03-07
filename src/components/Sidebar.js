@@ -4,7 +4,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/context/auth-context";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,6 +30,7 @@ const menuItems = [
   { href: "/templates", label: "Templates", icon: CircleDot },
   { href: "/chats", label: "Chats", icon: MessageSquare },
   { href: "/reports", label: "Relatórios", icon: FileText },
+  { href: "/clients", label: "Clientes", icon: Users }, // ADD THIS
   { href: "/settings", label: "Configurações", icon: Settings },
 ];
 

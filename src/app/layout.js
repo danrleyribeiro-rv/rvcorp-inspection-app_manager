@@ -1,5 +1,5 @@
 // src/app/layout.js
-import { AuthProvider } from '@/contexts/AuthContext';
+import { AuthProvider } from '@/context/auth-context';
 import { ThemeProvider } from "@/components/theme-provider";
 import { Inter } from 'next/font/google';
 import './globals.css';

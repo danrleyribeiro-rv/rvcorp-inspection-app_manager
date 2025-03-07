@@ -1,10 +1,8 @@
-// src/app/(dashboard)/inspections/components/InspectionDetailsDialog.js
+// app/(dashboard)/inspections/components/InspectionDetailsDialog.js
 "use client";
 
 import { useState, useEffect } from "react";
-import { doc, updateDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { getS3Url } from "@/lib/s3";
+import { supabase } from "@/lib/supabase";
 import {
   Dialog,
   DialogContent,
@@ -12,299 +10,441 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  Card, 
-  CardContent, 
-  CardHeader, 
-  CardTitle 
+import { Badge } from "@/components/ui/badge";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
 } from "@/components/ui/card";
-import { 
-  DragDropContext, 
-  Droppable, 
-  Draggable 
-} from "@hello-pangea/dnd";
-import { toast } from "@/hooks/use-toast";
-import { 
-  Eye, 
-  EyeOff, 
-  Copy, 
-  Trash2, 
-  MoveVertical,
-  Image,
-  Video 
+import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  CalendarIcon,
+  FileText,
+  User,
+  MapPin,
+  FileCode,
+  ScrollText,
+  Home
 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+
+const getStatusBadge = (status) => {
+  const statusMap = {
+    pending: { label: "Pendente", variant: "yellow" },
+    in_progress: { label: "Em Andamento", variant: "blue" },
+    completed: { label: "Concluída", variant: "green" },
+    canceled: { label: "Cancelada", variant: "red" },
+  };
+  return statusMap[status] || { label: status, variant: "gray" };
+};
 
 export default function InspectionDetailsDialog({ inspection, open, onClose }) {
-  const [rooms, setRooms] = useState(inspection.rooms || []);
-  const [selectedRoom, setSelectedRoom] = useState(null);
-  const [mediaUrls, setMediaUrls] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [rooms, setRooms] = useState([]);
+  const [projectDetails, setProjectDetails] = useState(null);
+  const [inspectorDetails, setInspectorDetails] = useState(null);
+  const [templateDetails, setTemplateDetails] = useState(null);
+  const { toast } = useToast();
 
   useEffect(() => {
-    if (inspection.completed) {
-      loadMediaUrls();
+    if (inspection?.id) {
+      fetchDetails();
     }
   }, [inspection]);
 
-  const loadMediaUrls = async () => {
-    const urls = {};
-    for (const room of inspection.rooms) {
-      for (const item of room.items) {
-        for (const detail of item.details) {
-          if (detail.media) {
-            for (const media of detail.media) {
-              urls[media.key] = await getS3Url(media.key);
-            }
-          }
-        }
-      }
-    }
-    setMediaUrls(urls);
-  };
-
-  const handleSaveChanges = async () => {
+  const fetchDetails = async () => {
+    setLoading(true);
     try {
-      await updateDoc(doc(db, "inspections", inspection.id), {
-        rooms,
-        updatedAt: new Date().toISOString()
-      });
-      toast({
-        title: "Sucesso",
-        description: "Alterações salvas com sucesso"
-      });
-      onClose();
+      // Fetch rooms
+      const { data: roomsData, error: roomsError } = await supabase
+        .from('rooms')
+        .select('*, room_items(*)')
+        .eq('inspection_id', inspection.id)
+        .order('position');
+      
+      if (roomsError) throw roomsError;
+      setRooms(roomsData || []);
+      
+      // Fetch project details
+      if (inspection.project_id) {
+        const { data: projectData, error: projectError } = await supabase
+          .from('projects')
+          .select('*, clients(*)')
+          .eq('id', inspection.project_id)
+          .single();
+        
+        if (projectError && projectError.code !== 'PGRST116') throw projectError;
+        setProjectDetails(projectData);
+      }
+      
+      // Fetch inspector details
+      if (inspection.inspector_id) {
+        const { data: inspectorData, error: inspectorError } = await supabase
+          .from('inspectors')
+          .select('*')
+          .eq('id', inspection.inspector_id)
+          .single();
+        
+        if (inspectorError && inspectorError.code !== 'PGRST116') throw inspectorError;
+        setInspectorDetails(inspectorData);
+      }
+      
+      // Fetch template details
+      if (inspection.template_id) {
+        const { data: templateData, error: templateError } = await supabase
+          .from('templates')
+          .select('*')
+          .eq('id', inspection.template_id)
+          .single();
+        
+        if (templateError && templateError.code !== 'PGRST116') throw templateError;
+        setTemplateDetails(templateData);
+      }
     } catch (error) {
-      console.error("Error saving changes:", error);
+      console.error("Error fetching inspection details:", error);
       toast({
-        title: "Erro",
-        description: "Erro ao salvar alterações",
+        title: "Erro ao carregar detalhes",
+        description: error.message,
         variant: "destructive"
       });
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleHideItem = (roomIndex, itemIndex) => {
-    const newRooms = [...rooms];
-    newRooms[roomIndex].items[itemIndex].hidden = 
-      !newRooms[roomIndex].items[itemIndex].hidden;
-    setRooms(newRooms);
-  };
+  if (loading) {
+    return (
+      <Dialog open={open} onOpenChange={onClose}>
+        <DialogContent className="max-w-4xl max-h-[90vh]">
+          <div className="flex justify-center items-center h-64">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
-  const handleDuplicateItem = (roomIndex, itemIndex) => {
-    const newRooms = [...rooms];
-    const itemToDuplicate = {...newRooms[roomIndex].items[itemIndex]};
-    newRooms[roomIndex].items.splice(itemIndex + 1, 0, itemToDuplicate);
-    setRooms(newRooms);
-  };
-
-  const handleRemoveItem = (roomIndex, itemIndex) => {
-    const newRooms = [...rooms];
-    newRooms[roomIndex].items.splice(itemIndex, 1);
-    setRooms(newRooms);
-  };
-
-  const handleDragEnd = (result) => {
-    if (!result.destination) return;
-
-    const { source, destination } = result;
-    const [sourceRoom, sourceItem] = source.droppableId.split('-');
-    const [destRoom, destItem] = destination.droppableId.split('-');
-
-    const newRooms = [...rooms];
-
-    // Mover item entre dependências
-    if (sourceRoom !== destRoom) {
-      const itemToMove = newRooms[sourceRoom].items[source.index];
-      newRooms[sourceRoom].items.splice(source.index, 1);
-      newRooms[destRoom].items.splice(destination.index, 0, itemToMove);
-    }
-    // Reordenar itens na mesma dependência
-    else {
-      const [removed] = newRooms[sourceRoom].items.splice(source.index, 1);
-      newRooms[sourceRoom].items.splice(destination.index, 0, removed);
-    }
-
-    setRooms(newRooms);
-  };
-
-  const handleEditResponse = (roomIndex, itemIndex, detailIndex, newValue) => {
-    const newRooms = [...rooms];
-    newRooms[roomIndex].items[itemIndex].details[detailIndex].response = newValue;
-    setRooms(newRooms);
-  };
+  const status = getStatusBadge(inspection.status);
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl h-[90vh]">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
         <DialogHeader>
-          <DialogTitle>Detalhes da Inspeção</DialogTitle>
+          <DialogTitle className="flex items-center justify-between">
+            <span>{inspection.title}</span>
+            <Badge variant={status.variant}>{status.label}</Badge>
+          </DialogTitle>
         </DialogHeader>
 
-        <div className="grid grid-cols-[300px,1fr] gap-4 h-full">
-          {/* Lista de Dependências */}
-          <div className="border-r pr-4">
-            <h3 className="font-semibold mb-4">Dependências</h3>
-            <div className="space-y-2">
-              {rooms.map((room, roomIndex) => (
-                <Button
-                  key={roomIndex}
-                  variant={selectedRoom === roomIndex ? "default" : "outline"}
-                  className="w-full justify-start"
-                  onClick={() => setSelectedRoom(roomIndex)}
-                >
-                  {room.name}
-                </Button>
-              ))}
-            </div>
-          </div>
-
-          {/* Detalhes da Dependência Selecionada */}
-          <div className="overflow-y-auto">
-            {selectedRoom !== null && (
-              <DragDropContext onDragEnd={handleDragEnd}>
-                <div className="space-y-4">
-                  <h2 className="text-2xl font-bold mb-4">
-                    {rooms[selectedRoom].name}
-                  </h2>
-
-                  {rooms[selectedRoom].items.map((item, itemIndex) => (
-                    <Droppable 
-                      key={`${selectedRoom}-${itemIndex}`}
-                      droppableId={`${selectedRoom}-${itemIndex}`}
-                    >
-                      {(provided) => (
-                        <Card
-                          ref={provided.innerRef}
-                          {...provided.droppableProps}
-                          className={item.hidden ? "opacity-50" : ""}
-                        >
-                          <CardHeader className="flex flex-row items-center justify-between">
-                            <CardTitle>{item.name}</CardTitle>
-                            <div className="flex gap-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleHideItem(selectedRoom, itemIndex)}
-                              >
-                                {item.hidden ? <Eye size={16} /> : <EyeOff size={16} />}
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleDuplicateItem(selectedRoom, itemIndex)}
-                              >
-                                <Copy size={16} />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleRemoveItem(selectedRoom, itemIndex)}
-                              >
-                                <Trash2 size={16} />
-                              </Button>
-                              <Button variant="ghost" size="sm">
-                                <MoveVertical size={16} />
-                              </Button>
-                            </div>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="space-y-4">
-                              {item.details.map((detail, detailIndex) => (
-                                <div key={detailIndex} className="space-y-2">
-                                  <h4 className="font-medium">{detail.name}</h4>
-                                  
-                                  {/* Respostas */}
-                                  {detail.type === "text" && (
-                                    <Input
-                                      value={detail.response || ""}
-                                      onChange={(e) => handleEditResponse(
-                                        selectedRoom,
-                                        itemIndex,
-                                        detailIndex,
-                                        e.target.value
-                                      )}
-                                    />
-                                  )}
-                                  
-                                  {detail.type === "select" && (
-                                    <Select
-                                      value={detail.response || ""}
-                                      onValueChange={(value) => handleEditResponse(
-                                        selectedRoom,
-                                        itemIndex,
-                                        detailIndex,
-                                        value
-                                      )}
-                                    >
-                                      <SelectTrigger>
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {detail.options.map((option) => (
-                                          <SelectItem key={option} value={option}>
-                                            {option}
-                                          </SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                  )}
-
-                                  {/* Mídia */}
-                                  {detail.media && (
-                                    <div className="grid grid-cols-4 gap-4">
-                                      {detail.media.map((media, mediaIndex) => (
-                                        <div key={mediaIndex} className="relative">
-                                          {media.type === "image" ? (
-                                            <img
-                                              src={mediaUrls[media.key]}
-                                              alt=""
-                                              className="w-full h-32 object-cover rounded-lg"
-                                            />
-                                          ) : (
-                                            <video
-                                              src={mediaUrls[media.key]}
-                                              controls
-                                              className="w-full h-32 object-cover rounded-lg"
-                                            />
-                                          )}
-                                          <Button
-                                            variant="destructive"
-                                            size="sm"
-                                            className="absolute top-2 right-2"
-                                            onClick={() => handleRemoveMedia(
-                                              selectedRoom,
-                                              itemIndex,
-                                              detailIndex,
-                                              mediaIndex
-                                            )}
-                                          >
-                                            <Trash2 size={12} />
-                                          </Button>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      )}
-                    </Droppable>
-                  ))}
-                </div>
-              </DragDropContext>
+        <Tabs defaultValue="overview" className="overflow-hidden h-[calc(100%-4rem)]">
+          <TabsList>
+            <TabsTrigger value="overview">Visão Geral</TabsTrigger>
+            <TabsTrigger value="rooms">
+              Dependências ({rooms.length})
+            </TabsTrigger>
+            {templateDetails && (
+              <TabsTrigger value="template">Template</TabsTrigger>
             )}
-          </div>
-        </div>
+          </TabsList>
 
-        <div className="flex justify-end gap-4 mt-4">
-          <Button variant="outline" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button onClick={handleSaveChanges}>
-            Salvar Alterações
-          </Button>
+          <TabsContent value="overview" className="overflow-auto h-full">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Detalhes da Inspeção</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {inspection.observation && (
+                    <div className="flex items-start gap-2">
+                      <FileText className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                      <div>
+                        <p className="font-medium">Observação</p>
+                        <p className="text-sm text-muted-foreground">{inspection.observation}</p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {inspection.scheduled_date && (
+                    <div className="flex items-center gap-2">
+                      <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <p className="font-medium">Data Agendada</p>
+                        <p className="text-sm text-muted-foreground">
+                          {format(new Date(inspection.scheduled_date), "PPP", { locale: ptBR })}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="flex items-center gap-2">
+                    <ScrollText className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="font-medium">Criado em</p>
+                      <p className="text-sm text-muted-foreground">
+                        {format(new Date(inspection.created_at), "PPP", { locale: ptBR })}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              {projectDetails && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Projeto</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-start gap-2">
+                      <FileCode className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                      <div>
+                        <p className="font-medium">Título</p>
+                        <p className="text-sm text-muted-foreground">{projectDetails.title}</p>
+                      </div>
+                    </div>
+                    
+                    {projectDetails.description && (
+                      <div className="flex items-start gap-2">
+                        <FileText className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                        <div>
+                          <p className="font-medium">Descrição</p>
+                          <p className="text-sm text-muted-foreground">{projectDetails.description}</p>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {projectDetails.clients && (
+                      <div className="flex items-center gap-2">
+                        <User className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <p className="font-medium">Cliente</p>
+                          <p className="text-sm text-muted-foreground">{projectDetails.clients.name}</p>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+              
+              {inspectorDetails && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Vistoriador</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <User className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <p className="font-medium">Nome</p>
+                        <p className="text-sm text-muted-foreground">
+                          {`${inspectorDetails.name} ${inspectorDetails.last_name || ''}`}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    {inspectorDetails.email && (
+                      <div className="flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground">
+                          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                          <polyline points="22,6 12,13 2,6"></polyline>
+                        </svg>
+                        <div>
+                          <p className="font-medium">Email</p>
+                          <p className="text-sm text-muted-foreground">{inspectorDetails.email}</p>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {inspectorDetails.phonenumber && (
+                      <div className="flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground">
+                          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                        </svg>
+                        <div>
+                          <p className="font-medium">Telefone</p>
+                          <p className="text-sm text-muted-foreground">{inspectorDetails.phonenumber}</p>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {(inspectorDetails.city || inspectorDetails.state) && (
+                      <div className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <p className="font-medium">Localização</p>
+                          <p className="text-sm text-muted-foreground">
+                            {[inspectorDetails.city, inspectorDetails.state].filter(Boolean).join(", ")}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+              
+              {templateDetails && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Template</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-start gap-2">
+                      <FileCode className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                      <div>
+                        <p className="font-medium">Título</p>
+                        <p className="text-sm text-muted-foreground">{templateDetails.title}</p>
+                      </div>
+                    </div>
+                    
+                    {templateDetails.description && (
+                      <div className="flex items-start gap-2">
+                        <FileText className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                        <div>
+                          <p className="font-medium">Descrição</p>
+                          <p className="text-sm text-muted-foreground">{templateDetails.description}</p>
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div className="flex items-center gap-2">
+                      <Home className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <p className="font-medium">Salas</p>
+                        <p className="text-sm text-muted-foreground">
+                          {templateDetails.rooms?.length || 0} salas definidas
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="rooms" className="overflow-auto h-full">
+            {rooms.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                Nenhuma dependência encontrada para esta inspeção.
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {rooms.map((room) => (
+                  <Card key={room.id}>
+                    <CardHeader>
+                      <CardTitle>{room.room_name}</CardTitle>
+                      {room.room_label && (
+                        <CardDescription>{room.room_label}</CardDescription>
+                      )}
+                    </CardHeader>
+                    <CardContent>
+                      {room.observation && (
+                        <div className="mb-4">
+                          <p className="font-medium">Observação</p>
+                          <p className="text-sm text-muted-foreground">{room.observation}</p>
+                        </div>
+                      )}
+                      
+                      {room.is_damaged && (
+                        <Badge variant="red" className="mb-4">Danificado</Badge>
+                      )}
+                      
+                      {room.room_items && room.room_items.length > 0 ? (
+                        <div>
+                          <h3 className="font-medium mb-2">Itens ({room.room_items.length})</h3>
+                          <div className="space-y-3">
+                            {room.room_items.map((item) => (
+                              <div key={item.id} className="border p-3 rounded-md">
+                                <p className="font-medium">{item.item_name}</p>
+                                {item.item_label && (
+                                  <p className="text-sm text-muted-foreground">{item.item_label}</p>
+                                )}
+                                {item.observation && (
+                                  <p className="text-sm mt-1">{item.observation}</p>
+                                )}
+                                {item.is_damaged && (
+                                  <Badge variant="red" className="mt-2">Danificado</Badge>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">Nenhum item nesta dependência.</p>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          {templateDetails && (
+            <TabsContent value="template" className="overflow-auto h-full">
+              <Card>
+                <CardHeader>
+                  <CardTitle>{templateDetails.title}</CardTitle>
+                  <CardDescription>{templateDetails.description}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {templateDetails.rooms && templateDetails.rooms.length > 0 ? (
+                    <div className="space-y-6">
+                      {templateDetails.rooms.map((room, index) => (
+                        <div key={index} className="border p-4 rounded-md">
+                          <h3 className="font-medium text-lg mb-2">{room.name}</h3>
+                          {room.description && (
+                            <p className="text-sm text-muted-foreground mb-4">{room.description}</p>
+                          )}
+                          
+                          {room.items && room.items.length > 0 ? (
+                            <div className="space-y-4">
+                              <h4 className="font-medium">Itens</h4>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {room.items.map((item, itemIndex) => (
+                                  <div key={itemIndex} className="border p-3 rounded-md">
+                                    <p className="font-medium">{item.name}</p>
+                                    {item.description && (
+                                      <p className="text-sm text-muted-foreground">{item.description}</p>
+                                    )}
+                                    
+                                    {item.details && item.details.length > 0 && (
+                                      <div className="mt-2">
+                                        <h5 className="text-sm font-medium">Detalhes</h5>
+                                        <ul className="text-xs mt-1 space-y-1">
+                                          {item.details.map((detail, detailIndex) => (
+                                            <li key={detailIndex}>
+                                              {detail.name}
+                                              {detail.required && <span className="text-red-500">*</span>}
+                                              {detail.type && <span className="text-muted-foreground ml-1">({detail.type})</span>}
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-sm text-muted-foreground">Nenhum item definido.</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground">Nenhuma dependência definida neste template.</p>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
+        </Tabs>
+        
+        <div className="flex justify-end mt-4">
+          <Button onClick={onClose}>Fechar</Button>
         </div>
       </DialogContent>
     </Dialog>

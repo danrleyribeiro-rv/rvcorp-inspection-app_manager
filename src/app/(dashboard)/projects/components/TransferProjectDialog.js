@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from "react";
 import { doc, updateDoc, getDocs, collection } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/supabase";
 import {
   Dialog,
   DialogContent,
