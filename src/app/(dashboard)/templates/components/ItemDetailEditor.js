@@ -15,7 +15,8 @@ const RESPONSE_TYPES = [
   { value: "number", label: "Número" },
   { value: "boolean", label: "Sim/Não" },
   { value: "image", label: "Imagem" },
-  { value: "video", label: "Vídeo" }
+  { value: "video", label: "Vídeo" },
+  { value: "measure", label: "Medida" }
 ];
 
 export default function ItemDetailEditor({ details = [], onChange }) {
