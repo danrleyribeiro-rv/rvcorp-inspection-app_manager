@@ -1,4 +1,3 @@
-
 // app/(dashboard)/inspections/components/InspectionCard.js
 "use client";
 
@@ -7,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Pencil, Eye, Calendar, User } from "lucide-react";
+import { Pencil, Eye, Calendar, User, Trash2 } from "lucide-react";
 
 const getStatusColor = (status) => {
   const statusColors = {
@@ -29,7 +28,7 @@ const getStatusText = (status) => {
   return statusMap[status] || status;
 };
 
-export default function InspectionCard({ inspection, onEdit, onView }) {
+export default function InspectionCard({ inspection, onEdit, onView, onDelete }) {
   return (
     <Card>
       <CardHeader>
@@ -66,9 +65,9 @@ export default function InspectionCard({ inspection, onEdit, onView }) {
             </div>
           )}
 
-          {inspection.clients && (
+          {inspection.projects && inspection.projects.clients && (
             <div className="text-sm text-muted-foreground">
-              Cliente: {inspection.clients.name}
+              Cliente: {inspection.projects.clients.name}
             </div>
           )}
 
@@ -80,6 +79,10 @@ export default function InspectionCard({ inspection, onEdit, onView }) {
             <Button variant="outline" size="sm" onClick={onEdit}>
               <Pencil className="h-4 w-4 mr-2" />
               Editar
+            </Button>
+            <Button variant="outline" size="sm" onClick={onDelete}>
+              <Trash2 className="h-4 w-4 mr-2 text-destructive" />
+              Excluir
             </Button>
           </div>
         </div>

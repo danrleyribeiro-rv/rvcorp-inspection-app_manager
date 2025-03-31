@@ -117,10 +117,30 @@ export default function InspectionDetailsDialog({ inspection, open, onClose }) {
     }
   };
 
+  const formatDateSafely = (dateString) => {
+    try {
+      if (!dateString) return "Data não definida";
+      const date = new Date(dateString);
+      
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        return "Data inválida";
+      }
+      
+      return format(date, "PPP", { locale: ptBR });
+    } catch (error) {
+      console.error("Error formatting date:", error, dateString);
+      return "Data inválida";
+    }
+  };
+
   if (loading) {
     return (
       <Dialog open={open} onOpenChange={onClose}>
         <DialogContent className="max-w-4xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle>Carregando detalhes...</DialogTitle>
+          </DialogHeader>
           <div className="flex justify-center items-center h-64">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>
@@ -175,7 +195,8 @@ export default function InspectionDetailsDialog({ inspection, open, onClose }) {
                       <div>
                         <p className="font-medium">Data Agendada</p>
                         <p className="text-sm text-muted-foreground">
-                          {format(new Date(inspection.scheduled_date), "PPP", { locale: ptBR })}
+                          {formatDateSafely(inspection.scheduled_date)
+                          }
                         </p>
                       </div>
                     </div>
@@ -186,7 +207,8 @@ export default function InspectionDetailsDialog({ inspection, open, onClose }) {
                     <div>
                       <p className="font-medium">Criado em</p>
                       <p className="text-sm text-muted-foreground">
-                        {format(new Date(inspection.created_at), "PPP", { locale: ptBR })}
+                        {formatDateSafely(inspection.created_at)
+                        }
                       </p>
                     </div>
                   </div>

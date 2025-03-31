@@ -1,4 +1,3 @@
-
 // app/(dashboard)/inspections/components/EditInspectionDialog.js
 "use client";
 
@@ -25,7 +24,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function EditInspectionDialog({ inspection, open, onClose, onSuccess }) {
@@ -37,8 +36,8 @@ export default function EditInspectionDialog({ inspection, open, onClose, onSucc
     title: inspection.title || "",
     observation: inspection.observation || "",
     project_id: inspection.project_id || "",
-    template_id: inspection.template_id || "",
-    inspector_id: inspection.inspector_id || "",
+    template_id: inspection.template_id || null,
+    inspector_id: inspection.inspector_id || null,
     status: inspection.status || "pending",
     scheduled_date: inspection.scheduled_date ? new Date(inspection.scheduled_date) : null
   });
@@ -197,14 +196,14 @@ export default function EditInspectionDialog({ inspection, open, onClose, onSucc
           <div className="space-y-2">
             <Label>Template (opcional)</Label>
             <Select
-              value={formData.template_id}
-              onValueChange={(value) => setFormData({ ...formData, template_id: value })}
+              value={formData.template_id || "none"}
+              onValueChange={(value) => setFormData({ ...formData, template_id: value === "none" ? null : value })}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Selecione um template" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Nenhum template</SelectItem>
+                <SelectItem value="none">Nenhum template</SelectItem>
                 {templates.map((template) => (
                   <SelectItem key={template.id} value={template.id}>
                     {template.title}
@@ -213,19 +212,18 @@ export default function EditInspectionDialog({ inspection, open, onClose, onSucc
               </SelectContent>
             </Select>
           </div>
-
           {/* Inspector Selection */}
           <div className="space-y-2">
             <Label>Vistoriador (opcional)</Label>
             <Select
-              value={formData.inspector_id}
-              onValueChange={(value) => setFormData({ ...formData, inspector_id: value })}
+              value={formData.inspector_id || "none"}
+              onValueChange={(value) => setFormData({ ...formData, inspector_id: value === "none" ? null : value })}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Selecione um vistoriador" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Nenhum vistoriador</SelectItem>
+                <SelectItem value="none">Nenhum vistoriador</SelectItem>
                 {inspectors.map((inspector) => (
                   <SelectItem key={inspector.id} value={inspector.id}>
                     {`${inspector.name} ${inspector.last_name || ''}`}
@@ -288,10 +286,11 @@ export default function EditInspectionDialog({ inspection, open, onClose, onSucc
           </div>
 
           <div className="flex justify-end gap-4 pt-4">
-            <Button type="button" variant="outline" onClick={onClose}>
+            <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
               Cancelar
             </Button>
             <Button type="submit" disabled={loading}>
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               {loading ? "Salvando..." : "Salvar Alterações"}
             </Button>
           </div>

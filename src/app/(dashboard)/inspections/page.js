@@ -13,6 +13,7 @@ import InspectionCard from "./components/InspectionCard";
 import CreateInspectionDialog from "./components/CreateInspectionDialog";
 import EditInspectionDialog from "./components/EditInspectionDialog";
 import InspectionDetailsDialog from "./components/InspectionDetailsDialog";
+import DeleteInspectionDialog from "./components/DeleteInspectionDialog";
 import FilterPanel from "./components/FilterPanel";
 
 export default function InspectionsPage() {
@@ -21,6 +22,7 @@ export default function InspectionsPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [editingInspection, setEditingInspection] = useState(null);
   const [viewingInspection, setViewingInspection] = useState(null);
+  const [deletingInspection, setDeletingInspection] = useState(null);
   const [filterState, setFilterState] = useState({
     status: "all",
     project: "all",
@@ -84,7 +86,7 @@ export default function InspectionsPage() {
         (inspection.title?.toLowerCase().includes(search.toLowerCase()) ||
          inspection.projects?.title?.toLowerCase().includes(search.toLowerCase()) ||
          inspection.inspectors?.name?.toLowerCase().includes(search.toLowerCase()) ||
-         inspection.clients?.name?.toLowerCase().includes(search.toLowerCase()));
+         inspection.projects?.clients?.name?.toLowerCase().includes(search.toLowerCase()));
 
       // Status filter
       const matchesStatus = filterState.status === "all" || inspection.status === filterState.status;
@@ -162,6 +164,7 @@ export default function InspectionsPage() {
               inspection={inspection}
               onEdit={() => setEditingInspection(inspection)}
               onView={() => setViewingInspection(inspection)}
+              onDelete={() => setDeletingInspection(inspection)}
             />
           ))}
         </div>
@@ -190,6 +193,15 @@ export default function InspectionsPage() {
           inspection={viewingInspection}
           open={!!viewingInspection}
           onClose={() => setViewingInspection(null)}
+        />
+      )}
+
+      {deletingInspection && (
+        <DeleteInspectionDialog
+          inspection={deletingInspection}
+          open={!!deletingInspection}
+          onClose={() => setDeletingInspection(null)}
+          onDelete={fetchInspections}
         />
       )}
     </div>

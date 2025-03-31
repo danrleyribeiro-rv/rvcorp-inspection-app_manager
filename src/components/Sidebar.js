@@ -24,13 +24,10 @@ import Image from "next/image";
 
 const menuItems = [
   { href: "/projects", label: "Projetos", icon: LayoutDashboard },
-  { href: "/orders", label: "Pedidos", icon: ClipboardList },
   { href: "/inspections", label: "Inspeções", icon: Search },
-  { href: "/inspectors", label: "Vistoriadores", icon: Users },
   { href: "/templates", label: "Templates", icon: CircleDot },
-  { href: "/chats", label: "Chats", icon: MessageSquare },
-  { href: "/reports", label: "Relatórios", icon: FileText },
-  { href: "/clients", label: "Clientes", icon: Users }, // ADD THIS
+  { href: "/inspectors", label: "Vistoriadores", icon: Users },
+  { href: "/clients", label: "Clientes", icon: Users }, 
   { href: "/settings", label: "Configurações", icon: Settings },
 ];
 

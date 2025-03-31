@@ -35,19 +35,22 @@ export default function CreateInspectionDialog({ open, onClose, onSuccess, manag
   const [formData, setFormData] = useState({
     title: "",
     observation: "",
-    project_id: "",
-    template_id: null,  // Initialize to null
-    inspector_id: null, // Initialize to null
+    project_id: "", // Required, so initialize as empty string OK
+    template_id: null,  // Optional, initialize to null
+    inspector_id: null, // Optional, initialize to null
     status: "pending",
     scheduled_date: null
   });
   const { toast } = useToast();
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (managerId) {
+        fetchData();
+    }
+  }, [managerId]);
 
   const fetchData = async () => {
+    // --- Fetch data logic (keep as is) ---
     try {
       // Fetch projects managed by this manager
       const { data: projectsData, error: projectsError } = await supabase
@@ -87,49 +90,191 @@ export default function CreateInspectionDialog({ open, onClose, onSuccess, manag
     }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
+  const createInspectionHierarchy = async (inspectionId, templateId) => {
+      try {
+        console.log(`Starting hierarchy creation for inspection ${inspectionId} using template ${templateId}`);
+        const { data: template, error: templateFetchError } = await supabase
+          .from('templates')
+          .select('*')
+          .eq('id', templateId)
+          .single();
 
-    try {
-      // Basic validation
-      if (!formData.project_id || !formData.title) {
-        throw new Error("Preencha os campos obrigatórios");
+        if (templateFetchError) {
+            console.error("Error fetching template:", templateFetchError);
+            throw new Error(`Failed to fetch template details: ${templateFetchError.message}`);
+        }
+        if (!template) {
+            throw new Error(`Template with ID ${templateId} not found.`);
+        }
+
+        if (!template.rooms || !Array.isArray(template.rooms)) {
+          console.warn(`Template ${templateId} has no rooms array or it's not an array. Skipping hierarchy creation.`);
+          return true;
+        }
+         if (template.rooms.length === 0) {
+          console.log(`Template ${templateId} has 0 rooms. Skipping hierarchy creation.`);
+          return true; 
+        }
+
+        console.log(`Template ${templateId} has ${template.rooms.length} rooms.`);
+
+        for (let i = 0; i < template.rooms.length; i++) {
+          const room = template.rooms[i];
+          const roomPosition = i + 1; // Use 1-based index for room_id
+
+          // 1. Create room
+          console.log(`Attempting to create room ${roomPosition}: ${room.name}`);
+          const { error: roomError } = await supabase
+            .from('rooms')
+            .insert({
+              inspection_id: inspectionId,
+              room_id: roomPosition, // Logical ID based on position
+              room_name: room.name || `Room ${roomPosition}`,
+              position: roomPosition
+            });
+
+          if (roomError) {
+              console.error(`Error creating room ${roomPosition} (${room.name}):`, roomError);
+              throw new Error(`Failed to create room ${roomPosition}: ${roomError.message}`);
+          }
+          console.log(`Successfully created room ${roomPosition}: ${room.name}`);
+
+          // 2. Create items for this room
+          if (room.items && Array.isArray(room.items) && room.items.length > 0) {
+            console.log(`Room ${roomPosition} has ${room.items.length} items.`);
+            for (let j = 0; j < room.items.length; j++) {
+              const item = room.items[j];
+              const itemPosition = j + 1; // Use 1-based index for item_id
+
+              // 2a. Create room_item
+              console.log(`Attempting to create item ${itemPosition}: ${item.name} in room ${roomPosition}`);
+              const { error: itemError } = await supabase
+                .from('room_items')
+                .insert({
+                  inspection_id: inspectionId,
+                  room_id: roomPosition, // Logical ID from parent room
+                  item_id: itemPosition, // Logical ID based on position
+                  item_name: item.name || `Item ${itemPosition}`,
+                  position: itemPosition
+                });
+
+              if (itemError) {
+                  console.error(`Error creating item ${itemPosition} (${item.name}) in room ${roomPosition}:`, itemError);
+                  throw new Error(`Failed to create item ${itemPosition}: ${itemError.message}`);
+              }
+              console.log(`Successfully created item ${itemPosition}: ${item.name} in room ${roomPosition}`);
+
+            // 3. Create details for this item
+            if (item.details && Array.isArray(item.details) && item.details.length > 0) {
+               console.log(`Item ${itemPosition} has ${item.details.length} details.`);
+              for (let k = 0; k < item.details.length; k++) {
+                const detail = item.details[k];
+                const detailPosition = k + 1; // Use 1-based index for detail_id
+
+                // 3a. Create item_detail
+                console.log(`Attempting to create detail ${detailPosition}: ${detail.name} for item ${itemPosition}`);
+                const { error: detailError } = await supabase
+                  .from('item_details')
+                  .insert({
+                    inspection_id: inspectionId,
+                    room_id: roomPosition,
+                    room_item_id: itemPosition, 
+                    detail_id: detailPosition,  
+                    detail_name: detail.name || `Detail ${detailPosition}`,
+                    position: detailPosition,
+                  });
+
+                if (detailError) {
+                  // Log the specific error and continue
+                  console.error(`Error creating detail ${detailPosition} (${detail.name}) for item ${itemPosition} in room ${roomPosition}:`, detailError);
+                   continue;
+                }
+                console.log(`Successfully created detail ${detailPosition}: ${detail.name}`);
+              }
+            } else {
+                 console.log(`Item ${itemPosition} has no details.`);
+            }
+            }
+          } else {
+              console.log(`Room ${roomPosition} has no items.`);
+          }
+        }
+
+        console.log(`Successfully created complete inspection hierarchy for inspection ${inspectionId}`);
+        return true;
+
+      } catch (error) {
+        console.error("Error creating inspection structure:", error);
+        throw error;
+      }
+  };
+
+  const handleSubmit = async (e) => {
+      // --- Submit logic (keep as is from previous correction) ---
+      e.preventDefault();
+      setLoading(true);
+
+      if (!managerId) {
+          toast({
+            title: "Erro interno",
+            description: "ID do gestor não encontrado. Recarregue a página.",
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
       }
 
-      // Create inspection
-      const { data, error } = await supabase
-        .from('inspections')
-        .insert({
+      try {
+        if (!formData.project_id || !formData.title) {
+          throw new Error("Título da Inspeção e Projeto são obrigatórios.");
+        }
+
+        const inspectionData = {
           title: formData.title,
-          observation: formData.observation,
+          observation: formData.observation || null,
           project_id: formData.project_id,
-          template_id: formData.template_id, // No need for || null
-          inspector_id: formData.inspector_id, // No need for || null
+          template_id: formData.template_id || null,
+          inspector_id: formData.inspector_id || null,
           status: formData.status,
-          scheduled_date: formData.scheduled_date,
-          created_at: new Date()
-        })
-        .select();
+          scheduled_date: formData.scheduled_date || null,
+        };
 
-      if (error) throw error;
+        const { data: inspectionResult, error: inspectionError } = await supabase
+          .from('inspections')
+          .insert(inspectionData)
+          .select()
+          .single();
 
-      toast({
-        title: "Inspeção criada com sucesso"
-      });
+        if (inspectionError) throw inspectionError;
+        if (!inspectionResult) throw new Error("Falha ao criar a inspeção, nenhum dado retornado.");
 
-      onSuccess();
-      onClose();
-    } catch (error) {
-      console.error("Error creating inspection:", error);
-      toast({
-        title: "Erro ao criar inspeção",
-        description: error.message,
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
+        const newInspectionId = inspectionResult.id;
+        console.log(`Inspection ${newInspectionId} created successfully.`);
+
+        if (formData.template_id) {
+          console.log(`Template selected (${formData.template_id}). Creating hierarchy...`);
+          await createInspectionHierarchy(newInspectionId, formData.template_id);
+          console.log(`Hierarchy creation process finished for inspection ${newInspectionId}.`);
+        } else {
+           console.log(`No template selected for inspection ${newInspectionId}. Skipping hierarchy creation.`);
+        }
+
+        toast({
+          title: "Inspeção criada com sucesso"
+        });
+
+        onSuccess();
+        onClose();
+      } catch (error) {
+        console.error("Error during inspection creation process:", error);
+        toast({
+          title: "Erro ao criar inspeção",
+          description: error.message || "Ocorreu um erro inesperado.",
+          variant: "destructive"
+        });
+      } finally {
+        setLoading(false);
+      }
   };
 
   return (
@@ -140,10 +285,11 @@ export default function CreateInspectionDialog({ open, onClose, onSuccess, manag
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Basic Information */}
+          {/* Title */}
           <div className="space-y-2">
-            <Label>Título da Inspeção</Label>
+            <Label htmlFor="title">Título da Inspeção <span className="text-red-500">*</span></Label>
             <Input
+              id="title"
               value={formData.title}
               onChange={e => setFormData({ ...formData, title: e.target.value })}
               placeholder="Ex: Inspeção Apartamento 101"
@@ -151,9 +297,11 @@ export default function CreateInspectionDialog({ open, onClose, onSuccess, manag
             />
           </div>
 
+          {/* Observation */}
           <div className="space-y-2">
-            <Label>Observações</Label>
+            <Label htmlFor="observation">Observações</Label>
             <Textarea
+              id="observation"
               value={formData.observation}
               onChange={e => setFormData({ ...formData, observation: e.target.value })}
               placeholder="Observações adicionais sobre a inspeção"
@@ -162,18 +310,21 @@ export default function CreateInspectionDialog({ open, onClose, onSuccess, manag
 
           {/* Project Selection */}
           <div className="space-y-2">
-            <Label>Projeto</Label>
+            <Label htmlFor="project">Projeto <span className="text-red-500">*</span></Label>
             <Select
-              value={formData.project_id}
+              value={formData.project_id} // Project ID is required, so binding to "" is fine initially
               onValueChange={(value) => setFormData({ ...formData, project_id: value })}
               required
             >
-              <SelectTrigger>
+              <SelectTrigger id="project">
+                {/* Placeholder shows when value is "" */}
                 <SelectValue placeholder="Selecione um projeto" />
               </SelectTrigger>
               <SelectContent>
+                {projects.length === 0 && <SelectItem value="loading" disabled>Carregando...</SelectItem>} {/* Optional: Loading state */}
                 {projects.map((project) => (
-                  <SelectItem key={project.id} value={project.id}>
+                  // Ensure value is never "" here
+                  <SelectItem key={project.id} value={project.id.toString()}>
                     {project.title}
                   </SelectItem>
                 ))}
@@ -183,18 +334,19 @@ export default function CreateInspectionDialog({ open, onClose, onSuccess, manag
 
           {/* Template Selection */}
           <div className="space-y-2">
-            <Label>Template (opcional)</Label>
+            <Label htmlFor="template">Template (opcional)</Label>
             <Select
-                value={formData.template_id}
-                onValueChange={(value) => setFormData({ ...formData, template_id: value })}
+
+                value={formData.template_id?.toString() ?? ""}
+
+                onValueChange={(value) => setFormData({ ...formData, template_id: value ? parseInt(value) : null })}
             >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione um template" />
+              <SelectTrigger id="template">
+                <SelectValue placeholder="Nenhum template" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={null}>Nenhum template</SelectItem>
                 {templates.map((template) => (
-                  <SelectItem key={template.id} value={template.id}>
+                  <SelectItem key={template.id} value={template.id.toString()}>
                     {template.title}
                   </SelectItem>
                 ))}
@@ -204,19 +356,24 @@ export default function CreateInspectionDialog({ open, onClose, onSuccess, manag
 
           {/* Inspector Selection */}
           <div className="space-y-2">
-            <Label>Vistoriador (opcional)</Label>
+            <Label htmlFor="inspector">Vistoriador (opcional)</Label>
             <Select
-                value={formData.inspector_id}
-                onValueChange={(value) => setFormData({ ...formData, inspector_id: value })}
+                // If inspector_id is null/undefined, value becomes "", showing the placeholder
+                value={formData.inspector_id?.toString() ?? ""}
+                 // If user selects an item, value is its string ID -> parse to int
+                // If user conceptually clears, value might become "" -> set to null
+                onValueChange={(value) => setFormData({ ...formData, inspector_id: value ? parseInt(value) : null })}
             >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione um vistoriador" />
+              <SelectTrigger id="inspector">
+                 {/* Placeholder shows when value is "" (i.e., inspector_id is null) */}
+                <SelectValue placeholder="Nenhum vistoriador" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={null}>Nenhum vistoriador</SelectItem>
+                {/* REMOVED: <SelectItem value="">Nenhum vistoriador</SelectItem> */}
                 {inspectors.map((inspector) => (
-                  <SelectItem key={inspector.id} value={inspector.id}>
-                    {`${inspector.name} ${inspector.last_name || ''}`}
+                  // Ensure value is never "" here
+                  <SelectItem key={inspector.id} value={inspector.id.toString()}>
+                    {`${inspector.name} ${inspector.last_name || ''}`.trim()}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -225,12 +382,12 @@ export default function CreateInspectionDialog({ open, onClose, onSuccess, manag
 
           {/* Status */}
           <div className="space-y-2">
-            <Label>Status</Label>
+            <Label htmlFor="status">Status</Label>
             <Select
               value={formData.status}
               onValueChange={(value) => setFormData({ ...formData, status: value })}
             >
-              <SelectTrigger>
+              <SelectTrigger id="status">
                 <SelectValue placeholder="Selecione o status" />
               </SelectTrigger>
               <SelectContent>
@@ -255,7 +412,7 @@ export default function CreateInspectionDialog({ open, onClose, onSuccess, manag
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   {formData.scheduled_date ? (
-                    format(formData.scheduled_date, "PPP", { locale: ptBR })
+                    format(new Date(formData.scheduled_date), "PPP", { locale: ptBR })
                   ) : (
                     <span>Selecione uma data</span>
                   )}
@@ -264,9 +421,9 @@ export default function CreateInspectionDialog({ open, onClose, onSuccess, manag
               <PopoverContent className="w-auto p-0">
                 <Calendar
                   mode="single"
-                  selected={formData.scheduled_date}
+                  selected={formData.scheduled_date ? new Date(formData.scheduled_date) : undefined}
                   onSelect={(date) =>
-                    setFormData({ ...formData, scheduled_date: date })
+                    setFormData({ ...formData, scheduled_date: date ? date.toISOString() : null })
                   }
                   initialFocus
                   locale={ptBR}
@@ -276,10 +433,10 @@ export default function CreateInspectionDialog({ open, onClose, onSuccess, manag
           </div>
 
           <div className="flex justify-end gap-4 pt-4">
-            <Button type="button" variant="outline" onClick={onClose}>
+            <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={loading}>
+            <Button type="submit" disabled={loading || !formData.project_id || !formData.title}>
               {loading ? "Criando..." : "Criar Inspeção"}
             </Button>
           </div>
