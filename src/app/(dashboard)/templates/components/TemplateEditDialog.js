@@ -24,11 +24,10 @@ import {
   Store,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import TemplateCreationDialog from "./components/TemplateCreationDialog";
-import TemplateEditDialog from "./components/TemplateEditDialog";
-import ImportTemplateDialog from "./components/ImportTemplateDialog";
-import ExportTemplateDialog from "./components/ExportTemplateDialog";
-import DeleteTemplateDialog from "./components/DeleteTemplateDialog";
+import TemplateCreationDialog from "./TemplateCreationDialog";
+import ImportTemplateDialog from "./ImportTemplateDialog";
+import ExportTemplateDialog from "./ExportTemplateDialog";
+import DeleteTemplateDialog from "./DeleteTemplateDialog";
 
 const iconComponents = {
   'pencil-ruler': PencilRuler,

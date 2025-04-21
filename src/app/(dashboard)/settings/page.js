@@ -1,9 +1,9 @@
-// app/(dashboard)/settings/page.js
+// src/app/(dashboard)/settings/page.js
 "use client";
 
 import { useState, useEffect } from "react";
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from "firebase/firestore";
-import { db, auth } from "@/lib/firebase";
+import { db, auth, storage } from "@/lib/firebase";
 import { updatePassword } from "firebase/auth";
 import { useTheme } from "next-themes";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import ProfileSection from "./components/ProfileSection";
 
 const defaultSettings = {
   notifications: {
@@ -46,11 +47,6 @@ const defaultSettings = {
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState(defaultSettings);
-  const [profile, setProfile] = useState({
-    name: "",
-    surname: "",
-    email: ""
-  });
   const [password, setPassword] = useState({
     current: "",
     new: "",
@@ -58,7 +54,6 @@ export default function SettingsPage() {
   });
   const [loading, setLoading] = useState({
     settings: true,
-    profile: false,
     password: false
   });
   const { theme, setTheme } = useTheme();
@@ -68,7 +63,6 @@ export default function SettingsPage() {
   useEffect(() => {
     if (user) {
       loadSettings();
-      loadProfile();
     }
   }, [user]);
 
@@ -106,31 +100,6 @@ export default function SettingsPage() {
       });
     } finally {
       setLoading(prev => ({ ...prev, settings: false }));
-    }
-  };
-
-  const loadProfile = async () => {
-    try {
-      if (!user?.uid) return;
-      
-      const managerRef = doc(db, 'managers', user.uid);
-      const managerDoc = await getDoc(managerRef);
-      
-      if (managerDoc.exists()) {
-        const data = managerDoc.data();
-        setProfile({
-          name: data.name || "",
-          surname: data.surname || "",
-          email: user.email || data.email || ""
-        });
-      }
-    } catch (error) {
-      console.error("Error loading profile:", error);
-      toast({
-        title: "Erro",
-        description: "Falha ao carregar informações do perfil",
-        variant: "destructive",
-      });
     }
   };
 
@@ -208,37 +177,6 @@ export default function SettingsPage() {
     };
     setSettings(newSettings);
     saveSettings(newSettings);
-  };
-
-  const handleUpdateProfile = async (e) => {
-    e.preventDefault();
-    setLoading(prev => ({ ...prev, profile: true }));
-
-    try {
-      if (!user?.uid) return;
-      
-      const managerRef = doc(db, 'managers', user.uid);
-      
-      await updateDoc(managerRef, {
-        name: profile.name,
-        surname: profile.surname,
-        updated_at: serverTimestamp()
-      });
-
-      toast({
-        title: "Sucesso",
-        description: "Perfil atualizado com sucesso",
-      });
-    } catch (error) {
-      console.error("Error updating profile:", error);
-      toast({
-        title: "Erro",
-        description: "Falha ao atualizar perfil",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(prev => ({ ...prev, profile: false }));
-    }
   };
 
   const handleChangePassword = async (e) => {
@@ -344,53 +282,7 @@ export default function SettingsPage() {
         </TabsList>
 
         <TabsContent value="profile">
-          <Card>
-            <CardHeader>
-              <CardTitle>Informações do Perfil</CardTitle>
-              <CardDescription>
-                Atualize suas informações pessoais
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleUpdateProfile} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Nome</Label>
-                    <Input
-                      id="name"
-                      value={profile.name}
-                      onChange={(e) => setProfile({ ...profile, name: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="surname">Sobrenome</Label>
-                    <Input
-                      id="surname"
-                      value={profile.surname}
-                      onChange={(e) => setProfile({ ...profile, surname: e.target.value })}
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={profile.email}
-                    disabled
-                  />
-                  <p className="text-xs text-muted-foreground">O email não pode ser alterado.</p>
-                </div>
-                <div className="flex justify-end">
-                  <Button type="submit" disabled={loading.profile}>
-                    {loading.profile ? "Salvando..." : "Salvar Alterações"}
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
+          <ProfileSection />
         </TabsContent>
 
         <TabsContent value="notifications">
@@ -540,6 +432,7 @@ export default function SettingsPage() {
                     value={password.current}
                     onChange={(e) => setPassword({ ...password, current: e.target.value })}
                     required
+                    disabled={loading.password}
                   />
                 </div>
 
@@ -551,6 +444,7 @@ export default function SettingsPage() {
                     value={password.new}
                     onChange={(e) => setPassword({ ...password, new: e.target.value })}
                     required
+                    disabled={loading.password}
                   />
                 </div>
 
@@ -562,6 +456,7 @@ export default function SettingsPage() {
                     value={password.confirm}
                     onChange={(e) => setPassword({ ...password, confirm: e.target.value })}
                     required
+                    disabled={loading.password}
                   />
                 </div>
 

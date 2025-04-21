@@ -373,7 +373,7 @@ export default function CreateInspectionDialog({ open, onClose, onSuccess, manag
               <SelectContent>
                 {inspectors.map((inspector) => (
                   <SelectItem key={inspector.id} value={inspector.id.toString()}>
-                    {`${inspector.name} ${inspector.last_name || ''}'.trim()`}
+                    {`${inspector.name} ${inspector.last_name || ''}`.trim()}
                   </SelectItem>
                 ))}
               </SelectContent>

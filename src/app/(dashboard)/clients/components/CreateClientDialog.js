@@ -16,9 +16,18 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
+
+const SEGMENT_OPTIONS = [
+    "Redes de Varejo",
+    "Inspeção de Obras",
+    "Hotelaria", 
+    "Avulso",
+    "Outro"
+];
 
 export default function CreateClientDialog({ open, onClose, onSuccess }) {
     const [formData, setFormData] = useState({
@@ -29,10 +38,16 @@ export default function CreateClientDialog({ open, onClose, onSuccess }) {
         responsible_name: "",
         responsible_surname: "",
         address: "",
+        street: "",
+        neighborhood: "",
+        city: "",
+        state: "",
+        cep: "",
         phonenumber: "",
         segment: "",
     });
     const [loading, setLoading] = useState(false);
+    const [cepLoading, setCepLoading] = useState(false);
     const { toast } = useToast();
     const { user } = useAuth();
 
@@ -41,28 +56,68 @@ export default function CreateClientDialog({ open, onClose, onSuccess }) {
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
+    const handleCepBlur = async () => {
+        const cep = formData.cep.replace(/\D/g, '');
+        if (cep.length !== 8) return;
+        
+        setCepLoading(true);
+        try {
+            const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+            if (!response.ok) {
+                throw new Error('Erro ao consultar CEP');
+            }
+            
+            const data = await response.json();
+            
+            if (!data.erro) {
+                setFormData(prev => ({
+                    ...prev,
+                    street: data.logradouro || prev.street,
+                    neighborhood: data.bairro || prev.neighborhood,
+                    city: data.localidade || prev.city,
+                    state: data.uf || prev.state
+                }));
+            } else {
+                toast({
+                    title: "CEP não encontrado",
+                    description: "O CEP informado não foi encontrado",
+                    variant: "destructive",
+                });
+            }
+        } catch (error) {
+            console.error("Erro ao buscar CEP:", error);
+            toast({
+                title: "Erro",
+                description: "Não foi possível consultar o CEP",
+                variant: "destructive",
+            });
+        } finally {
+            setCepLoading(false);
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
 
         try {
-            // Basic validation
+            // Validação básica
             if (!formData.name || !formData.email || !formData.password) {
-                throw new Error("Name, email and password are required fields");
+                throw new Error("Nome, email e senha são campos obrigatórios");
             }
 
             if (formData.password.length < 6) {
-                throw new Error("Password must be at least 6 characters long");
+                throw new Error("A senha deve ter pelo menos 6 caracteres");
             }
 
-            // 1. Create user in Firebase Authentication
+            // 1. Criar usuário no Firebase Authentication
             const userCredential = await createUserWithEmailAndPassword(
                 auth,
                 formData.email,
                 formData.password
             );
             
-            // 2. Create client document in Firestore
+            // 2. Criar documento do cliente no Firestore
             const clientData = {
                 user_id: userCredential.user.uid,
                 name: formData.name,
@@ -71,6 +126,11 @@ export default function CreateClientDialog({ open, onClose, onSuccess }) {
                 responsible_name: formData.responsible_name || null,
                 responsible_surname: formData.responsible_surname || null,
                 address: formData.address || null,
+                cep: formData.cep || null,
+                street: formData.street || null,
+                neighborhood: formData.neighborhood || null,
+                city: formData.city || null,
+                state: formData.state || null,
                 phonenumber: formData.phonenumber || null,
                 segment: formData.segment || null,
                 manager_id: user.uid,
@@ -81,39 +141,52 @@ export default function CreateClientDialog({ open, onClose, onSuccess }) {
             
             await addDoc(collection(db, 'clients'), clientData);
 
+            // 3. Criar documento na coleção 'users'
+            const userData = {
+                email: formData.email,
+                role: "client",
+                created_at: serverTimestamp(),
+                updated_at: serverTimestamp()
+            };
+
+            await addDoc(collection(db, 'users'), {
+                ...userData,
+                user_id: userCredential.user.uid
+            });
+
             toast({
-                title: "Success",
-                description: "Client created successfully!",
+                title: "Sucesso",
+                description: "Cliente criado com sucesso!",
             });
             
             onSuccess();
             onClose();
         } catch (error) {
-            console.error("Error creating client:", error);
+            console.error("Erro ao criar cliente:", error);
             
-            // Handle specific Firebase auth errors
+            // Tratamento de erros específicos do Firebase Auth
             if (error.code === 'auth/email-already-in-use') {
                 toast({
-                    title: "Error",
-                    description: "This email is already registered. Please use a different email.",
+                    title: "Erro",
+                    description: "Este email já está registrado. Por favor, use um email diferente.",
                     variant: "destructive",
                 });
             } else if (error.code === 'auth/invalid-email') {
                 toast({
-                    title: "Error",
-                    description: "Please provide a valid email address.",
+                    title: "Erro",
+                    description: "Por favor, forneça um endereço de email válido.",
                     variant: "destructive",
                 });
             } else if (error.code === 'auth/weak-password') {
                 toast({
-                    title: "Error",
-                    description: "Password is too weak. Please use a stronger password.",
+                    title: "Erro",
+                    description: "Senha muito fraca. Por favor, use uma senha mais forte.",
                     variant: "destructive",
                 });
             } else {
                 toast({
-                    title: "Error",
-                    description: error.message || "Failed to create client.",
+                    title: "Erro",
+                    description: error.message || "Falha ao criar cliente.",
                     variant: "destructive",
                 });
             }
@@ -126,15 +199,16 @@ export default function CreateClientDialog({ open, onClose, onSuccess }) {
         <Dialog open={open} onOpenChange={onClose}>
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
-                    <DialogTitle>Create New Client</DialogTitle>
+                    <DialogTitle>Novo Cliente</DialogTitle>
                     <DialogDescription>
-                        Add a new client to your dashboard.
+                        Adicione um novo cliente ao seu painel.
                     </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
+                    {/* Informações básicas */}
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <Label htmlFor="name">Name*</Label>
+                            <Label htmlFor="name">Nome*</Label>
                             <Input
                                 id="name"
                                 name="name"
@@ -156,7 +230,7 @@ export default function CreateClientDialog({ open, onClose, onSuccess }) {
                         </div>
                     </div>
                     <div>
-                        <Label htmlFor="password">Password*</Label>
+                        <Label htmlFor="password">Senha*</Label>
                         <Input
                             type="password"
                             id="password"
@@ -166,11 +240,11 @@ export default function CreateClientDialog({ open, onClose, onSuccess }) {
                             required
                         />
                         <p className="text-xs text-muted-foreground mt-1">
-                            Password must be at least 6 characters long.
+                            A senha deve ter pelo menos 6 caracteres.
                         </p>
                     </div>
                     <div>
-                        <Label htmlFor="document">Document</Label>
+                        <Label htmlFor="document">Documento (CPF/CNPJ)</Label>
                         <Input
                             id="document"
                             name="document"
@@ -180,7 +254,7 @@ export default function CreateClientDialog({ open, onClose, onSuccess }) {
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <Label htmlFor="responsible_name">Responsible Name</Label>
+                            <Label htmlFor="responsible_name">Nome do Responsável</Label>
                             <Input
                                 id="responsible_name"
                                 name="responsible_name"
@@ -189,7 +263,7 @@ export default function CreateClientDialog({ open, onClose, onSuccess }) {
                             />
                         </div>
                         <div>
-                            <Label htmlFor="responsible_surname">Responsible Surname</Label>
+                            <Label htmlFor="responsible_surname">Sobrenome</Label>
                             <Input
                                 id="responsible_surname"
                                 name="responsible_surname"
@@ -198,18 +272,68 @@ export default function CreateClientDialog({ open, onClose, onSuccess }) {
                             />
                         </div>
                     </div>
-                    <div>
-                        <Label htmlFor="address">Address</Label>
-                        <Input
-                            id="address"
-                            name="address"
-                            value={formData.address}
-                            onChange={handleInputChange}
-                        />
+
+                    {/* CEP e endereço */}
+                    <div className="space-y-2">
+                        <Label htmlFor="cep">CEP</Label>
+                        <div className="flex gap-2">
+                            <Input
+                                id="cep"
+                                name="cep"
+                                value={formData.cep}
+                                onChange={handleInputChange}
+                                onBlur={handleCepBlur}
+                                placeholder="00000-000"
+                            />
+                            {cepLoading && <Loader2 className="animate-spin h-5 w-5" />}
+                        </div>
                     </div>
+
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <Label htmlFor="phonenumber">Phone Number</Label>
+                            <Label htmlFor="street">Rua</Label>
+                            <Input
+                                id="street"
+                                name="street"
+                                value={formData.street}
+                                onChange={handleInputChange}
+                            />
+                        </div>
+                        <div>
+                            <Label htmlFor="neighborhood">Bairro</Label>
+                            <Input
+                                id="neighborhood"
+                                name="neighborhood"
+                                value={formData.neighborhood}
+                                onChange={handleInputChange}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <Label htmlFor="city">Cidade</Label>
+                            <Input
+                                id="city"
+                                name="city"
+                                value={formData.city}
+                                onChange={handleInputChange}
+                            />
+                        </div>
+                        <div>
+                            <Label htmlFor="state">Estado</Label>
+                            <Input
+                                id="state"
+                                name="state"
+                                value={formData.state}
+                                onChange={handleInputChange}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <Label htmlFor="phonenumber">Telefone</Label>
                             <Input
                                 id="phonenumber"
                                 name="phonenumber"
@@ -218,22 +342,31 @@ export default function CreateClientDialog({ open, onClose, onSuccess }) {
                             />
                         </div>
                         <div>
-                            <Label htmlFor="segment">Segment</Label>
-                            <Input
-                                id="segment"
-                                name="segment"
+                            <Label htmlFor="segment">Segmento</Label>
+                            <Select
                                 value={formData.segment}
-                                onChange={handleInputChange}
-                            />
+                                onValueChange={(value) => setFormData({...formData, segment: value})}
+                            >
+                                <SelectTrigger id="segment">
+                                    <SelectValue placeholder="Segmento" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {SEGMENT_OPTIONS.map((segment) => (
+                                        <SelectItem key={segment} value={segment}>
+                                            {segment}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                         </div>
                     </div>
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
-                            Cancel
+                            Cancelar
                         </Button>
                         <Button type="submit" disabled={loading}>
                             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                            {loading ? "Creating..." : "Create Client"}
+                            {loading ? "Criando..." : "Criar Cliente"}
                         </Button>
                     </DialogFooter>
                 </form>

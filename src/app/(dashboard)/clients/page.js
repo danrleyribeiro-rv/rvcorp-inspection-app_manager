@@ -72,10 +72,10 @@ export default function ClientsPage() {
     return (
         <div className="container p-6">
             <div className="flex justify-between items-center mb-6">
-                <h1 className="text-3xl font-bold">Clients</h1>
+                <h1 className="text-3xl font-bold">Clientes</h1>
                 <Button onClick={() => setShowCreateDialog(true)}>
                     <UserPlus className="mr-2 h-4 w-4" />
-                    Create Client
+                    Novo Cliente
                 </Button>
             </div>
 
@@ -85,9 +85,9 @@ export default function ClientsPage() {
                 </div>
             ) : (
                 <>
-                    <h2 className="text-xl font-semibold mb-2">Client List</h2>
+                    <h2 className="text-xl font-semibold mb-2">Lista de Clientes</h2>
                     {clients.length === 0 ? (
-                        <p className="text-muted-foreground">No clients found.</p>
+                        <p className="text-muted-foreground">Não foram encontrados clientes.</p>
                     ) : (
                         <div className="rounded-md border">
                         <Table>
