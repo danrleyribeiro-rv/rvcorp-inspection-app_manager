@@ -2,8 +2,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { doc, updateDoc, getDocs, collection } from "firebase/firestore";
-import { db } from "@/lib/supabase";
+import { db } from "@/lib/firebase";
+import { doc, updateDoc, collection, query, where, getDocs, serverTimestamp } from "firebase/firestore";
 import {
   Dialog,
   DialogContent,
@@ -19,12 +19,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { toast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 
 export default function TransferProjectDialog({ project, open, onClose }) {
   const [loading, setLoading] = useState(false);
   const [managers, setManagers] = useState([]);
   const [selectedManager, setSelectedManager] = useState("");
+  const { toast } = useToast();
 
   useEffect(() => {
     fetchManagers();
@@ -32,43 +33,74 @@ export default function TransferProjectDialog({ project, open, onClose }) {
 
   const fetchManagers = async () => {
     try {
-      const managersSnap = await getDocs(collection(db, "managers"));
-      setManagers(managersSnap.docs.map(doc => ({
+      // Query active managers from Firestore
+      const managersQuery = query(
+        collection(db, 'managers'),
+        where('deleted_at', '==', null)
+      );
+      
+      const managersSnapshot = await getDocs(managersQuery);
+      
+      const managersList = managersSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
-      })));
+      }));
+      
+      setManagers(managersList);
     } catch (error) {
       console.error("Error fetching managers:", error);
+      toast({
+        title: "Erro",
+        description: "Falha ao carregar lista de gerentes",
+        variant: "destructive"
+      });
     }
   };
 
   const handleTransfer = async () => {
-    if (!selectedManager) return;
+    if (!selectedManager) {
+      toast({
+        title: "Erro",
+        description: "Selecione um gerente para transferir o projeto",
+        variant: "destructive"
+      });
+      return;
+    }
 
     setLoading(true);
     try {
+      // Get the selected manager's data for recording who the project was transferred to
       const selectedManagerData = managers.find(m => m.id === selectedManager);
+      if (!selectedManagerData) {
+        throw new Error("Dados do gerente não encontrados");
+      }
       
-      await updateDoc(doc(db, "projects", project.id), {
-        managerId: selectedManager,
-        managerName: `${selectedManagerData.name} ${selectedManagerData.surname}`,
-        transferredAt: new Date().toISOString()
+      // Update the project with new manager
+      const projectRef = doc(db, 'projects', project.id);
+      
+      await updateDoc(projectRef, {
+        manager_id: selectedManager,
+        managerName: `${selectedManagerData.name || ''} ${selectedManagerData.surname || ''}`.trim(),
+        transferredAt: serverTimestamp(),
+        updated_at: serverTimestamp()
       });
 
       toast({
         title: "Sucesso",
         description: "Projeto transferido com sucesso"
       });
+      
       onClose();
     } catch (error) {
       console.error("Error transferring project:", error);
       toast({
         title: "Erro",
-        description: "Erro ao transferir projeto",
+        description: error.message || "Erro ao transferir projeto",
         variant: "destructive"
       });
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
@@ -92,7 +124,7 @@ export default function TransferProjectDialog({ project, open, onClose }) {
             <SelectContent>
               {managers.map((manager) => (
                 <SelectItem key={manager.id} value={manager.id}>
-                  {`${manager.name} ${manager.surname}`}
+                  {`${manager.name || ''} ${manager.surname || ''}`.trim()}
                 </SelectItem>
               ))}
             </SelectContent>

@@ -2,7 +2,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { supabase } from "@/lib/supabase"
+import { db } from "@/lib/firebase"
+import { collection, addDoc, getDocs, query, where, serverTimestamp } from "firebase/firestore"
 import {
   Dialog,
   DialogContent,
@@ -20,28 +21,26 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
-// No need for Calendar, Popover, format, ptBR, or CalendarIcon
 
 const statusOptions = ["Aguardando", "Em Andamento", "Em Revisão", "Concluído"]
 
-// Add project type options
+// Project type options
 const projectTypeOptions = [
     "Inspeção de Redes",
     "Inspeção de Obras",
     "Levantamento Arquitetônico",
     "Implantação",
-    "Outro" // Add "Other" option
+    "Outro"
 ];
 
 export function CreateProjectDialog({ open, onClose, onSuccess, managerId }) {
     const [formData, setFormData] = useState({
         title: "",
         description: "",
-        type: "",  // Will hold the selected project type
+        type: "",
         project_price: "",
         client_id: "",
         status: "Aguardando",
-        // Remove inspection_date
     });
     const [isLoading, setIsLoading] = useState(false);
     const [clients, setClients] = useState([]);
@@ -53,14 +52,20 @@ export function CreateProjectDialog({ open, onClose, onSuccess, managerId }) {
 
     const fetchClients = async () => {
         try {
-            const { data, error } = await supabase
-                .from('clients')
-                .select('id, name')
-                .is('deleted_at', null)
-                .order('name');
-
-            if (error) throw error;
-            setClients(data || []);
+            // Query clients that aren't deleted
+            const clientsQuery = query(
+                collection(db, 'clients'),
+                where('deleted_at', '==', null)
+            );
+            
+            const clientsSnapshot = await getDocs(clientsQuery);
+            
+            const clientsList = clientsSnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            })).sort((a, b) => a.name.localeCompare(b.name));
+            
+            setClients(clientsList);
         } catch (error) {
             console.error("Error fetching clients:", error);
             toast({
@@ -79,22 +84,22 @@ export function CreateProjectDialog({ open, onClose, onSuccess, managerId }) {
             // Convert project price to number
             const projectPrice = parseFloat(formData.project_price) || 0;
 
-            const { data, error } = await supabase
-                .from('projects')
-                .insert({
-                    title: formData.title,
-                    description: formData.description,
-                    type: formData.type,
-                    project_price: projectPrice,
-                    manager_id: managerId,
-                    client_id: formData.client_id,
-                    status: formData.status,
-                    // Remove inspection_date
-                })
-                .select();
-
-            if (error) throw error;
-
+            // Create project document
+            const projectData = {
+                title: formData.title,
+                description: formData.description,
+                type: formData.type,
+                project_price: projectPrice,
+                manager_id: managerId,
+                client_id: formData.client_id,
+                status: formData.status,
+                created_at: serverTimestamp(),
+                updated_at: serverTimestamp(),
+                deleted_at: null
+            };
+            
+            const docRef = await addDoc(collection(db, 'projects'), projectData);
+            
             toast({
                 title: "Projeto criado com sucesso"
             });
@@ -205,7 +210,6 @@ export function CreateProjectDialog({ open, onClose, onSuccess, managerId }) {
                             ))}
                         </SelectContent>
                     </Select>
-                    {/* Remove Date Picker */}
                     <div className="flex justify-end gap-2">
                         <Button
                             type="button"

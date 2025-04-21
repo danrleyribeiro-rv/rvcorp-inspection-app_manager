@@ -1,9 +1,17 @@
-// app/context/auth-context.js (with router.refresh())
+// src/context/auth-context.js
 "use client";
 
 import { createContext, useState, useContext, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
+import { 
+  signInWithEmailAndPassword, 
+  signOut as firebaseSignOut,
+  onAuthStateChanged,
+  sendPasswordResetEmail,
+  updatePassword as firebaseUpdatePassword
+} from "firebase/auth";
+import { auth, db } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
+import { doc, getDoc } from "firebase/firestore";
 
 const AuthContext = createContext({});
 
@@ -14,150 +22,89 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const setupAuth = async () => {
-      const { data: authListener } = supabase.auth.onAuthStateChange(
-        async (event, session) => {
-          console.log("Auth state changed:", event, session);
-
-          if (event === "SIGNED_IN" || event === "INITIAL_SESSION") {
-            if (session?.user) {
-              setLoading(true); // Start loading during auth check
-              console.log("onAuthStateChange: User detected, starting checks...");
-              try {
-                // Manager Check
-                const { data: managerData, error: managerError } =
-                  await supabase
-                    .from("managers")
-                    .select("*")
-                    .eq("id", session.user.id)
-                    .single();
-
-                if (managerError && managerError.code !== "PGRST116") {
-                  console.error("Manager check error:", managerError); // Log the error
-                  throw managerError;
-                }
-
-                const isManager = managerData !== null;
-                const isTestUser = session.user.email === "danrley@post.com";
-
-                console.log("onAuthStateChange: isManager:", isManager);
-                console.log("onAuthStateChange: isTestUser:", isTestUser);
-
-
-                if (isManager || isTestUser) {
-                  const newUser = {
-                    ...session.user,
-                    role: "manager",
-                    ...(managerData && { profile: managerData }),
-                    ...(isTestUser && { isTestUser: true }),
-                  };
-                  console.log("onAuthStateChange: Setting user:", newUser);
-                  setUser(newUser);
-
-                  if (event === "SIGNED_IN") {
-                    console.log("onAuthStateChange: Redirecting to /projects...");
-                    router.push("/projects");
-                    router.refresh(); // Force a server-side refresh
-                    console.log("onAuthStateChange: router.push and router.refresh called."); // Confirm push is called
-                  }
-
-                } else {
-                  console.log("onAuthStateChange: User is not a manager, logging out...");
-                  await supabase.auth.signOut();
-                  router.push("/login"); // Redirect on sign out
-                  setUser(null);
-                }
-              } catch (error) {
-                console.error("Error in auth check:", error);
-                await supabase.auth.signOut();
-                router.push("/login");
-                setUser(null);
-              } finally {
-                console.log("onAuthStateChange: Setting loading to false (finally block).");
-                setLoading(false);
-              }
+      const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+        if (firebaseUser) {
+          try {
+            // Check if user is a manager
+            const managerDocRef = doc(db, "managers", firebaseUser.uid);
+            const managerDoc = await getDoc(managerDocRef);
+            
+            if (managerDoc.exists() || firebaseUser.email === "danrley@post.com") {
+              const userData = {
+                ...firebaseUser,
+                role: "manager",
+                ...(managerDoc.exists() && { profile: managerDoc.data() }),
+                ...(firebaseUser.email === "danrley@post.com" && { isTestUser: true }),
+              };
+              setUser(userData);
             } else {
-                console.log("onAuthStateChange: No user in session, setting user to null.");
+              // User is not a manager, sign them out
+              await firebaseSignOut(auth);
+              router.push("/login");
               setUser(null);
-              setLoading(false);
             }
-          } else if (event === "SIGNED_OUT") {
-            console.log("onAuthStateChange: SIGNED_OUT event, setting user to null.");
+          } catch (error) {
+            console.error("Error in auth check:", error);
+            await firebaseSignOut(auth);
+            router.push("/login");
             setUser(null);
-            setLoading(false);
-            // No redirect here
-          }  else if (event === "PASSWORD_RECOVERY") {
-              router.push("/reset-password"); //Navigate user to the reset password page
-          } else {
-            console.log("onAuthStateChange: Other event, setting loading to false.");
-            setLoading(false); // For other events
           }
+        } else {
+          setUser(null);
         }
-      );
+        setLoading(false);
+      });
 
-      return () => {
-        authListener.subscription.unsubscribe();
-      };
+      return () => unsubscribe();
     };
 
     setupAuth();
   }, [router]);
 
   const signIn = async (email, password) => {
-    console.log("Attempting to login with:", email);
     setLoading(true);
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) {
-        console.error("Authentication error:", error);
-        setLoading(false);
-        throw error;
-      }
-
-      console.log("Login successful, data:", data);
-      // onAuthStateChange handles the rest
-
-      return { success: true, data };
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      
+      // Firebase handles the session automatically
+      router.push("/projects");
+      router.refresh();
+      
+      return { success: true, data: userCredential.user };
     } catch (error) {
       console.error("Login error:", error);
-      setLoading(false); // Set loading to false on error
+      setLoading(false);
       return { success: false, error: error.message };
     }
   };
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) {
+    try {
+      await firebaseSignOut(auth);
+      router.push("/login");
+    } catch (error) {
       console.error("Logout error:", error);
     }
-    router.push("/login"); // Redirect on sign out.
   };
 
-    const resetPassword = async (email) => {
+  const resetPassword = async (email) => {
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
+      await sendPasswordResetEmail(auth, email, {
+        url: `${window.location.origin}/reset-password`,
+        handleCodeInApp: true,
       });
-
-      if (error) throw error;
       return { success: true };
     } catch (error) {
       console.error("Password reset error:", error);
       return { success: false, error: error.message };
     }
   };
-  
-  // Função para redefinir senha com token
+
   const resetPasswordWithToken = async (newPassword) => {
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: newPassword
-      });
-  
-      if (error) throw error;
+      // In Firebase, the auth session should already be tied to the reset token
+      // when the user clicks the reset link in their email
+      await firebaseUpdatePassword(auth.currentUser, newPassword);
       return { success: true };
     } catch (error) {
       console.error("Password reset error:", error);
@@ -165,14 +112,9 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // Função para atualizar senha
   const updatePassword = async (password) => {
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: password
-      });
-
-      if (error) throw error;
+      await firebaseUpdatePassword(auth.currentUser, password);
       return { success: true };
     } catch (error) {
       console.error("Password update error:", error);

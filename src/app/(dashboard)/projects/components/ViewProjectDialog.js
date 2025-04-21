@@ -1,9 +1,9 @@
-
 // components/projects/components/ViewProjectDialog.js
 "use client"
 
 import { useState, useEffect } from "react"
-import { supabase } from "@/lib/supabase"
+import { db } from "@/lib/firebase"
+import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore"
 import {
   Dialog,
   DialogContent,
@@ -52,14 +52,17 @@ export default function ViewProjectDialog({ project, open, onClose }) {
 
   const fetchClientDetails = async () => {
     try {
-      const { data, error } = await supabase
-        .from('clients')
-        .select('name, email, phonenumber, responsible_name, responsible_surname')
-        .eq('id', project.client_id)
-        .single();
+      if (!project.client_id) return;
       
-      if (error) throw error;
-      setClientDetails(data);
+      const clientRef = doc(db, 'clients', project.client_id);
+      const clientDoc = await getDoc(clientRef);
+      
+      if (clientDoc.exists()) {
+        setClientDetails({
+          id: clientDoc.id,
+          ...clientDoc.data()
+        });
+      }
     } catch (error) {
       console.error("Error fetching client details:", error);
     }
@@ -67,15 +70,29 @@ export default function ViewProjectDialog({ project, open, onClose }) {
 
   const fetchInspections = async () => {
     try {
-      const { data, error } = await supabase
-        .from('inspections')
-        .select('id, title, status, scheduled_date')
-        .eq('project_id', project.id)
-        .is('deleted_at', null)
-        .order('scheduled_date', { ascending: false });
+      if (!project.id) return;
       
-      if (error) throw error;
-      setInspections(data || []);
+      const inspectionsQuery = query(
+        collection(db, 'inspections'),
+        where('project_id', '==', project.id),
+        where('deleted_at', '==', null)
+      );
+      
+      const inspectionsSnapshot = await getDocs(inspectionsQuery);
+      
+      const inspectionsList = inspectionsSnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          // Convert Firebase timestamps to ISO strings
+          scheduled_date: data.scheduled_date ? data.scheduled_date.toDate().toISOString() : null,
+          created_at: data.created_at ? data.created_at.toDate().toISOString() : null,
+          updated_at: data.updated_at ? data.updated_at.toDate().toISOString() : null
+        };
+      });
+      
+      setInspections(inspectionsList);
     } catch (error) {
       console.error("Error fetching inspections:", error);
     } finally {
@@ -147,7 +164,7 @@ export default function ViewProjectDialog({ project, open, onClose }) {
                 <div>
                   <p className="font-medium">Criado em</p>
                   <p className="text-sm text-muted-foreground">
-                    {format(new Date(project.created_at), "PPP", { locale: ptBR })}
+                    {project.created_at ? format(new Date(project.created_at), "PPP", { locale: ptBR }) : "Data desconhecida"}
                   </p>
                 </div>
               </div>

@@ -2,7 +2,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { supabase } from "@/lib/supabase"
+import { db } from "@/lib/firebase"
+import { doc, updateDoc, collection, query, where, getDocs, serverTimestamp } from "firebase/firestore"
 import {
   Dialog,
   DialogContent,
@@ -20,11 +21,6 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
-// Remove: import { Calendar } from "@/components/ui/calendar"
-// Remove: import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-// Remove: import { format, parseISO } from "date-fns"
-// Remove: import { ptBR } from "date-fns/locale"
-// Remove: import { CalendarIcon } from "lucide-react"
 
 const statusOptions = ["Aguardando", "Em Andamento", "Em Revisão", "Concluído"]
 
@@ -41,29 +37,28 @@ export default function EditProjectDialog({ project, open, onClose, onSuccess })
   const [formData, setFormData] = useState({
     title: project.title,
     description: project.description || "",
-    type: project.type || "", // Use existing type
+    type: project.type || "",
     project_price: project.project_price?.toString() || "0",
     client_id: project.client_id || "",
     status: project.status || "Aguardando",
-    // Remove inspection_date
   });
   const [isLoading, setIsLoading] = useState(false)
   const [clients, setClients] = useState([])
   const { toast } = useToast()
 
   useEffect(() => {
-        // Update form data when the project prop changes
-        if (project) {
-            setFormData({
-                title: project.title,
-                description: project.description || "",
-                type: project.type || "",
-                project_price: project.project_price?.toString() || "0",
-                client_id: project.client_id || "",
-                status: project.status || "Aguardando",
-            });
-        }
-    }, [project]);
+    // Update form data when the project prop changes
+    if (project) {
+      setFormData({
+        title: project.title,
+        description: project.description || "",
+        type: project.type || "",
+        project_price: project.project_price?.toString() || "0",
+        client_id: project.client_id || "",
+        status: project.status || "Aguardando",
+      });
+    }
+  }, [project]);
 
   useEffect(() => {
     fetchClients()
@@ -71,14 +66,20 @@ export default function EditProjectDialog({ project, open, onClose, onSuccess })
 
   const fetchClients = async () => {
     try {
-      const { data, error } = await supabase
-        .from('clients')
-        .select('id, name')
-        .is('deleted_at', null)
-        .order('name');
-
-      if (error) throw error;
-      setClients(data || []);
+      // Query clients that aren't deleted
+      const clientsQuery = query(
+        collection(db, 'clients'),
+        where('deleted_at', '==', null)
+      );
+      
+      const clientsSnapshot = await getDocs(clientsQuery);
+      
+      const clientsList = clientsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })).sort((a, b) => a.name.localeCompare(b.name));
+      
+      setClients(clientsList);
     } catch (error) {
       console.error("Error fetching clients:", error);
       toast({
@@ -97,21 +98,18 @@ export default function EditProjectDialog({ project, open, onClose, onSuccess })
       // Convert project price to number
       const projectPrice = parseFloat(formData.project_price) || 0;
 
-      const { error } = await supabase
-        .from('projects')
-        .update({
-          title: formData.title,
-          description: formData.description,
-          type: formData.type,  // Update the type
-          project_price: projectPrice,
-          client_id: formData.client_id,
-          status: formData.status,
-          // Remove inspection_date
-          updated_at: new Date()
-        })
-        .eq('id', project.id);
-
-      if (error) throw error;
+      // Update the project document
+      const projectRef = doc(db, 'projects', project.id);
+      
+      await updateDoc(projectRef, {
+        title: formData.title,
+        description: formData.description,
+        type: formData.type,
+        project_price: projectPrice,
+        client_id: formData.client_id,
+        status: formData.status,
+        updated_at: serverTimestamp()
+      });
 
       toast({
         title: "Projeto atualizado com sucesso"

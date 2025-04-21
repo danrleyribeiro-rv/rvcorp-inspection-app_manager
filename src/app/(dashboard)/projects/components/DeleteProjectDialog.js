@@ -2,7 +2,8 @@
 "use client"
 
 import { useState } from "react"
-import { supabase } from "@/lib/supabase"
+import { db } from "@/lib/firebase"
+import { doc, updateDoc, serverTimestamp } from "firebase/firestore"
 import {
   Dialog,
   DialogContent,
@@ -24,14 +25,12 @@ export default function DeleteProjectDialog({ project, open, onClose, onSuccess 
     
     try {
       // Soft delete by setting deleted_at
-      const { error } = await supabase
-        .from('projects')
-        .update({
-          deleted_at: new Date()
-        })
-        .eq('id', project.id);
+      const projectRef = doc(db, 'projects', project.id);
       
-      if (error) throw error;
+      await updateDoc(projectRef, {
+        deleted_at: serverTimestamp(),
+        updated_at: serverTimestamp()
+      });
       
       toast({
         title: "Projeto excluído com sucesso"

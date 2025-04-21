@@ -1,4 +1,3 @@
-
 // app/(dashboard)/inspectors/components/RatingDialog.js
 "use client";
 
@@ -19,12 +18,14 @@ export default function RatingDialog({ inspector, open, onClose, onRate }) {
 
     setLoading(true);
     try {
+      // Call the parent component's onRate function which handles Firebase logic
       await onRate(inspector, rating, comment);
       onClose();
     } catch (error) {
       console.error("Error submitting rating:", error);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
@@ -46,6 +47,7 @@ export default function RatingDialog({ inspector, open, onClose, onRate }) {
                 onMouseEnter={() => setHoveredRating(value)}
                 onMouseLeave={() => setHoveredRating(0)}
                 className="focus:outline-none"
+                type="button"
               >
                 <Star
                   className={`h-8 w-8 ${
@@ -66,7 +68,7 @@ export default function RatingDialog({ inspector, open, onClose, onRate }) {
           />
 
           <div className="flex justify-end gap-4">
-            <Button variant="outline" onClick={onClose}>
+            <Button variant="outline" onClick={onClose} disabled={loading}>
               Cancelar
             </Button>
             <Button onClick={handleSubmit} disabled={rating === 0 || loading}>

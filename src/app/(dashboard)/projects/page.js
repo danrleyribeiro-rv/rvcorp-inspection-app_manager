@@ -2,7 +2,8 @@
 "use client"
 
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
+import { db } from "@/lib/firebase";
+import { collection, query, where, orderBy, getDocs, doc, getDoc } from "firebase/firestore";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
@@ -30,16 +31,13 @@ export default function ProjectsPage() {
 
   const loadDefaultView = async () => {
     try {
-      const { data: userData, error } = await supabase
-        .from('user_settings') // Use the correct table: user_settings
-        .select('settings')
-        .eq('user_id', user.id) // Use the correct column name: user_id
-        .single();
-
-      if (!error && userData?.settings?.app?.defaultView) {
-        setActiveView(userData.settings.app.defaultView);
-      } else if (error && error.code !== 'PGRST116'){
-          console.error("Error loading default view:", error);
+      if (!user?.uid) return;
+      
+      const userSettingsRef = doc(db, 'user_settings', user.uid);
+      const settingsDoc = await getDoc(userSettingsRef);
+      
+      if (settingsDoc.exists() && settingsDoc.data()?.settings?.app?.defaultView) {
+        setActiveView(settingsDoc.data().settings.app.defaultView);
       }
     } catch (error) {
       console.error("Error loading default view:", error);
@@ -49,40 +47,52 @@ export default function ProjectsPage() {
   const fetchProjects = async () => {
     setLoading(true);
     try {
-      // Check if the user is a manager
-      const { data: managerData, error: managerError } = await supabase
-        .from('managers')
-        .select('id')
-        .eq('id', user.id)
-        .single();
-
-      if (managerError && managerError.code !== 'PGRST116') {
-        throw managerError;
+      if (!user?.uid) {
+        throw new Error("User not authenticated");
       }
 
-      // If manager, get projects assigned to this manager
-      const { data, error } = await supabase
-        .from('projects')
-        .select(`
-          id,
-          title,
-          description,
-          type,
-          project_price,
-          status,
-          manager_id,
-          client_id,
-          created_at,
-          updated_at,
-          clients:client_id (name)
-        `)
-        .eq('manager_id', user.id)
-        .is('deleted_at', null)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      setProjects(data || []);
+      // Fetch projects for this manager
+      const projectsQuery = query(
+        collection(db, 'projects'),
+        where('manager_id', '==', user.uid),
+        where('deleted_at', '==', null),
+        orderBy('created_at', 'desc')
+      );
+      
+      const projectsSnapshot = await getDocs(projectsQuery);
+      const projectsList = [];
+      
+      // For each project, fetch client data
+      for (const projectDoc of projectsSnapshot.docs) {
+        const projectData = {
+          id: projectDoc.id,
+          ...projectDoc.data(),
+          // Convert Firebase timestamps to ISO strings for easier handling
+          created_at: projectDoc.data().created_at?.toDate().toISOString(),
+          updated_at: projectDoc.data().updated_at?.toDate().toISOString()
+        };
+        
+        // Fetch client data if client_id exists
+        if (projectData.client_id) {
+          try {
+            const clientRef = doc(db, 'clients', projectData.client_id);
+            const clientDoc = await getDoc(clientRef);
+            
+            if (clientDoc.exists()) {
+              projectData.clients = {
+                id: clientDoc.id,
+                ...clientDoc.data()
+              };
+            }
+          } catch (err) {
+            console.error("Error fetching client data:", err);
+          }
+        }
+        
+        projectsList.push(projectData);
+      }
+      
+      setProjects(projectsList);
     } catch (error) {
       console.error("Error fetching projects:", error);
       toast({
@@ -130,7 +140,7 @@ export default function ProjectsPage() {
           open={showCreateModal}
           onClose={() => setShowCreateModal(false)}
           onSuccess={fetchProjects}
-          managerId={user.id}
+          managerId={user.uid}
         />
       )}
     </div>

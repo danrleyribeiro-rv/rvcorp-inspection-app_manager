@@ -2,7 +2,8 @@
 "use client";
 
 import { useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { db } from "@/lib/firebase";
+import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import {
     Dialog,
     DialogContent,
@@ -23,12 +24,12 @@ export default function DeleteClientDialog({ client, open, onClose, onDelete }) 
         setLoading(true);
         try {
             // Soft delete by setting deleted_at
-            const { error } = await supabase
-                .from('clients')
-                .update({ deleted_at: new Date() })
-                .eq('id', client.id);
-
-            if (error) throw error;
+            const clientRef = doc(db, 'clients', client.id);
+            
+            await updateDoc(clientRef, {
+                deleted_at: serverTimestamp(),
+                updated_at: serverTimestamp()
+            });
 
             toast({
                 title: "Success",

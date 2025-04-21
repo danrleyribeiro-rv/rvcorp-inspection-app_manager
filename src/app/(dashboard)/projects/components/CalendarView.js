@@ -1,4 +1,3 @@
-
 // components/projects/components/CalendarView.js
 "use client";
 

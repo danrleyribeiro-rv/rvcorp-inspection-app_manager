@@ -3,7 +3,8 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { db } from "@/lib/firebase";
+import { collection, query, where, getDocs, updateDoc, doc, increment, addDoc, serverTimestamp } from "firebase/firestore";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { 
@@ -68,15 +69,49 @@ export default function InspectorsPage() {
   const fetchInspectors = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('inspectors')
-        .select('*, profile_images(url)')
-        .is('deleted_at', null)
-        .order('name');
+      // Query for active inspectors
+      const inspectorsQuery = query(
+        collection(db, 'inspectors'),
+        where('deleted_at', '==', null)
+      );
       
-      if (error) throw error;
-      setInspectors(data || []);
-      setFilteredInspectors(data || []);
+      const inspectorsSnapshot = await getDocs(inspectorsQuery);
+      
+      // Process inspector data
+      const inspectorsList = [];
+      
+      for (const doc of inspectorsSnapshot.docs) {
+        const inspectorData = {
+          id: doc.id,
+          ...doc.data()
+        };
+        
+        // Fetch profile images if they exist
+        if (inspectorData.profile_image_id) {
+          try {
+            const imagesQuery = query(
+              collection(db, 'profile_images'),
+              where('inspector_id', '==', doc.id)
+            );
+            
+            const imagesSnapshot = await getDocs(imagesQuery);
+            
+            const images = imagesSnapshot.docs.map(imgDoc => ({
+              id: imgDoc.id,
+              ...imgDoc.data()
+            }));
+            
+            inspectorData.profile_images = images;
+          } catch (err) {
+            console.error("Error fetching inspector images:", err);
+          }
+        }
+        
+        inspectorsList.push(inspectorData);
+      }
+      
+      setInspectors(inspectorsList);
+      setFilteredInspectors(inspectorsList);
     } catch (error) {
       console.error("Error fetching inspectors:", error);
       toast({
@@ -169,27 +204,23 @@ export default function InspectorsPage() {
       const newRatingCount = ratingCount + 1;
       const newAverageRating = ((currentRating * ratingCount) + rating) / newRatingCount;
       
-      // Update inspector rating
-      const { error } = await supabase
-        .from('inspectors')
-        .update({
-          rating: newAverageRating.toFixed(1),
-          rating_count: newRatingCount
-        })
-        .eq('id', inspector.id);
+      // Update inspector rating in Firestore
+      const inspectorRef = doc(db, 'inspectors', inspector.id);
       
-      if (error) throw error;
+      await updateDoc(inspectorRef, {
+        rating: newAverageRating.toFixed(1),
+        rating_count: increment(1),
+        updated_at: serverTimestamp()
+      });
       
       // Store rating record
-      await supabase
-        .from('inspector_ratings')
-        .insert({
-          inspector_id: inspector.id,
-          rater_id: null, // Could be the manager's ID if needed
-          rating,
-          comment,
-          created_at: new Date()
-        });
+      await addDoc(collection(db, 'inspector_ratings'), {
+        inspector_id: inspector.id,
+        rater_id: null, // Could be the manager's ID if needed
+        rating,
+        comment,
+        created_at: serverTimestamp()
+      });
       
       toast({
         title: "Avaliação enviada com sucesso"

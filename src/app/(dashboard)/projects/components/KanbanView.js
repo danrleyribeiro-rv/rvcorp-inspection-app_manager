@@ -1,4 +1,3 @@
-
 // components/projects/components/KanbanView.js
 "use client";
 
@@ -7,7 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CalendarIcon, Edit, Trash2, Eye } from "lucide-react";
 import { useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { db } from "@/lib/firebase";
+import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -67,16 +67,13 @@ export default function KanbanView({ projects, isLoading, onRefresh }) {
     if (source.droppableId === destination.droppableId) return;
 
     try {
-      // Update project status
-      const { error } = await supabase
-        .from('projects')
-        .update({
-          status: destination.droppableId,
-          updated_at: new Date()
-        })
-        .eq('id', draggableId);
-
-      if (error) throw error;
+      // Update project status in Firestore
+      const projectRef = doc(db, 'projects', draggableId);
+      
+      await updateDoc(projectRef, {
+        status: destination.droppableId,
+        updated_at: serverTimestamp()
+      });
       
       toast({
         title: "Status atualizado com sucesso"

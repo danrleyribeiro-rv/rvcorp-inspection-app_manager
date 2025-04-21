@@ -3,7 +3,6 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -12,6 +11,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ArrowLeft, CheckCircle } from 'lucide-react';
 import Image from "next/image";
 import { useAuth } from '@/context/auth-context';
+import { auth } from '@/lib/firebase';
+import { isSignInWithEmailLink, signInWithEmailLink, verifyPasswordResetCode } from 'firebase/auth';
 
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState('');
@@ -23,55 +24,68 @@ export default function ResetPasswordPage() {
   const router = useRouter();
   const { resetPasswordWithToken } = useAuth();
 
-  // Verificar se o token está presente na URL
+  // Check if the reset code in the URL is valid
   useEffect(() => {
-    // Extrai e verifica o token do URL
-    const checkToken = async () => {
+    const checkResetCode = async () => {
       try {
-        // Check if in browser environment
-        if (typeof window !== 'undefined') {
-          // Verificar os parâmetros de hash na URL
-          const hash = window.location.hash;
-          
-          if (hash && hash.includes('error')) {
-            console.error('Reset password error:', hash);
-            setTokenValid(false);
-            setMessage({
-              text: 'Link de redefinição inválido ou expirado. Por favor, solicite um novo link.',
-              success: false
-            });
-          } else if (!hash || hash.length < 10) {
-            // Nenhum token encontrado
-            setTokenValid(false);
-            setMessage({
-              text: 'Link de redefinição incorreto. Verifique seu email novamente ou solicite um novo link.',
-              success: false
-            });
-          } else {
-            // Supabase deve estar processando o token automaticamente
-            // Verificar se a sessão está configurada
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) {
+        // Extract the action code from the URL
+        const searchParams = new URLSearchParams(window.location.search);
+        const actionCode = searchParams.get('oobCode');
+        
+        if (!actionCode) {
+          if (isSignInWithEmailLink(auth, window.location.href)) {
+            // If this is a sign-in link (for passwordless auth), handle differently
+            const email = window.localStorage.getItem('emailForSignIn');
+            if (email) {
+              try {
+                // Complete sign-in
+                await signInWithEmailLink(auth, email, window.location.href);
+                window.localStorage.removeItem('emailForSignIn');
+                router.push('/projects');
+              } catch (error) {
+                console.error('Error signing in with email link:', error);
+                setTokenValid(false);
+                setMessage({
+                  text: 'Link de autenticação inválido ou expirado.',
+                  success: false
+                });
+              }
+            } else {
               setTokenValid(false);
               setMessage({
-                text: 'Sessão de redefinição de senha não detectada. Por favor, verifique seu email novamente ou solicite um novo link.',
+                text: 'Email para autenticação não encontrado. Por favor, tente novamente.',
                 success: false
               });
             }
+          } else {
+            setTokenValid(false);
+            setMessage({
+              text: 'Código de redefinição não encontrado. Por favor, solicite um novo link.',
+              success: false
+            });
           }
+          return;
         }
+        
+        // Verify the code
+        await verifyPasswordResetCode(auth, actionCode);
+        
+        // If we got here, the code is valid
+        // Store the code to use it when resetting the password
+        window.sessionStorage.setItem('resetCode', actionCode);
+
       } catch (error) {
-        console.error('Error checking reset token:', error);
+        console.error('Error verifying reset code:', error);
         setTokenValid(false);
         setMessage({
-          text: 'Erro ao verificar o token de redefinição. Por favor, tente novamente.',
+          text: 'Link de redefinição inválido ou expirado. Por favor, solicite um novo link.',
           success: false
         });
       }
     };
 
-    checkToken();
-  }, []);
+    checkResetCode();
+  }, [router]);
 
   const validatePassword = (password) => {
     // Minimum 8 characters, at least one uppercase letter, one lowercase letter, and one number
@@ -105,13 +119,18 @@ export default function ResetPasswordPage() {
     }
 
     try {
-      // Use the resetPasswordWithToken function from context
-      const result = await resetPasswordWithToken(password);
-      
-      if (!result.success) {
-        throw new Error(result.error || 'Erro ao redefinir senha.');
+      // Use the stored reset code
+      const actionCode = window.sessionStorage.getItem('resetCode');
+      if (!actionCode) {
+        throw new Error('Código de redefinição não encontrado. Por favor, solicite um novo link.');
       }
-
+      
+      // Apply the password reset
+      await auth.confirmPasswordReset(actionCode, password);
+      
+      // Clear the stored code
+      window.sessionStorage.removeItem('resetCode');
+      
       // Show success message
       setMessage({
         text: 'Sua senha foi redefinida com sucesso!',
@@ -236,4 +255,4 @@ export default function ResetPasswordPage() {
       </Card>
     </div>
   );
-}
+} 

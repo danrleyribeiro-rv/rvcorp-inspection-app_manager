@@ -1,9 +1,9 @@
 // components/clients/components/TransferClientDialog.js
-
 "use client";
 
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
+import { db } from "@/lib/firebase";
+import { doc, updateDoc, collection, query, where, getDocs, serverTimestamp } from "firebase/firestore";
 import {
     Dialog,
     DialogContent,
@@ -29,22 +29,34 @@ export default function TransferClientDialog({ client, open, onClose, onTransfer
     const { toast } = useToast();
 
     useEffect(() => {
-        const fetchManagers = async () => {
-            try {
-                const { data, error } = await supabase
-                    .from("managers")
-                    .select("id, name, surname") // Fetch manager names
-                    .is('deleted_at', null);
-
-                if (error) throw error;
-                setManagers(data || []);
-            } catch (error) {
-                console.error("Error fetching managers:", error);
-            }
-        };
-
         fetchManagers();
     }, []);
+
+    const fetchManagers = async () => {
+        try {
+            // Query active managers from Firestore
+            const managersQuery = query(
+                collection(db, 'managers'),
+                where('deleted_at', '==', null)
+            );
+            
+            const managersSnapshot = await getDocs(managersQuery);
+            
+            const managersList = managersSnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+            
+            setManagers(managersList);
+        } catch (error) {
+            console.error("Error fetching managers:", error);
+            toast({
+                title: "Error",
+                description: "Failed to fetch managers.",
+                variant: "destructive",
+            });
+        }
+    };
 
     const handleTransfer = async () => {
       setLoading(true);
@@ -58,12 +70,13 @@ export default function TransferClientDialog({ client, open, onClose, onTransfer
             return;
         }
 
-        const { error } = await supabase
-            .from("clients")
-            .update({ manager_id: selectedManager })
-            .eq("id", client.id);
-
-        if (error) throw error;
+        // Update client with new manager_id
+        const clientRef = doc(db, 'clients', client.id);
+        
+        await updateDoc(clientRef, {
+            manager_id: selectedManager,
+            updated_at: serverTimestamp()
+        });
 
         toast({
             title: "Success",
@@ -86,6 +99,7 @@ export default function TransferClientDialog({ client, open, onClose, onTransfer
     };
 
     if(!client) return null;
+    
     return (
         <Dialog open={open} onOpenChange={onClose}>
             <DialogContent>

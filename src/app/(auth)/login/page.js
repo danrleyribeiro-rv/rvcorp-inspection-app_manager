@@ -1,4 +1,4 @@
-// app/(auth)/login/page.js  (Minor change: more robust error message)
+// app/(auth)/login/page.js
 "use client";
 
 import { useState } from 'react';
@@ -26,11 +26,15 @@ export default function LoginPage() {
 
     const result = await signIn(email, password);
     if (!result.success) {
-      // More robust error handling, including Supabase-specific errors
-      if (result.error.includes("Invalid login credentials")) {
+      // Handle Firebase-specific error messages
+      if (result.error.includes("auth/invalid-credential")) {
         setError('Email ou senha incorretos. Por favor, verifique suas credenciais.');
-      } else if (result.error.includes("Unauthorized access")) {
-        setError('Você não tem permissão para acessar este sistema. Apenas gerentes podem acessar.');
+      } else if (result.error.includes("auth/user-not-found")) {
+        setError('Usuário não encontrado. Verifique seu email.');
+      } else if (result.error.includes("auth/wrong-password")) {
+        setError('Senha incorreta. Por favor, tente novamente.');
+      } else if (result.error.includes("auth/too-many-requests")) {
+        setError('Acesso temporariamente bloqueado devido a muitas tentativas falhas. Tente novamente mais tarde.');
       } else {
         setError(result.error || 'Ocorreu um erro durante o login.');
       }

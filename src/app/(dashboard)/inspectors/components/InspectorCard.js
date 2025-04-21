@@ -1,4 +1,3 @@
-
 // app/(dashboard)/inspectors/components/InspectorCard.js
 "use client";
 
@@ -14,13 +13,21 @@ export default function InspectorCard({ inspector, onRate, onChat }) {
     return `${name.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
   };
 
+  // Function to get profile image URL (handles Firebase Storage URLs)
+  const getProfileImageUrl = () => {
+    if (inspector.profile_images && inspector.profile_images.length > 0) {
+      return inspector.profile_images[0].url;
+    }
+    return null;
+  };
+
   return (
     <Card>
       <CardHeader className="pb-2">
         <div className="flex justify-between items-start">
           <div className="flex items-center gap-3">
             <Avatar>
-              <AvatarImage src={inspector.profile_images?.[0]?.url} />
+              <AvatarImage src={getProfileImageUrl()} />
               <AvatarFallback>{getAvatarLetters()}</AvatarFallback>
             </Avatar>
             <CardTitle className="text-lg">
@@ -57,7 +64,7 @@ export default function InspectorCard({ inspector, onRate, onChat }) {
           )}
 
           <div className="flex flex-wrap gap-2">
-            {inspector.training?.map((specialty) => (
+            {Array.isArray(inspector.training) && inspector.training.map((specialty) => (
               <span
                 key={specialty}
                 className="px-2 py-1 bg-primary/10 rounded-full text-xs"
@@ -82,5 +89,3 @@ export default function InspectorCard({ inspector, onRate, onChat }) {
     </Card>
   );
 }
-
-      

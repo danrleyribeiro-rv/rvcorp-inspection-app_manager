@@ -1,9 +1,10 @@
-// components/clients/components/EditClientDialog.js
+// components/clients/components/CreateClientDialog.js
 "use client";
 
-import { useState, useEffect } from "react";
-import { db } from "@/lib/firebase";
-import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { useState } from "react";
+import { db, auth } from "@/lib/firebase";
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import {
     Dialog,
     DialogContent,
@@ -17,89 +18,123 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
+import { useAuth } from "@/context/auth-context";
 
-
-export default function EditClientDialog({ client, open, onClose, onUpdate }) {
-
+export default function CreateClientDialog({ open, onClose, onSuccess }) {
     const [formData, setFormData] = useState({
-        name: client?.name || "",
-        document: client?.document || "",
-        responsible_name: client?.responsible_name || "",
-        responsible_surname: client?.responsible_surname || "",
-        address: client?.address || "",
-        email: client?.email || "",
-        phonenumber: client?.phonenumber || "",
-        segment: client?.segment || "",
+        name: "",
+        email: "",
+        password: "",
+        document: "",
+        responsible_name: "",
+        responsible_surname: "",
+        address: "",
+        phonenumber: "",
+        segment: "",
     });
     const [loading, setLoading] = useState(false);
     const { toast } = useToast();
-
-     useEffect(() => {
-        // Update local state when the client prop changes
-        if (client) {
-            setFormData({
-                name: client.name || "",
-                document: client.document || "",
-                responsible_name: client.responsible_name || "",
-                responsible_surname: client.responsible_surname || "",
-                address: client.address || "",
-                email: client.email || "",
-                phonenumber: client.phonenumber || "",
-                segment: client.segment || "",
-            });
-        }
-    }, [client]);
+    const { user } = useAuth();
 
     const handleInputChange = (e) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
     };
-    
-    const handleUpdateClient = async (e) => {
-      e.preventDefault();
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
         setLoading(true);
+
         try {
-          // Update client document in Firestore
-          const clientRef = doc(db, 'clients', client.id);
-          
-          await updateDoc(clientRef, {
-            ...formData,
-            updated_at: serverTimestamp()
-          });
+            // Basic validation
+            if (!formData.name || !formData.email || !formData.password) {
+                throw new Error("Name, email and password are required fields");
+            }
 
-          toast({
-              title: "Success",
-              description: "Client updated successfully",
-          });
-          onUpdate(); // Refresh the client list
-          onClose();
+            if (formData.password.length < 6) {
+                throw new Error("Password must be at least 6 characters long");
+            }
 
-        } catch (error) {
-            console.error("Error updating client:", error);
+            // 1. Create user in Firebase Authentication
+            const userCredential = await createUserWithEmailAndPassword(
+                auth,
+                formData.email,
+                formData.password
+            );
+            
+            // 2. Create client document in Firestore
+            const clientData = {
+                user_id: userCredential.user.uid,
+                name: formData.name,
+                email: formData.email,
+                document: formData.document || null,
+                responsible_name: formData.responsible_name || null,
+                responsible_surname: formData.responsible_surname || null,
+                address: formData.address || null,
+                phonenumber: formData.phonenumber || null,
+                segment: formData.segment || null,
+                manager_id: user.uid,
+                created_at: serverTimestamp(),
+                updated_at: serverTimestamp(),
+                deleted_at: null
+            };
+            
+            await addDoc(collection(db, 'clients'), clientData);
+
             toast({
-                title: "Error",
-                description: error.message || "Failed to update client.",
-                variant: "destructive",
+                title: "Success",
+                description: "Client created successfully!",
             });
+            
+            onSuccess();
+            onClose();
+        } catch (error) {
+            console.error("Error creating client:", error);
+            
+            // Handle specific Firebase auth errors
+            if (error.code === 'auth/email-already-in-use') {
+                toast({
+                    title: "Error",
+                    description: "This email is already registered. Please use a different email.",
+                    variant: "destructive",
+                });
+            } else if (error.code === 'auth/invalid-email') {
+                toast({
+                    title: "Error",
+                    description: "Please provide a valid email address.",
+                    variant: "destructive",
+                });
+            } else if (error.code === 'auth/weak-password') {
+                toast({
+                    title: "Error",
+                    description: "Password is too weak. Please use a stronger password.",
+                    variant: "destructive",
+                });
+            } else {
+                toast({
+                    title: "Error",
+                    description: error.message || "Failed to create client.",
+                    variant: "destructive",
+                });
+            }
         } finally {
-          setLoading(false)
+            setLoading(false);
         }
     };
-
-    if(!client) return null; //If no client is selected.
 
     return (
         <Dialog open={open} onOpenChange={onClose}>
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
-                    <DialogTitle>Edit Client</DialogTitle>
+                    <DialogTitle>Create New Client</DialogTitle>
                     <DialogDescription>
-                        Modify the client's information.
+                        Add a new client to your dashboard.
                     </DialogDescription>
                 </DialogHeader>
-                <form onSubmit={handleUpdateClient}  className="space-y-4">
+                <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <Label htmlFor="name">Name</Label>
+                            <Label htmlFor="name">Name*</Label>
                             <Input
                                 id="name"
                                 name="name"
@@ -108,8 +143,8 @@ export default function EditClientDialog({ client, open, onClose, onUpdate }) {
                                 required
                             />
                         </div>
-                         <div>
-                            <Label htmlFor="email">Email</Label>
+                        <div>
+                            <Label htmlFor="email">Email*</Label>
                             <Input
                                 id="email"
                                 name="email"
@@ -117,9 +152,22 @@ export default function EditClientDialog({ client, open, onClose, onUpdate }) {
                                 value={formData.email}
                                 onChange={handleInputChange}
                                 required
-                                disabled // Email can't be changed as it's tied to authentication
                             />
                         </div>
+                    </div>
+                    <div>
+                        <Label htmlFor="password">Password*</Label>
+                        <Input
+                            type="password"
+                            id="password"
+                            name="password"
+                            value={formData.password}
+                            onChange={handleInputChange}
+                            required
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                            Password must be at least 6 characters long.
+                        </p>
                     </div>
                     <div>
                         <Label htmlFor="document">Document</Label>
@@ -150,7 +198,6 @@ export default function EditClientDialog({ client, open, onClose, onUpdate }) {
                             />
                         </div>
                     </div>
-
                     <div>
                         <Label htmlFor="address">Address</Label>
                         <Input
@@ -185,8 +232,8 @@ export default function EditClientDialog({ client, open, onClose, onUpdate }) {
                             Cancel
                         </Button>
                         <Button type="submit" disabled={loading}>
-                        {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                        {loading ? "Updating..." : "Update Client"}
+                            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                            {loading ? "Creating..." : "Create Client"}
                         </Button>
                     </DialogFooter>
                 </form>

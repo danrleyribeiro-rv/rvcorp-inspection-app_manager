@@ -22,19 +22,25 @@ export default function ForgotPasswordPage() {
     setLoading(true);
     setMessage({ text: '', success: false });
 
-    const result = await resetPassword(email);
-    if (result.success) {
+    try {
+      const result = await resetPassword(email);
+      
+      if (result.success) {
+        setMessage({
+          text: 'Email de redefinição de senha enviado. Verifique sua caixa de entrada e spam.',
+          success: true
+        });
+      } else {
+        throw new Error(result.error || 'Erro ao enviar email de redefinição.');
+      }
+    } catch (error) {
       setMessage({
-        text: 'Email de redefinição de senha enviado. Verifique sua caixa de entrada e spam.',
-        success: true
-      });
-    } else {
-      setMessage({
-        text: result.error || 'Erro ao enviar email de redefinição. Por favor, tente novamente.',
+        text: error.message || 'Erro ao enviar email de redefinição. Por favor, tente novamente.',
         success: false
       });
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (

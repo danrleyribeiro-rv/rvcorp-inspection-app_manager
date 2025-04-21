@@ -2,7 +2,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
+import { db } from "@/lib/firebase";
+import { collection, getDocs, query, where } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import {
     Table,
@@ -12,52 +13,50 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table"
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Pencil, Trash2, UserPlus, Users } from "lucide-react";
 import EditClientDialog from "./components/EditClientDialog";
 import DeleteClientDialog from "./components/DeleteClientDialog";
 import TransferClientDialog from "./components/TransferClientDialog";
-
+import CreateClientDialog from "./components/CreateClientDialog";
+import { useAuth } from "@/context/auth-context";
 
 export default function ClientsPage() {
     const [clients, setClients] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [showCreateForm, setShowCreateForm] = useState(false);
-    const [editClient, setEditClient] = useState(null); // State for editing
-    const [deleteClient, setDeleteClient] = useState(null); // State for deleting
-    const [transferClient, setTransferClient] = useState(null); // State for transfer
+    const [showCreateDialog, setShowCreateDialog] = useState(false);
+    const [editClient, setEditClient] = useState(null);
+    const [deleteClient, setDeleteClient] = useState(null);
+    const [transferClient, setTransferClient] = useState(null);
     const { toast } = useToast();
-
-    // Form state
-    const [newClient, setNewClient] = useState({
-        name: "",
-        email: "",
-        password: "",
-        document: "",
-        responsible_name: "",
-        responsible_surname: "",
-        address: "",
-        phonenumber: "",
-        segment: "",
-    });
-
+    const { user } = useAuth();
 
     useEffect(() => {
-        fetchClients();
-    }, []);
+        if (user) {
+            fetchClients();
+        }
+    }, [user]);
 
     const fetchClients = async () => {
         setLoading(true);
         try {
-            const { data, error } = await supabase
-                .from("clients")
-                .select("*")
-                .order("created_at", { ascending: false });
-
-            if (error) throw error;
-            setClients(data || []);
+            const clientsQuery = query(
+                collection(db, 'clients'),
+                where('deleted_at', '==', null)
+            );
+            
+            const clientsSnapshot = await getDocs(clientsQuery);
+            
+            const clientsList = clientsSnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data(),
+                created_at: doc.data().created_at?.toDate().toISOString()
+            })).sort((a, b) => {
+                if (!a.created_at || !b.created_at) return 0;
+                return new Date(b.created_at) - new Date(a.created_at);
+            });
+            
+            setClients(clientsList);
         } catch (error) {
             console.error("Error fetching clients:", error);
             toast({
@@ -70,167 +69,15 @@ export default function ClientsPage() {
         }
     };
 
-    const handleInputChange = (e) => {
-        setNewClient({ ...newClient, [e.target.name]: e.target.value });
-    };
-
-    const handleCreateClient = async (e) => {
-        e.preventDefault();
-        setLoading(true);
-
-        try {
-            const { data, error } = await supabase.rpc('create_client', {
-                email: newClient.email,       // Correct order and names
-                password: newClient.password,
-                name: newClient.name,
-                document: newClient.document,
-                responsible_name: newClient.responsible_name,
-                responsible_surname: newClient.responsible_surname,
-                address: newClient.address,
-                phonenumber: newClient.phonenumber,
-                segment: newClient.segment
-            });
-
-
-            if (error) {
-                throw error;
-            }
-
-            toast({
-                title: "Success",
-                description: "Client created successfully!",
-            });
-            //Refetch
-            fetchClients();
-            setShowCreateForm(false)
-            setNewClient({ //Clear form
-                name: "",
-                email: "",
-                password: "",
-                document: "",
-                responsible_name: "",
-                responsible_surname: "",
-                address: "",
-                phonenumber: "",
-                segment: "",
-            });
-        } catch (error) {
-            console.error("Error creating client:", error);
-            toast({
-                title: "Error",
-                description: error.message || "Failed to create client.",
-                variant: "destructive",
-            });
-        } finally {
-            setLoading(false);
-        }
-    };
-
     return (
         <div className="container p-6">
-            <h1 className="text-3xl font-bold mb-4">Clients</h1>
-
-            <Button onClick={() => setShowCreateForm(!showCreateForm)} className="mb-4">
-                <UserPlus className="mr-2" />
-                {showCreateForm ? "Hide Form" : "Create Client"}
-            </Button>
-
-            {showCreateForm && (
-                <form onSubmit={handleCreateClient} className="space-y-4 mb-6">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <Label htmlFor="name">Name</Label>
-                            <Input
-                                id="name"
-                                name="name"
-                                value={newClient.name}
-                                onChange={handleInputChange}
-                                required
-                            />
-                        </div>
-                        <div>
-                            <Label htmlFor="email">Email</Label>
-                            <Input
-                                id="email"
-                                name="email"
-                                type="email"
-                                value={newClient.email}
-                                onChange={handleInputChange}
-                                required
-                            />
-                        </div>
-                        <div>
-                            <Label htmlFor="password">Password</Label>
-                            <Input
-                                type="password"
-                                id="password"
-                                name="password"
-                                value={newClient.password}
-                                onChange={handleInputChange}
-                                required
-                            />
-                        </div>
-                        <div>
-                            <Label htmlFor="document">Document</Label>
-                            <Input
-                                id="document"
-                                name="document"
-                                value={newClient.document}
-                                onChange={handleInputChange}
-                            />
-                        </div>
-                        <div>
-                            <Label htmlFor="responsible_name">Responsible Name</Label>
-                            <Input
-                                id="responsible_name"
-                                name="responsible_name"
-                                value={newClient.responsible_name}
-                                onChange={handleInputChange}
-                            />
-                        </div>
-                        <div>
-                            <Label htmlFor="responsible_surname">Responsible Surname</Label>
-                            <Input
-                                id="responsible_surname"
-                                name="responsible_surname"
-                                value={newClient.responsible_surname}
-                                onChange={handleInputChange}
-                            />
-                        </div>
-                        <div>
-                            <Label htmlFor="address">Address</Label>
-                            <Input
-                                id="address"
-                                name="address"
-                                value={newClient.address}
-                                onChange={handleInputChange}
-                            />
-                        </div>
-                        <div>
-                            <Label htmlFor="phonenumber">Phone Number</Label>
-                            <Input
-                                id="phonenumber"
-                                name="phonenumber"
-                                value={newClient.phonenumber}
-                                onChange={handleInputChange}
-                            />
-                        </div>
-                        <div>
-                            <Label htmlFor="segment">Segment</Label>
-                            <Input
-                                id="segment"
-                                name="segment"
-                                value={newClient.segment}
-                                onChange={handleInputChange}
-                            />
-                        </div>
-                    </div>
-                    <Button type="submit" disabled={loading}>
-                        {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                        {loading ? "Creating..." : "Create Client"}
-                    </Button>
-                </form>
-            )}
+            <div className="flex justify-between items-center mb-6">
+                <h1 className="text-3xl font-bold">Clients</h1>
+                <Button onClick={() => setShowCreateDialog(true)}>
+                    <UserPlus className="mr-2 h-4 w-4" />
+                    Create Client
+                </Button>
+            </div>
 
             {loading ? (
                 <div className="flex justify-center items-center py-12">
@@ -273,7 +120,6 @@ export default function ClientsPage() {
                                                 variant="ghost"
                                                 size="icon"
                                                 onClick={() => setTransferClient(client)}
-
                                             >
                                                 <Users className="h-4 w-4" />
                                             </Button>
@@ -294,6 +140,16 @@ export default function ClientsPage() {
                     )}
                 </>
             )}
+            
+            {/* Create Client Dialog */}
+            {showCreateDialog && (
+                <CreateClientDialog
+                    open={showCreateDialog}
+                    onClose={() => setShowCreateDialog(false)}
+                    onSuccess={fetchClients}
+                />
+            )}
+
             {/* Edit Client Dialog */}
             {editClient && (
                 <EditClientDialog
