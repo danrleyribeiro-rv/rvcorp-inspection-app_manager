@@ -4,9 +4,10 @@
 import { useState, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/lib/supabase";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
-import { FileJson, FileSpreadsheet, Upload } from "lucide-react";
+import { FileJson, Upload } from "lucide-react";
 
 export default function ImportTemplateDialog({ open, onClose, onSuccess }) {
   const [file, setFile] = useState(null);
@@ -24,18 +25,18 @@ export default function ImportTemplateDialog({ open, onClose, onSuccess }) {
       try {
         if (file.name.endsWith(".json")) {
           const data = JSON.parse(text);
-           // Validate that the imported JSON has the expected structure.
+          // Validate that the imported JSON has the expected structure
           if (!data.title) {
             throw new Error("Imported JSON must have a 'title' property.");
           }
-          // If 'rooms' exists, ensure that it's an array.
+          // If 'rooms' exists, ensure that it's an array
           if (data.rooms && !Array.isArray(data.rooms)) {
-                throw new Error("The 'rooms' property must be an array.");
+            throw new Error("The 'rooms' property must be an array.");
           }
 
           setPreview(data);
         } else {
-          // CSV is *not* supported, show error immediately.
+          // CSV is not supported, show error immediately
           toast({
             title: "Formato não suportado",
             description:
@@ -67,25 +68,24 @@ export default function ImportTemplateDialog({ open, onClose, onSuccess }) {
     if (!preview) return;
     setLoading(true);
     try {
-
       const dataToSave = {
         title: preview.title,
-        description: preview.description || null, // Handle optional fields
+        description: preview.description || null,
         template_price: parseFloat(preview.template_price) || null,
         icon: preview.icon || null,
         icon_color: preview.icon_color || null,
-        rooms: preview.rooms || [], // Ensure 'rooms' is an array (even if empty)
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        rooms: preview.rooms || [],
+        created_at: serverTimestamp(),
+        updated_at: serverTimestamp(),
+        deleted_at: null
       };
 
-      const { error } = await supabase.from("templates").insert([dataToSave]); // Insert as an array
-
-      if (error) throw error;
+      // Add document to Firestore
+      await addDoc(collection(db, 'templates'), dataToSave);
 
       toast({
         title: "Sucesso",
-        description: "Template importado com sucesso",
+        description: "Template importado com sucesso"
       });
 
       onSuccess();
@@ -95,10 +95,10 @@ export default function ImportTemplateDialog({ open, onClose, onSuccess }) {
       toast({
         title: "Erro",
         description: error.message || "Erro ao importar template",
-        variant: "destructive",
+        variant: "destructive"
       });
     } finally {
-       setLoading(false);
+      setLoading(false);
     }
   };
 

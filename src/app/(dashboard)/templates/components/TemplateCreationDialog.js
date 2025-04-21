@@ -9,7 +9,8 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import RoomEditor from "./RoomEditor";
-import { supabase } from "@/lib/supabase";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 
 const TEMPLATE_ICONS = [
@@ -74,13 +75,13 @@ export default function TemplateCreationDialog({ open, onClose, onSuccess }) {
         icon: formData.icon || null,
         icon_color: formData.icon_color || null,
         rooms: formData.rooms || [], // Ensure 'rooms' is an array
-        created_at: new Date().toISOString()
+        created_at: serverTimestamp(),
+        updated_at: serverTimestamp(),
+        deleted_at: null
       };
 
-
-      const { error } = await supabase.from('templates').insert([dataToSave]);
-
-      if (error) throw error;
+      // Add document to Firestore
+      await addDoc(collection(db, 'templates'), dataToSave);
 
       toast({
         title: "Sucesso",
@@ -97,7 +98,7 @@ export default function TemplateCreationDialog({ open, onClose, onSuccess }) {
         variant: "destructive"
       });
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
   };
 

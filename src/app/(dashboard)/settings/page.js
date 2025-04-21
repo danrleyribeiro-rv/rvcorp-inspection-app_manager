@@ -2,7 +2,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
+import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { db, auth } from "@/lib/firebase";
+import { updatePassword } from "firebase/auth";
 import { useTheme } from "next-themes";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
@@ -60,7 +62,7 @@ export default function SettingsPage() {
     password: false
   });
   const { theme, setTheme } = useTheme();
-  const { user, updatePassword } = useAuth();
+  const { user } = useAuth();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -71,30 +73,30 @@ export default function SettingsPage() {
   }, [user]);
 
   const loadSettings = async () => {
-    setLoading(prev => ({ ...prev, settings: true })); // Set loading *before* async call
+    setLoading(prev => ({ ...prev, settings: true }));
     try {
-      const { data, error } = await supabase
-        .from('user_settings') // Use the correct table name!
-        .select('settings')
-        .eq('user_id', user.id) // Use user_id to link to settings
-        .single();
-
-      if (error) {
-        // Handle the case where settings don't exist yet
-        if (error.code === 'PGRST116') { // "Not found" error
-          // No settings found, use defaults.  Don't throw.
-          console.log("No settings found for user, using defaults.");
-          setSettings(defaultSettings); // Use default settings
-        } else {
-            throw error; // Re-throw other errors
-        }
-      } else if (data?.settings) {
-          setSettings(data.settings);
-          if (data.settings.theme) {
-            setTheme(data.settings.theme);
+      if (!user?.uid) return;
+      
+      const userSettingsRef = doc(db, 'user_settings', user.uid);
+      const settingsDoc = await getDoc(userSettingsRef);
+      
+      if (settingsDoc.exists()) {
+        const settingsData = settingsDoc.data();
+        if (settingsData.settings) {
+          setSettings(settingsData.settings);
+          
+          // Apply theme from settings if it exists
+          if (settingsData.settings.theme) {
+            setTheme(settingsData.settings.theme);
           }
+        } else {
+          // If settings object doesn't exist in the document
+          setSettings(defaultSettings);
+        }
+      } else {
+        // If document doesn't exist yet, use defaults
+        setSettings(defaultSettings);
       }
-
     } catch (error) {
       console.error("Error loading settings:", error);
       toast({
@@ -109,19 +111,17 @@ export default function SettingsPage() {
 
   const loadProfile = async () => {
     try {
-      const { data, error } = await supabase
-        .from('managers')
-        .select('name, surname, email')
-        .eq('id', user.id)
-        .single();
-
-      if (error) throw error;
-
-      if (data) {
+      if (!user?.uid) return;
+      
+      const managerRef = doc(db, 'managers', user.uid);
+      const managerDoc = await getDoc(managerRef);
+      
+      if (managerDoc.exists()) {
+        const data = managerDoc.data();
         setProfile({
           name: data.name || "",
           surname: data.surname || "",
-          email: data.email || ""
+          email: user.email || data.email || ""
         });
       }
     } catch (error) {
@@ -134,39 +134,47 @@ export default function SettingsPage() {
     }
   };
 
-const saveSettings = async (newSettings) => {
-  setLoading(prev => ({ ...prev, settings: true }));
-  try {
-    // Use UPSERT to either insert or update the settings
-    const { error } = await supabase
-      .from('user_settings')
-      .upsert(
-        {
-          user_id: user.id, // Use user_id
+  const saveSettings = async (newSettings) => {
+    setLoading(prev => ({ ...prev, settings: true }));
+    try {
+      if (!user?.uid) return;
+      
+      const userSettingsRef = doc(db, 'user_settings', user.uid);
+      
+      // Check if the document already exists
+      const docSnap = await getDoc(userSettingsRef);
+      
+      if (docSnap.exists()) {
+        // Update existing document
+        await updateDoc(userSettingsRef, {
           settings: newSettings,
-          updated_at: new Date(),
-        },
-        { onConflict: 'user_id' } // On conflict with user_id, update
-      );
+          updated_at: serverTimestamp()
+        });
+      } else {
+        // Create new document
+        await setDoc(userSettingsRef, {
+          settings: newSettings,
+          user_id: user.uid,
+          created_at: serverTimestamp(),
+          updated_at: serverTimestamp()
+        });
+      }
 
-    if (error) throw error;
-
-    toast({
-      title: "Sucesso",
-      description: "Configurações salvas com sucesso",
-    });
-  } catch (error) {
-    console.error("Error saving settings:", error);
-    toast({
-      title: "Erro",
-      description: "Falha ao salvar configurações",
-      variant: "destructive",
-    });
-  } finally {
-        setLoading(prev => ({...prev, settings: false}));
+      toast({
+        title: "Sucesso",
+        description: "Configurações salvas com sucesso",
+      });
+    } catch (error) {
+      console.error("Error saving settings:", error);
+      toast({
+        title: "Erro",
+        description: "Falha ao salvar configurações",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(prev => ({ ...prev, settings: false }));
     }
-};
-
+  };
 
   const updateNotificationSetting = (key) => {
     const newSettings = {
@@ -207,16 +215,15 @@ const saveSettings = async (newSettings) => {
     setLoading(prev => ({ ...prev, profile: true }));
 
     try {
-      const { error } = await supabase
-        .from('managers')
-        .update({
-          name: profile.name,
-          surname: profile.surname,
-          updated_at: new Date()
-        })
-        .eq('id', user.id);
-
-      if (error) throw error;
+      if (!user?.uid) return;
+      
+      const managerRef = doc(db, 'managers', user.uid);
+      
+      await updateDoc(managerRef, {
+        name: profile.name,
+        surname: profile.surname,
+        updated_at: serverTimestamp()
+      });
 
       toast({
         title: "Sucesso",
@@ -259,11 +266,12 @@ const saveSettings = async (newSettings) => {
     setLoading(prev => ({ ...prev, password: true }));
 
     try {
-      const result = await updatePassword(password.new);
-
-      if (!result.success) {
-        throw new Error(result.error);
+      if (!auth.currentUser) {
+        throw new Error("Usuário não autenticado");
       }
+      
+      // Use Firebase Auth to update password
+      await updatePassword(auth.currentUser, password.new);
 
       toast({
         title: "Sucesso",
@@ -278,9 +286,18 @@ const saveSettings = async (newSettings) => {
       });
     } catch (error) {
       console.error("Error changing password:", error);
+      let errorMessage = "Falha ao alterar senha";
+      
+      // Provide more specific error messages for Firebase Auth errors
+      if (error.code === 'auth/requires-recent-login') {
+        errorMessage = "Por motivos de segurança, faça login novamente antes de alterar sua senha";
+      } else if (error.code === 'auth/weak-password') {
+        errorMessage = "A senha é muito fraca. Use uma senha mais forte";
+      }
+      
       toast({
         title: "Erro",
-        description: error.message || "Falha ao alterar senha",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

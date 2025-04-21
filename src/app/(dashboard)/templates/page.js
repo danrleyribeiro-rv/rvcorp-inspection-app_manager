@@ -2,7 +2,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
+import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Plus, Upload, Download } from "lucide-react";
 import {
@@ -54,14 +55,27 @@ export default function TemplatesPage() {
   const fetchTemplates = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('templates') // Correct table name
-        .select('*')
-        .is('deleted_at', null)
-        .order('title');
-
-      if (error) throw error;
-      setTemplates(data || []);
+      // Create query to get all non-deleted templates
+      const templatesQuery = query(
+        collection(db, 'templates'),
+        where('deleted_at', '==', null),
+        orderBy('title')
+      );
+      
+      const querySnapshot = await getDocs(templatesQuery);
+      
+      // Map docs to our data structure, formatting timestamps
+      const templatesData = querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          created_at: data.created_at?.toDate().toISOString(),
+          updated_at: data.updated_at?.toDate().toISOString()
+        };
+      });
+      
+      setTemplates(templatesData || []);
     } catch (error) {
       console.error("Error fetching templates:", error);
       toast({
@@ -104,7 +118,7 @@ export default function TemplatesPage() {
               <Download className="mr-2 h-4 w-4" />
               Exportar
             </Button>
-          </div> {/* THIS WAS MISSING */}
+          </div>
         </div>
       </div>
 

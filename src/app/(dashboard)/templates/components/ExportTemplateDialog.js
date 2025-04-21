@@ -1,4 +1,3 @@
-
 // app/(dashboard)/templates/components/ExportTemplateDialog.js
 "use client";
 
@@ -43,8 +42,14 @@ export default function ExportTemplateDialog({ open, onClose, templates }) {
 
     setLoading(true);
     try {
-      // Filter templates to export
-      const templatesData = templates.filter(t => selectedTemplates.includes(t.id));
+      // Filter templates to export and remove Firebase-specific fields
+      const templatesData = templates
+        .filter(t => selectedTemplates.includes(t.id))
+        .map(({ id, created_at, updated_at, deleted_at, ...rest }) => ({
+          ...rest,
+          // Keep the ID but make it optional for import purposes
+          original_id: id
+        }));
       
       // Create JSON data
       const dataStr = JSON.stringify(templatesData, null, 2);
@@ -71,8 +76,9 @@ export default function ExportTemplateDialog({ open, onClose, templates }) {
         description: "Erro ao exportar templates",
         variant: "destructive"
       });
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
