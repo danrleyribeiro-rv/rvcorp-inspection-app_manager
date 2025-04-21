@@ -1,204 +1,233 @@
-// app/(dashboard)/templates/components/TemplateEditDialog.js
+// app/(dashboard)/templates/page.js
 "use client";
 
-import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { useState, useEffect } from "react";
+import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import RoomEditor from "./RoomEditor";
-import { supabase } from "@/lib/supabase";
+import { Plus, Upload, Download } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  PencilRuler,
+  Ruler,
+  Wrench,
+  Puzzle,
+  Home,
+  Building,
+  Store,
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import TemplateCreationDialog from "./components/TemplateCreationDialog";
+import TemplateEditDialog from "./components/TemplateEditDialog";
+import ImportTemplateDialog from "./components/ImportTemplateDialog";
+import ExportTemplateDialog from "./components/ExportTemplateDialog";
+import DeleteTemplateDialog from "./components/DeleteTemplateDialog";
 
-const TEMPLATE_ICONS = [
-  { value: 'pencil-ruler', label: 'Régua e Lápis' },
-  { value: 'ruler', label: 'Régua' },
-  { value: 'wrench', label: 'Chave' },
-  { value: 'puzzle', label: 'Quebra-cabeça' },
-  { value: 'house', label: 'Casa' },
-  { value: 'building', label: 'Prédio' },
-  { value: 'store', label: 'Loja' }
-];
+const iconComponents = {
+  'pencil-ruler': PencilRuler,
+  'ruler': Ruler,
+  'wrench': Wrench,
+  'puzzle': Puzzle,
+  'house': Home,
+  'building': Building,
+  'store': Store,
+};
 
-const TEMPLATE_COLORS = [
-  { value: 'text-green-500', label: 'Verde', class: 'text-green-500 bg-green-50' },
-  { value: 'text-red-500', label: 'Vermelho', class: 'text-red-500 bg-red-50' },
-  { value: 'text-blue-500', label: 'Azul', class: 'text-blue-500 bg-blue-50' },
-  { value: 'text-purple-500', label: 'Roxo', class: 'text-purple-500 bg-purple-50' },
-  { value: 'text-orange-500', label: 'Laranja', class: 'text-orange-500 bg-orange-50' },
-  { value: 'text-black', label: 'Preto', class: 'text-black bg-gray-50' },
-  { value: 'text-gray-700', label: 'Cinza Escuro', class: 'text-gray-700 bg-gray-50' }
-];
-
-export default function TemplateEditDialog({ template, open, onClose, onSuccess }) {
-  const [formData, setFormData] = useState({
-    ...template,
-    template_price: template.template_price?.toString() || "0" // Ensure price is string
-  });
-  const [loading, setLoading] = useState(false);
+export default function TemplatesPage() {
+  const [templates, setTemplates] = useState([]);
+  const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const [templateToDelete, setTemplateToDelete] = useState(null);
+  const [showImport, setShowImport] = useState(false);
+  const [showExport, setShowExport] = useState(false);
+  const [showCreate, setShowCreate] = useState(false);
+  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  const handleNumberChange = (e) => {
-    const { name, value } = e.target;
-    const numericValue = value.replace(/[^0-9.]/g, '');
-    const parsedValue = parseFloat(numericValue) || 0;
-    setFormData(prev => ({
-        ...prev,
-        [name]: parsedValue.toString()
-    }));
-  };
+  useEffect(() => {
+    fetchTemplates();
+  }, []);
 
-  const handleSubmit = async () => {
-    if (!formData.title.trim()) {
-      toast({
-        title: "Erro",
-        description: "O título é obrigatório",
-        variant: "destructive"
-      });
-      return;
-    }
-
+  const fetchTemplates = async () => {
     setLoading(true);
     try {
-      const dataToSave = {
-        title: formData.title,
-        description: formData.description || null,
-        template_price: parseFloat(formData.template_price) || null,
-        icon: formData.icon || null,
-        icon_color: formData.icon_color || null,
-        rooms: formData.rooms || [], // Ensure rooms is always an array
-        updated_at: new Date().toISOString()
-      };
-
-      const { error } = await supabase
-        .from('templates')
-        .update(dataToSave)
-        .eq('id', template.id);
-
-      if (error) throw error;
-
-      toast({
-        title: "Sucesso",
-        description: "Template atualizado com sucesso"
+      // Criar query para obter todos os templates não excluídos
+      const templatesQuery = query(
+        collection(db, 'templates'),
+        where('deleted_at', '==', null),
+        orderBy('title')
+      );
+      
+      const querySnapshot = await getDocs(templatesQuery);
+      
+      // Mapear documentos para nossa estrutura de dados, formatando timestamps
+      const templatesData = querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          created_at: data.created_at?.toDate().toISOString(),
+          updated_at: data.updated_at?.toDate().toISOString()
+        };
       });
-
-      onSuccess();
-      onClose();
+      
+      setTemplates(templatesData || []);
     } catch (error) {
-      console.error("Erro ao atualizar template:", error);
+      console.error("Erro ao carregar templates:", error);
       toast({
-        title: "Erro",
-        description: "Erro ao atualizar template",
+        title: "Erro ao carregar templates",
+        description: error.message,
         variant: "destructive"
       });
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
   };
 
+  const getIconComponent = (iconName) => {
+    const IconComponent = iconComponents[iconName];
+    return IconComponent ? <IconComponent className="h-5 w-5" /> : null;
+  };
+
+  const formatCurrency = (value) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(value || 0);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl h-[90vh]">
-        <DialogHeader>
-          <DialogTitle>Editar Template</DialogTitle>
-          <DialogDescription>
-            Atualize o template de inspeção
-          </DialogDescription>
-        </DialogHeader>
-        <ScrollArea className="h-full pr-4">
-          <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Título</Label>
-                <Input
-                  value={formData.title}
-                  onChange={e => setFormData({...formData, title: e.target.value})}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Preço</Label>
-                <Input
-                  type="number"
-                  name="template_price"
-                  min="0"
-                  step="0.01"
-                  value={formData.template_price}
-                  onChange={handleNumberChange}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Descrição</Label>
-              <Input
-                value={formData.description}
-                onChange={e => setFormData({...formData, description: e.target.value})}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Ícone</Label>
-                <Select
-                  value={formData.icon}
-                  onValueChange={value => setFormData({...formData, icon: value})}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione um ícone" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TEMPLATE_ICONS.map(icon => (
-                      <SelectItem key={icon.value} value={icon.value}>
-                        <div className="flex items-center gap-2">
-                          {icon.label}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Cor do Ícone</Label>
-                <Select
-                  value={formData.icon_color}
-                  onValueChange={value => setFormData({...formData, icon_color: value})}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione uma cor" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TEMPLATE_COLORS.map(color => (
-                      <SelectItem key={color.value} value={color.value}>
-                        <div className="flex items-center gap-2">
-                          <div className={`w-4 h-4 rounded-full ${color.class}`} />
-                          {color.label}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <RoomEditor
-              rooms={formData.rooms || []}  // Ensure rooms is always an array
-              onChange={rooms => setFormData({...formData, rooms})}
-            />
-
-            <div className="flex justify-end gap-4">
-              <Button variant="outline" onClick={onClose} disabled={loading}>
-                Cancelar
-              </Button>
-              <Button onClick={handleSubmit} disabled={loading}>
-                {loading ? "Salvando..." : "Salvar Alterações"}
-              </Button>
-            </div>
+    <div className="container p-6">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">Templates</h1>
+        <div className="flex gap-4">
+          <Button onClick={() => setShowCreate(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Novo Template
+          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setShowImport(true)}>
+              <Upload className="mr-2 h-4 w-4" />
+              Importar
+            </Button>
+            <Button variant="outline" onClick={() => setShowExport(true)}>
+              <Download className="mr-2 h-4 w-4" />
+              Exportar
+            </Button>
           </div>
-        </ScrollArea>
-      </DialogContent>
-    </Dialog>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center items-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      ) : templates.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground">
+          Nenhum template encontrado. Crie um novo template para começar.
+        </div>
+      ) : (
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-12"></TableHead>
+                <TableHead>Nome</TableHead>
+                <TableHead>Descrição</TableHead>
+                <TableHead>Salas</TableHead>
+                <TableHead>Itens</TableHead>
+                <TableHead>Preço</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {templates.map((template) => (
+                <TableRow key={template.id}>
+                  <TableCell>
+                    <div className={template.icon_color || 'text-gray-700'}>
+                      {getIconComponent(template.icon)}
+                    </div>
+                  </TableCell>
+                  <TableCell className="font-medium">{template.title}</TableCell>
+                  <TableCell>{template.description}</TableCell>
+                  <TableCell>{template.rooms?.length || 0}</TableCell>
+                  <TableCell>
+                    {template.rooms?.reduce((acc, room) => acc + (room.items?.length || 0), 0) || 0}
+                  </TableCell>
+                  <TableCell>
+                    {formatCurrency(template.template_price)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        variant="ghost"
+                        onClick={() => setSelectedTemplate(template)}
+                      >
+                        Editar
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        className="text-destructive hover:text-destructive/90"
+                        onClick={() => setTemplateToDelete(template)}
+                      >
+                        Excluir
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      {showCreate && (
+        <TemplateCreationDialog 
+          onClose={() => setShowCreate(false)} 
+          open={showCreate}
+          onSuccess={fetchTemplates}
+        />
+      )}
+
+      {selectedTemplate && (
+        <TemplateEditDialog
+          template={selectedTemplate}
+          onClose={() => setSelectedTemplate(null)}
+          open={!!selectedTemplate}
+          onSuccess={fetchTemplates}
+        />
+      )}
+
+      {templateToDelete && (
+        <DeleteTemplateDialog
+          template={templateToDelete}
+          open={!!templateToDelete}
+          onClose={() => setTemplateToDelete(null)}
+          onDelete={fetchTemplates}
+        />
+      )}
+
+      {showImport && (
+        <ImportTemplateDialog
+          onClose={() => setShowImport(false)}
+          open={showImport}
+          onSuccess={fetchTemplates}
+        />
+      )}
+
+      {showExport && (
+        <ExportTemplateDialog
+          onClose={() => setShowExport(false)}
+          open={showExport}
+          templates={templates}
+        />
+      )}
+    </div>
   );
 }

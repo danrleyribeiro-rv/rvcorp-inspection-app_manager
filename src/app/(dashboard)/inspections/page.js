@@ -2,7 +2,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
+import { db } from "@/lib/firebase";
+import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetTrigger } from "@/components/ui/sheet";
@@ -47,26 +48,104 @@ export default function InspectionsPage() {
   const fetchInspections = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('inspections')
-        .select(`
-          id,
-          title,
-          observation,
-          status,
-          scheduled_date,
-          project_id,
-          inspector_id,
-          inspectors:inspector_id(name,last_name),
-          projects:project_id(title, client_id, clients!inner(name))
-        `)
-        .eq('projects.manager_id', user.id)
-        .is('deleted_at', null)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setInspections(data || []);
-      setFilteredInspections(data || []);
+      // First, get all projects for this manager
+      const projectsQuery = query(
+        collection(db, 'projects'),
+        where('manager_id', '==', user.uid),
+        where('deleted_at', '==', null)
+      );
+      
+      const projectsSnapshot = await getDocs(projectsQuery);
+      const projectIds = projectsSnapshot.docs.map(doc => doc.id);
+      
+      if (projectIds.length === 0) {
+        setInspections([]);
+        setFilteredInspections([]);
+        setLoading(false);
+        return;
+      }
+      
+      // Now, get all inspections for these projects
+      const inspectionsQuery = query(
+        collection(db, 'inspections'),
+        where('project_id', 'in', projectIds),
+        where('deleted_at', '==', null),
+        orderBy('created_at', 'desc')
+      );
+      
+      const inspectionsSnapshot = await getDocs(inspectionsQuery);
+      
+      // Process inspections with related data
+      const inspectionsData = [];
+      
+      for (const doc of inspectionsSnapshot.docs) {
+        const inspection = {
+          id: doc.id,
+          ...doc.data(),
+          // Convert Firebase timestamps to ISO strings
+          created_at: doc.data().created_at?.toDate().toISOString(),
+          updated_at: doc.data().updated_at?.toDate().toISOString(),
+          scheduled_date: doc.data().scheduled_date?.toDate().toISOString()
+        };
+        
+        // Get project data
+        if (inspection.project_id) {
+          const project = projectsSnapshot.docs.find(doc => doc.id === inspection.project_id);
+          if (project) {
+            inspection.projects = {
+              id: project.id,
+              ...project.data()
+            };
+            
+            // Get client data if available
+            if (inspection.projects.client_id) {
+              try {
+                const clientSnapshot = await getDocs(
+                  query(
+                    collection(db, 'clients'),
+                    where('__name__', '==', inspection.projects.client_id)
+                  )
+                );
+                
+                if (!clientSnapshot.empty) {
+                  inspection.projects.clients = {
+                    id: clientSnapshot.docs[0].id,
+                    ...clientSnapshot.docs[0].data()
+                  };
+                }
+              } catch (err) {
+                console.error("Error fetching client:", err);
+              }
+            }
+          }
+        }
+        
+        // Get inspector data
+        if (inspection.inspector_id) {
+          try {
+            const inspectorSnapshot = await getDocs(
+              query(
+                collection(db, 'inspectors'),
+                where('__name__', '==', inspection.inspector_id)
+              )
+            );
+            
+            if (!inspectorSnapshot.empty) {
+              inspection.inspectors = {
+                id: inspectorSnapshot.docs[0].id,
+                ...inspectorSnapshot.docs[0].data()
+              };
+            }
+          } catch (err) {
+            console.error("Error fetching inspector:", err);
+          }
+        }
+        
+        inspectionsData.push(inspection);
+      }
+      
+      setInspections(inspectionsData);
+      setFilteredInspections(inspectionsData);
     } catch (error) {
       console.error("Error fetching inspections:", error);
       toast({
@@ -175,7 +254,7 @@ export default function InspectionsPage() {
           open={showCreate}
           onClose={() => setShowCreate(false)}
           onSuccess={fetchInspections}
-          managerId={user.id}
+          managerId={user.uid}
         />
       )}
 

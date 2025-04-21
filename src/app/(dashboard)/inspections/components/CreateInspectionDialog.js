@@ -2,7 +2,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
+import { db } from "@/lib/firebase";
+import { collection, query, where, getDocs, addDoc, serverTimestamp } from "firebase/firestore";
 import {
   Dialog,
   DialogContent,
@@ -35,9 +36,9 @@ export default function CreateInspectionDialog({ open, onClose, onSuccess, manag
   const [formData, setFormData] = useState({
     title: "",
     observation: "",
-    project_id: "", // Required, so initialize as empty string OK
-    template_id: null,  // Optional, initialize to null
-    inspector_id: null, // Optional, initialize to null
+    project_id: "", // Required
+    template_id: null,  // Optional
+    inspector_id: null, // Optional
     status: "pending",
     scheduled_date: null
   });
@@ -50,32 +51,46 @@ export default function CreateInspectionDialog({ open, onClose, onSuccess, manag
   }, [managerId]);
 
   const fetchData = async () => {
-    // --- Fetch data logic (keep as is) ---
     try {
       // Fetch projects managed by this manager
-      const { data: projectsData, error: projectsError } = await supabase
-        .from('projects')
-        .select('id, title')
-        .eq('manager_id', managerId)
-        .is('deleted_at', null);
-
-      if (projectsError) throw projectsError;
+      const projectsQuery = query(
+        collection(db, 'projects'),
+        where('manager_id', '==', managerId),
+        where('deleted_at', '==', null)
+      );
+      
+      const projectsSnapshot = await getDocs(projectsQuery);
+      
+      const projectsData = projectsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
 
       // Fetch templates
-      const { data: templatesData, error: templatesError } = await supabase
-        .from('templates')
-        .select('id, title')
-        .is('deleted_at', null);
-
-      if (templatesError) throw templatesError;
+      const templatesQuery = query(
+        collection(db, 'templates'),
+        where('deleted_at', '==', null)
+      );
+      
+      const templatesSnapshot = await getDocs(templatesQuery);
+      
+      const templatesData = templatesSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
 
       // Fetch inspectors
-      const { data: inspectorsData, error: inspectorsError } = await supabase
-        .from('inspectors')
-        .select('id, name, last_name')
-        .is('deleted_at', null);
-
-      if (inspectorsError) throw inspectorsError;
+      const inspectorsQuery = query(
+        collection(db, 'inspectors'),
+        where('deleted_at', '==', null)
+      );
+      
+      const inspectorsSnapshot = await getDocs(inspectorsQuery);
+      
+      const inspectorsData = inspectorsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
 
       setProjects(projectsData || []);
       setTemplates(templatesData || []);
@@ -91,190 +106,183 @@ export default function CreateInspectionDialog({ open, onClose, onSuccess, manag
   };
 
   const createInspectionHierarchy = async (inspectionId, templateId) => {
-      try {
-        console.log(`Starting hierarchy creation for inspection ${inspectionId} using template ${templateId}`);
-        const { data: template, error: templateFetchError } = await supabase
-          .from('templates')
-          .select('*')
-          .eq('id', templateId)
-          .single();
+    try {
+      console.log(`Starting hierarchy creation for inspection ${inspectionId} using template ${templateId}`);
+      
+      // Get template data
+      const templatesQuery = query(
+        collection(db, 'templates'),
+        where('__name__', '==', templateId)
+      );
+      
+      const templateSnapshot = await getDocs(templatesQuery);
+      
+      if (templateSnapshot.empty) {
+        throw new Error(`Template with ID ${templateId} not found.`);
+      }
+      
+      const template = templateSnapshot.docs[0].data();
+      
+      if (!template.rooms || !Array.isArray(template.rooms)) {
+        console.warn(`Template ${templateId} has no rooms array or it's not an array. Skipping hierarchy creation.`);
+        return true;
+      }
+      
+      if (template.rooms.length === 0) {
+        console.log(`Template ${templateId} has 0 rooms. Skipping hierarchy creation.`);
+        return true; 
+      }
 
-        if (templateFetchError) {
-            console.error("Error fetching template:", templateFetchError);
-            throw new Error(`Failed to fetch template details: ${templateFetchError.message}`);
-        }
-        if (!template) {
-            throw new Error(`Template with ID ${templateId} not found.`);
-        }
+      console.log(`Template ${templateId} has ${template.rooms.length} rooms.`);
 
-        if (!template.rooms || !Array.isArray(template.rooms)) {
-          console.warn(`Template ${templateId} has no rooms array or it's not an array. Skipping hierarchy creation.`);
-          return true;
-        }
-         if (template.rooms.length === 0) {
-          console.log(`Template ${templateId} has 0 rooms. Skipping hierarchy creation.`);
-          return true; 
-        }
+      for (let i = 0; i < template.rooms.length; i++) {
+        const room = template.rooms[i];
+        const roomPosition = i + 1; // Use 1-based index for room_id
 
-        console.log(`Template ${templateId} has ${template.rooms.length} rooms.`);
+        // 1. Create room
+        console.log(`Attempting to create room ${roomPosition}: ${room.name}`);
+        await addDoc(collection(db, 'rooms'), {
+          inspection_id: inspectionId,
+          room_id: roomPosition, // Logical ID based on position
+          room_name: room.name || `Room ${roomPosition}`,
+          position: roomPosition,
+          created_at: serverTimestamp(),
+          updated_at: serverTimestamp()
+        });
 
-        for (let i = 0; i < template.rooms.length; i++) {
-          const room = template.rooms[i];
-          const roomPosition = i + 1; // Use 1-based index for room_id
+        console.log(`Successfully created room ${roomPosition}: ${room.name}`);
 
-          // 1. Create room
-          console.log(`Attempting to create room ${roomPosition}: ${room.name}`);
-          const { error: roomError } = await supabase
-            .from('rooms')
-            .insert({
+        // 2. Create items for this room
+        if (room.items && Array.isArray(room.items) && room.items.length > 0) {
+          console.log(`Room ${roomPosition} has ${room.items.length} items.`);
+          for (let j = 0; j < room.items.length; j++) {
+            const item = room.items[j];
+            const itemPosition = j + 1; // Use 1-based index for item_id
+
+            // 2a. Create room_item
+            console.log(`Attempting to create item ${itemPosition}: ${item.name} in room ${roomPosition}`);
+            
+            await addDoc(collection(db, 'room_items'), {
               inspection_id: inspectionId,
-              room_id: roomPosition, // Logical ID based on position
-              room_name: room.name || `Room ${roomPosition}`,
-              position: roomPosition
+              room_id: roomPosition, // Logical ID from parent room
+              item_id: itemPosition, // Logical ID based on position
+              item_name: item.name || `Item ${itemPosition}`,
+              position: itemPosition,
+              created_at: serverTimestamp(),
+              updated_at: serverTimestamp()
             });
 
-          if (roomError) {
-              console.error(`Error creating room ${roomPosition} (${room.name}):`, roomError);
-              throw new Error(`Failed to create room ${roomPosition}: ${roomError.message}`);
-          }
-          console.log(`Successfully created room ${roomPosition}: ${room.name}`);
-
-          // 2. Create items for this room
-          if (room.items && Array.isArray(room.items) && room.items.length > 0) {
-            console.log(`Room ${roomPosition} has ${room.items.length} items.`);
-            for (let j = 0; j < room.items.length; j++) {
-              const item = room.items[j];
-              const itemPosition = j + 1; // Use 1-based index for item_id
-
-              // 2a. Create room_item
-              console.log(`Attempting to create item ${itemPosition}: ${item.name} in room ${roomPosition}`);
-              const { error: itemError } = await supabase
-                .from('room_items')
-                .insert({
-                  inspection_id: inspectionId,
-                  room_id: roomPosition, // Logical ID from parent room
-                  item_id: itemPosition, // Logical ID based on position
-                  item_name: item.name || `Item ${itemPosition}`,
-                  position: itemPosition
-                });
-
-              if (itemError) {
-                  console.error(`Error creating item ${itemPosition} (${item.name}) in room ${roomPosition}:`, itemError);
-                  throw new Error(`Failed to create item ${itemPosition}: ${itemError.message}`);
-              }
-              console.log(`Successfully created item ${itemPosition}: ${item.name} in room ${roomPosition}`);
+            console.log(`Successfully created item ${itemPosition}: ${item.name} in room ${roomPosition}`);
 
             // 3. Create details for this item
             if (item.details && Array.isArray(item.details) && item.details.length > 0) {
-               console.log(`Item ${itemPosition} has ${item.details.length} details.`);
+              console.log(`Item ${itemPosition} has ${item.details.length} details.`);
               for (let k = 0; k < item.details.length; k++) {
                 const detail = item.details[k];
                 const detailPosition = k + 1; // Use 1-based index for detail_id
 
                 // 3a. Create item_detail
                 console.log(`Attempting to create detail ${detailPosition}: ${detail.name} for item ${itemPosition}`);
-                const { error: detailError } = await supabase
-                  .from('item_details')
-                  .insert({
+                try {
+                  await addDoc(collection(db, 'item_details'), {
                     inspection_id: inspectionId,
                     room_id: roomPosition,
                     room_item_id: itemPosition, 
                     detail_id: detailPosition,  
                     detail_name: detail.name || `Detail ${detailPosition}`,
                     position: detailPosition,
+                    created_at: serverTimestamp(),
+                    updated_at: serverTimestamp()
                   });
-
-                if (detailError) {
+                  
+                  console.log(`Successfully created detail ${detailPosition}: ${detail.name}`);
+                } catch (detailError) {
                   // Log the specific error and continue
                   console.error(`Error creating detail ${detailPosition} (${detail.name}) for item ${itemPosition} in room ${roomPosition}:`, detailError);
-                   continue;
+                  continue;
                 }
-                console.log(`Successfully created detail ${detailPosition}: ${detail.name}`);
               }
             } else {
-                 console.log(`Item ${itemPosition} has no details.`);
+              console.log(`Item ${itemPosition} has no details.`);
             }
-            }
-          } else {
-              console.log(`Room ${roomPosition} has no items.`);
           }
+        } else {
+          console.log(`Room ${roomPosition} has no items.`);
         }
-
-        console.log(`Successfully created complete inspection hierarchy for inspection ${inspectionId}`);
-        return true;
-
-      } catch (error) {
-        console.error("Error creating inspection structure:", error);
-        throw error;
       }
+
+      console.log(`Successfully created complete inspection hierarchy for inspection ${inspectionId}`);
+      return true;
+
+    } catch (error) {
+      console.error("Error creating inspection structure:", error);
+      throw error;
+    }
   };
 
   const handleSubmit = async (e) => {
-      // --- Submit logic (keep as is from previous correction) ---
-      e.preventDefault();
-      setLoading(true);
+    e.preventDefault();
+    setLoading(true);
 
-      if (!managerId) {
-          toast({
-            title: "Erro interno",
-            description: "ID do gestor não encontrado. Recarregue a página.",
-            variant: "destructive",
-          });
-          setLoading(false);
-          return;
+    if (!managerId) {
+      toast({
+        title: "Erro interno",
+        description: "ID do gestor não encontrado. Recarregue a página.",
+        variant: "destructive",
+      });
+      setLoading(false);
+      return;
+    }
+
+    try {
+      if (!formData.project_id || !formData.title) {
+        throw new Error("Título da Inspeção e Projeto são obrigatórios.");
       }
 
-      try {
-        if (!formData.project_id || !formData.title) {
-          throw new Error("Título da Inspeção e Projeto são obrigatórios.");
-        }
+      // Prepare data for Firebase
+      const inspectionData = {
+        title: formData.title,
+        observation: formData.observation || null,
+        project_id: formData.project_id,
+        template_id: formData.template_id || null,
+        inspector_id: formData.inspector_id || null,
+        status: formData.status,
+        scheduled_date: formData.scheduled_date ? new Date(formData.scheduled_date) : null,
+        created_at: serverTimestamp(),
+        updated_at: serverTimestamp(),
+        deleted_at: null
+      };
 
-        const inspectionData = {
-          title: formData.title,
-          observation: formData.observation || null,
-          project_id: formData.project_id,
-          template_id: formData.template_id || null,
-          inspector_id: formData.inspector_id || null,
-          status: formData.status,
-          scheduled_date: formData.scheduled_date || null,
-        };
+      // Add inspection to Firestore
+      const docRef = await addDoc(collection(db, 'inspections'), inspectionData);
+      
+      const newInspectionId = docRef.id;
+      console.log(`Inspection ${newInspectionId} created successfully.`);
 
-        const { data: inspectionResult, error: inspectionError } = await supabase
-          .from('inspections')
-          .insert(inspectionData)
-          .select()
-          .single();
-
-        if (inspectionError) throw inspectionError;
-        if (!inspectionResult) throw new Error("Falha ao criar a inspeção, nenhum dado retornado.");
-
-        const newInspectionId = inspectionResult.id;
-        console.log(`Inspection ${newInspectionId} created successfully.`);
-
-        if (formData.template_id) {
-          console.log(`Template selected (${formData.template_id}). Creating hierarchy...`);
-          await createInspectionHierarchy(newInspectionId, formData.template_id);
-          console.log(`Hierarchy creation process finished for inspection ${newInspectionId}.`);
-        } else {
-           console.log(`No template selected for inspection ${newInspectionId}. Skipping hierarchy creation.`);
-        }
-
-        toast({
-          title: "Inspeção criada com sucesso"
-        });
-
-        onSuccess();
-        onClose();
-      } catch (error) {
-        console.error("Error during inspection creation process:", error);
-        toast({
-          title: "Erro ao criar inspeção",
-          description: error.message || "Ocorreu um erro inesperado.",
-          variant: "destructive"
-        });
-      } finally {
-        setLoading(false);
+      if (formData.template_id) {
+        console.log(`Template selected (${formData.template_id}). Creating hierarchy...`);
+        await createInspectionHierarchy(newInspectionId, formData.template_id);
+        console.log(`Hierarchy creation process finished for inspection ${newInspectionId}.`);
+      } else {
+        console.log(`No template selected for inspection ${newInspectionId}. Skipping hierarchy creation.`);
       }
+
+      toast({
+        title: "Inspeção criada com sucesso"
+      });
+
+      onSuccess();
+      onClose();
+    } catch (error) {
+      console.error("Error during inspection creation process:", error);
+      toast({
+        title: "Erro ao criar inspeção",
+        description: error.message || "Ocorreu um erro inesperado.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -336,10 +344,8 @@ export default function CreateInspectionDialog({ open, onClose, onSuccess, manag
           <div className="space-y-2">
             <Label htmlFor="template">Template (opcional)</Label>
             <Select
-
-                value={formData.template_id?.toString() ?? ""}
-
-                onValueChange={(value) => setFormData({ ...formData, template_id: value ? parseInt(value) : null })}
+              value={formData.template_id?.toString() ?? ""}
+              onValueChange={(value) => setFormData({ ...formData, template_id: value ? value : null })}
             >
               <SelectTrigger id="template">
                 <SelectValue placeholder="Nenhum template" />
@@ -358,22 +364,16 @@ export default function CreateInspectionDialog({ open, onClose, onSuccess, manag
           <div className="space-y-2">
             <Label htmlFor="inspector">Vistoriador (opcional)</Label>
             <Select
-                // If inspector_id is null/undefined, value becomes "", showing the placeholder
-                value={formData.inspector_id?.toString() ?? ""}
-                 // If user selects an item, value is its string ID -> parse to int
-                // If user conceptually clears, value might become "" -> set to null
-                onValueChange={(value) => setFormData({ ...formData, inspector_id: value ? parseInt(value) : null })}
+              value={formData.inspector_id?.toString() ?? ""}
+              onValueChange={(value) => setFormData({ ...formData, inspector_id: value ? value : null })}
             >
               <SelectTrigger id="inspector">
-                 {/* Placeholder shows when value is "" (i.e., inspector_id is null) */}
                 <SelectValue placeholder="Nenhum vistoriador" />
               </SelectTrigger>
               <SelectContent>
-                {/* REMOVED: <SelectItem value="">Nenhum vistoriador</SelectItem> */}
                 {inspectors.map((inspector) => (
-                  // Ensure value is never "" here
                   <SelectItem key={inspector.id} value={inspector.id.toString()}>
-                    {`${inspector.name} ${inspector.last_name || ''}`.trim()}
+                    {`${inspector.name} ${inspector.last_name || ''}'.trim()`}
                   </SelectItem>
                 ))}
               </SelectContent>

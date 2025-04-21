@@ -30,7 +30,6 @@ import {
     }
   };
   
-  // Generic fetch operation that replaces Supabase's from().select()
   export const fetchCollection = async (collectionName, options = {}) => {
     try {
       const { 

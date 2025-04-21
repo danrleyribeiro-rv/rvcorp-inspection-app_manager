@@ -1,9 +1,9 @@
-
 // app/(dashboard)/inspections/components/FilterPanel.js
 "use client";
 
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
+import { db } from "@/lib/firebase";
+import { collection, query, where, getDocs } from "firebase/firestore";
 import { Label } from "@/components/ui/label";
 import {
   SheetContent,
@@ -36,14 +36,20 @@ export default function FilterPanel({ filterState, onFilterChange, inspections }
 
   const fetchProjects = async () => {
     try {
-      const { data, error } = await supabase
-        .from('projects')
-        .select('id, title')
-        .eq('manager_id', user.id)
-        .is('deleted_at', null);
+      const projectsQuery = query(
+        collection(db, 'projects'),
+        where('manager_id', '==', user.uid),
+        where('deleted_at', '==', null)
+      );
       
-      if (error) throw error;
-      setProjects(data || []);
+      const projectsSnapshot = await getDocs(projectsQuery);
+      
+      const projectsData = projectsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      setProjects(projectsData || []);
     } catch (error) {
       console.error("Error fetching projects:", error);
     }
@@ -51,13 +57,19 @@ export default function FilterPanel({ filterState, onFilterChange, inspections }
 
   const fetchInspectors = async () => {
     try {
-      const { data, error } = await supabase
-        .from('inspectors')
-        .select('id, name, last_name')
-        .is('deleted_at', null);
+      const inspectorsQuery = query(
+        collection(db, 'inspectors'),
+        where('deleted_at', '==', null)
+      );
       
-      if (error) throw error;
-      setInspectors(data || []);
+      const inspectorsSnapshot = await getDocs(inspectorsQuery);
+      
+      const inspectorsData = inspectorsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      setInspectors(inspectorsData || []);
     } catch (error) {
       console.error("Error fetching inspectors:", error);
     }
@@ -158,7 +170,7 @@ export default function FilterPanel({ filterState, onFilterChange, inspections }
               <SelectItem value="all">Todos</SelectItem>
               {getActiveInspectors().map((inspector) => (
                 <SelectItem key={inspector.id} value={inspector.id}>
-                  {`${inspector.name} ${inspector.last_name || ''}`}
+                  {`${inspector.name} ${inspector.last_name || ''}'`}
                 </SelectItem>
               ))}
             </SelectContent>

@@ -2,7 +2,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
+import { db } from "@/lib/firebase";
+import { collection, query, where, getDocs, doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import {
   Dialog,
   DialogContent,
@@ -50,44 +51,58 @@ export default function EditInspectionDialog({ inspection, open, onClose, onSucc
   const fetchData = async () => {
     try {
       // Get current project's manager_id
-      const { data: projectData, error: projectError } = await supabase
-        .from('projects')
-        .select('manager_id')
-        .eq('id', inspection.project_id)
-        .single();
+      const projectsQuery = query(
+        collection(db, 'projects'),
+        where('__name__', '==', inspection.project_id)
+      );
       
-      if (projectError) throw projectError;
+      const projectSnapshot = await getDocs(projectsQuery);
       
-      const managerId = projectData.manager_id;
+      if (projectSnapshot.empty) {
+        throw new Error("Project not found");
+      }
+      
+      const managerId = projectSnapshot.docs[0].data().manager_id;
       
       // Fetch projects managed by this manager
-      const { data: projectsData, error: projectsError } = await supabase
-        .from('projects')
-        .select('id, title')
-        .eq('manager_id', managerId)
-        .is('deleted_at', null);
+      const allProjectsQuery = query(
+        collection(db, 'projects'),
+        where('manager_id', '==', managerId),
+        where('deleted_at', '==', null)
+      );
       
-      if (projectsError) throw projectsError;
+      const projectsData = await getDocs(allProjectsQuery);
       
       // Fetch templates
-      const { data: templatesData, error: templatesError } = await supabase
-        .from('templates')
-        .select('id, title')
-        .is('deleted_at', null);
+      const templatesQuery = query(
+        collection(db, 'templates'),
+        where('deleted_at', '==', null)
+      );
       
-      if (templatesError) throw templatesError;
+      const templatesData = await getDocs(templatesQuery);
       
       // Fetch inspectors
-      const { data: inspectorsData, error: inspectorsError } = await supabase
-        .from('inspectors')
-        .select('id, name, last_name')
-        .is('deleted_at', null);
+      const inspectorsQuery = query(
+        collection(db, 'inspectors'),
+        where('deleted_at', '==', null)
+      );
       
-      if (inspectorsError) throw inspectorsError;
+      const inspectorsData = await getDocs(inspectorsQuery);
       
-      setProjects(projectsData || []);
-      setTemplates(templatesData || []);
-      setInspectors(inspectorsData || []);
+      setProjects(projectsData.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) || []);
+      
+      setTemplates(templatesData.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) || []);
+      
+      setInspectors(inspectorsData.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) || []);
     } catch (error) {
       console.error("Error fetching data:", error);
       toast({
@@ -108,22 +123,19 @@ export default function EditInspectionDialog({ inspection, open, onClose, onSucc
         throw new Error("Preencha os campos obrigatórios");
       }
       
-      // Update inspection
-      const { error } = await supabase
-        .from('inspections')
-        .update({
-          title: formData.title,
-          observation: formData.observation,
-          project_id: formData.project_id,
-          template_id: formData.template_id || null,
-          inspector_id: formData.inspector_id || null,
-          status: formData.status,
-          scheduled_date: formData.scheduled_date,
-          updated_at: new Date()
-        })
-        .eq('id', inspection.id);
-        
-      if (error) throw error;
+      // Update inspection in Firestore
+      const inspectionRef = doc(db, 'inspections', inspection.id);
+      
+      await updateDoc(inspectionRef, {
+        title: formData.title,
+        observation: formData.observation,
+        project_id: formData.project_id,
+        template_id: formData.template_id || null,
+        inspector_id: formData.inspector_id || null,
+        status: formData.status,
+        scheduled_date: formData.scheduled_date ? new Date(formData.scheduled_date) : null,
+        updated_at: serverTimestamp()
+      });
       
       toast({
         title: "Inspeção atualizada com sucesso"
@@ -212,6 +224,7 @@ export default function EditInspectionDialog({ inspection, open, onClose, onSucc
               </SelectContent>
             </Select>
           </div>
+          
           {/* Inspector Selection */}
           <div className="space-y-2">
             <Label>Vistoriador (opcional)</Label>
@@ -226,7 +239,7 @@ export default function EditInspectionDialog({ inspection, open, onClose, onSucc
                 <SelectItem value="none">Nenhum vistoriador</SelectItem>
                 {inspectors.map((inspector) => (
                   <SelectItem key={inspector.id} value={inspector.id}>
-                    {`${inspector.name} ${inspector.last_name || ''}`}
+                    {`${inspector.name} ${inspector.last_name || ''}'`}
                   </SelectItem>
                 ))}
               </SelectContent>

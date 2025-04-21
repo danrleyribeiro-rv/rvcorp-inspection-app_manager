@@ -2,7 +2,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
+import { db } from "@/lib/firebase";
+import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
 import {
   Dialog,
   DialogContent,
@@ -61,49 +62,86 @@ export default function InspectionDetailsDialog({ inspection, open, onClose }) {
     setLoading(true);
     try {
       // Fetch rooms
-      const { data: roomsData, error: roomsError } = await supabase
-        .from('rooms')
-        .select('*, room_items(*)')
-        .eq('inspection_id', inspection.id)
-        .order('position');
+      const roomsQuery = query(
+        collection(db, 'rooms'),
+        where('inspection_id', '==', inspection.id)
+      );
       
-      if (roomsError) throw roomsError;
-      setRooms(roomsData || []);
+      const roomsSnapshot = await getDocs(roomsQuery);
+      const roomsData = roomsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      // For each room, fetch its items
+      for (const room of roomsData) {
+        const itemsQuery = query(
+          collection(db, 'room_items'),
+          where('inspection_id', '==', inspection.id),
+          where('room_id', '==', room.room_id)
+        );
+        
+        const itemsSnapshot = await getDocs(itemsQuery);
+        room.room_items = itemsSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+      }
+      
+      setRooms(roomsData);
       
       // Fetch project details
       if (inspection.project_id) {
-        const { data: projectData, error: projectError } = await supabase
-          .from('projects')
-          .select('*, clients(*)')
-          .eq('id', inspection.project_id)
-          .single();
+        const projectRef = doc(db, 'projects', inspection.project_id);
+        const projectDoc = await getDoc(projectRef);
         
-        if (projectError && projectError.code !== 'PGRST116') throw projectError;
-        setProjectDetails(projectData);
+        if (projectDoc.exists()) {
+          const projectData = {
+            id: projectDoc.id,
+            ...projectDoc.data()
+          };
+          
+          // Get client data if available
+          if (projectData.client_id) {
+            const clientRef = doc(db, 'clients', projectData.client_id);
+            const clientDoc = await getDoc(clientRef);
+            
+            if (clientDoc.exists()) {
+              projectData.clients = {
+                id: clientDoc.id,
+                ...clientDoc.data()
+              };
+            }
+          }
+          
+          setProjectDetails(projectData);
+        }
       }
       
       // Fetch inspector details
       if (inspection.inspector_id) {
-        const { data: inspectorData, error: inspectorError } = await supabase
-          .from('inspectors')
-          .select('*')
-          .eq('id', inspection.inspector_id)
-          .single();
+        const inspectorRef = doc(db, 'inspectors', inspection.inspector_id);
+        const inspectorDoc = await getDoc(inspectorRef);
         
-        if (inspectorError && inspectorError.code !== 'PGRST116') throw inspectorError;
-        setInspectorDetails(inspectorData);
+        if (inspectorDoc.exists()) {
+          setInspectorDetails({
+            id: inspectorDoc.id,
+            ...inspectorDoc.data()
+          });
+        }
       }
       
       // Fetch template details
       if (inspection.template_id) {
-        const { data: templateData, error: templateError } = await supabase
-          .from('templates')
-          .select('*')
-          .eq('id', inspection.template_id)
-          .single();
+        const templateRef = doc(db, 'templates', inspection.template_id);
+        const templateDoc = await getDoc(templateRef);
         
-        if (templateError && templateError.code !== 'PGRST116') throw templateError;
-        setTemplateDetails(templateData);
+        if (templateDoc.exists()) {
+          setTemplateDetails({
+            id: templateDoc.id,
+            ...templateDoc.data()
+          });
+        }
       }
     } catch (error) {
       console.error("Error fetching inspection details:", error);
@@ -195,8 +233,7 @@ export default function InspectionDetailsDialog({ inspection, open, onClose }) {
                       <div>
                         <p className="font-medium">Data Agendada</p>
                         <p className="text-sm text-muted-foreground">
-                          {formatDateSafely(inspection.scheduled_date)
-                          }
+                          {formatDateSafely(inspection.scheduled_date)}
                         </p>
                       </div>
                     </div>
@@ -207,8 +244,7 @@ export default function InspectionDetailsDialog({ inspection, open, onClose }) {
                     <div>
                       <p className="font-medium">Criado em</p>
                       <p className="text-sm text-muted-foreground">
-                        {formatDateSafely(inspection.created_at)
-                        }
+                        {formatDateSafely(inspection.created_at)}
                       </p>
                     </div>
                   </div>
