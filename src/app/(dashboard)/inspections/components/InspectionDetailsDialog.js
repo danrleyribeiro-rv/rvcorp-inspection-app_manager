@@ -75,17 +75,23 @@ export default function InspectionDetailsDialog({ inspection, open, onClose }) {
       
       // For each room, fetch its items
       for (const room of roomsData) {
-        const itemsQuery = query(
-          collection(db, 'room_items'),
-          where('inspection_id', '==', inspection.id),
-          where('room_id', '==', room.room_id)
-        );
-        
-        const itemsSnapshot = await getDocs(itemsQuery);
-        room.room_items = itemsSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
+        // Verificar se room_id existe antes de usá-lo na consulta
+        if (room.room_id) {
+          const itemsQuery = query(
+            collection(db, 'room_items'),
+            where('inspection_id', '==', inspection.id),
+            where('room_id', '==', room.room_id)
+          );
+          
+          const itemsSnapshot = await getDocs(itemsQuery);
+          room.room_items = itemsSnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+        } else {
+          // Se room_id não existir, inicializar room_items como um array vazio
+          room.room_items = [];
+        }
       }
       
       setRooms(roomsData);
@@ -373,7 +379,7 @@ export default function InspectionDetailsDialog({ inspection, open, onClose }) {
                       <div>
                         <p className="font-medium">Salas</p>
                         <p className="text-sm text-muted-foreground">
-                          {templateDetails.rooms?.length || 0} salas definidas
+                          {templateDetails.rooms?.length || 0} tópicos definidas
                         </p>
                       </div>
                     </div>

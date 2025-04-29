@@ -79,13 +79,20 @@ export default function InspectionsPage() {
       const inspectionsData = [];
       
       for (const doc of inspectionsSnapshot.docs) {
+        const data = doc.data();
         const inspection = {
           id: doc.id,
-          ...doc.data(),
-          // Convert Firebase timestamps to ISO strings
-          created_at: doc.data().created_at?.toDate().toISOString(),
-          updated_at: doc.data().updated_at?.toDate().toISOString(),
-          scheduled_date: doc.data().scheduled_date?.toDate().toISOString()
+          ...data,
+          // Verifica e converte os timestamps de maneira segura
+          created_at: data.created_at && typeof data.created_at.toDate === 'function' 
+            ? data.created_at.toDate().toISOString() 
+            : data.created_at,
+          updated_at: data.updated_at && typeof data.updated_at.toDate === 'function'
+            ? data.updated_at.toDate().toISOString()
+            : data.updated_at,
+          scheduled_date: data.scheduled_date && typeof data.scheduled_date.toDate === 'function'
+            ? data.scheduled_date.toDate().toISOString()
+            : data.scheduled_date
         };
         
         // Get project data

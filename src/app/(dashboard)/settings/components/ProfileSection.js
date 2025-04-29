@@ -4,7 +4,7 @@
 import { useState, useEffect } from "react";
 import { db, storage } from "@/lib/firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, updateDoc, serverTimestamp, Timestamp } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/auth-context";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { User, Upload, Loader2 } from "lucide-react";
+import { time } from "framer-motion";
 
 export default function ProfileSection() {
   const [profile, setProfile] = useState({
@@ -138,7 +139,7 @@ export default function ProfileSection() {
       
       // Upload de imagem, se houver
       if (imageFile) {
-        const storageRef = ref(storage, `profile_images/${user.uid}`);
+        const storageRef = ref(storage, `profile_images/${user.uid}/${'profile_'+Date.now().toString()}`);
         await uploadBytes(storageRef, imageFile);
         const downloadURL = await getDownloadURL(storageRef);
         updateData.profileImageUrl = downloadURL;

@@ -25,7 +25,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function CreateInspectionDialog({ open, onClose, onSuccess, managerId }) {
@@ -46,7 +46,7 @@ export default function CreateInspectionDialog({ open, onClose, onSuccess, manag
 
   useEffect(() => {
     if (managerId) {
-        fetchData();
+      fetchData();
     }
   }, [managerId]);
 
@@ -105,121 +105,6 @@ export default function CreateInspectionDialog({ open, onClose, onSuccess, manag
     }
   };
 
-  const createInspectionHierarchy = async (inspectionId, templateId) => {
-    try {
-      console.log(`Starting hierarchy creation for inspection ${inspectionId} using template ${templateId}`);
-      
-      // Get template data
-      const templatesQuery = query(
-        collection(db, 'templates'),
-        where('__name__', '==', templateId)
-      );
-      
-      const templateSnapshot = await getDocs(templatesQuery);
-      
-      if (templateSnapshot.empty) {
-        throw new Error(`Template with ID ${templateId} not found.`);
-      }
-      
-      const template = templateSnapshot.docs[0].data();
-      
-      if (!template.rooms || !Array.isArray(template.rooms)) {
-        console.warn(`Template ${templateId} has no rooms array or it's not an array. Skipping hierarchy creation.`);
-        return true;
-      }
-      
-      if (template.rooms.length === 0) {
-        console.log(`Template ${templateId} has 0 rooms. Skipping hierarchy creation.`);
-        return true; 
-      }
-
-      console.log(`Template ${templateId} has ${template.rooms.length} rooms.`);
-
-      for (let i = 0; i < template.rooms.length; i++) {
-        const room = template.rooms[i];
-        const roomPosition = i + 1; // Use 1-based index for room_id
-
-        // 1. Create room
-        console.log(`Attempting to create room ${roomPosition}: ${room.name}`);
-        await addDoc(collection(db, 'rooms'), {
-          inspection_id: inspectionId,
-          room_id: roomPosition, // Logical ID based on position
-          room_name: room.name || `Room ${roomPosition}`,
-          position: roomPosition,
-          created_at: serverTimestamp(),
-          updated_at: serverTimestamp()
-        });
-
-        console.log(`Successfully created room ${roomPosition}: ${room.name}`);
-
-        // 2. Create items for this room
-        if (room.items && Array.isArray(room.items) && room.items.length > 0) {
-          console.log(`Room ${roomPosition} has ${room.items.length} items.`);
-          for (let j = 0; j < room.items.length; j++) {
-            const item = room.items[j];
-            const itemPosition = j + 1; // Use 1-based index for item_id
-
-            // 2a. Create room_item
-            console.log(`Attempting to create item ${itemPosition}: ${item.name} in room ${roomPosition}`);
-            
-            await addDoc(collection(db, 'room_items'), {
-              inspection_id: inspectionId,
-              room_id: roomPosition, // Logical ID from parent room
-              item_id: itemPosition, // Logical ID based on position
-              item_name: item.name || `Item ${itemPosition}`,
-              position: itemPosition,
-              created_at: serverTimestamp(),
-              updated_at: serverTimestamp()
-            });
-
-            console.log(`Successfully created item ${itemPosition}: ${item.name} in room ${roomPosition}`);
-
-            // 3. Create details for this item
-            if (item.details && Array.isArray(item.details) && item.details.length > 0) {
-              console.log(`Item ${itemPosition} has ${item.details.length} details.`);
-              for (let k = 0; k < item.details.length; k++) {
-                const detail = item.details[k];
-                const detailPosition = k + 1; // Use 1-based index for detail_id
-
-                // 3a. Create item_detail
-                console.log(`Attempting to create detail ${detailPosition}: ${detail.name} for item ${itemPosition}`);
-                try {
-                  await addDoc(collection(db, 'item_details'), {
-                    inspection_id: inspectionId,
-                    room_id: roomPosition,
-                    room_item_id: itemPosition, 
-                    detail_id: detailPosition,  
-                    detail_name: detail.name || `Detail ${detailPosition}`,
-                    position: detailPosition,
-                    created_at: serverTimestamp(),
-                    updated_at: serverTimestamp()
-                  });
-                  
-                  console.log(`Successfully created detail ${detailPosition}: ${detail.name}`);
-                } catch (detailError) {
-                  // Log the specific error and continue
-                  console.error(`Error creating detail ${detailPosition} (${detail.name}) for item ${itemPosition} in room ${roomPosition}:`, detailError);
-                  continue;
-                }
-              }
-            } else {
-              console.log(`Item ${itemPosition} has no details.`);
-            }
-          }
-        } else {
-          console.log(`Room ${roomPosition} has no items.`);
-        }
-      }
-
-      console.log(`Successfully created complete inspection hierarchy for inspection ${inspectionId}`);
-      return true;
-
-    } catch (error) {
-      console.error("Error creating inspection structure:", error);
-      throw error;
-    }
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -258,13 +143,13 @@ export default function CreateInspectionDialog({ open, onClose, onSuccess, manag
       
       const newInspectionId = docRef.id;
       console.log(`Inspection ${newInspectionId} created successfully.`);
-
+      
+      // Apenas logando informação sobre o template associado, sem criar a hierarquia
       if (formData.template_id) {
-        console.log(`Template selected (${formData.template_id}). Creating hierarchy...`);
-        await createInspectionHierarchy(newInspectionId, formData.template_id);
-        console.log(`Hierarchy creation process finished for inspection ${newInspectionId}.`);
+        console.log(`Template ${formData.template_id} associated with inspection ${newInspectionId}.`);
+        console.log(`The inspector will load template structure when opening the inspection.`);
       } else {
-        console.log(`No template selected for inspection ${newInspectionId}. Skipping hierarchy creation.`);
+        console.log(`No template associated with inspection ${newInspectionId}.`);
       }
 
       toast({
@@ -274,7 +159,7 @@ export default function CreateInspectionDialog({ open, onClose, onSuccess, manag
       onSuccess();
       onClose();
     } catch (error) {
-      console.error("Error during inspection creation process:", error);
+      console.error("Error creating inspection:", error);
       toast({
         title: "Erro ao criar inspeção",
         description: error.message || "Ocorreu um erro inesperado.",
@@ -320,19 +205,17 @@ export default function CreateInspectionDialog({ open, onClose, onSuccess, manag
           <div className="space-y-2">
             <Label htmlFor="project">Projeto <span className="text-red-500">*</span></Label>
             <Select
-              value={formData.project_id} // Project ID is required, so binding to "" is fine initially
+              value={formData.project_id}
               onValueChange={(value) => setFormData({ ...formData, project_id: value })}
               required
             >
               <SelectTrigger id="project">
-                {/* Placeholder shows when value is "" */}
                 <SelectValue placeholder="Selecione um projeto" />
               </SelectTrigger>
               <SelectContent>
-                {projects.length === 0 && <SelectItem value="loading" disabled>Carregando...</SelectItem>} {/* Optional: Loading state */}
+                {projects.length === 0 && <SelectItem value="loading" disabled>Carregando...</SelectItem>}
                 {projects.map((project) => (
-                  // Ensure value is never "" here
-                  <SelectItem key={project.id} value={project.id.toString()}>
+                  <SelectItem key={project.id} value={project.id}>
                     {project.title}
                   </SelectItem>
                 ))}
@@ -344,15 +227,16 @@ export default function CreateInspectionDialog({ open, onClose, onSuccess, manag
           <div className="space-y-2">
             <Label htmlFor="template">Template (opcional)</Label>
             <Select
-              value={formData.template_id?.toString() ?? ""}
-              onValueChange={(value) => setFormData({ ...formData, template_id: value ? value : null })}
+              value={formData.template_id || "none"}
+              onValueChange={(value) => setFormData({ ...formData, template_id: value === "none" ? null : value })}
             >
               <SelectTrigger id="template">
                 <SelectValue placeholder="Nenhum template" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="none">Nenhum template</SelectItem>
                 {templates.map((template) => (
-                  <SelectItem key={template.id} value={template.id.toString()}>
+                  <SelectItem key={template.id} value={template.id}>
                     {template.title}
                   </SelectItem>
                 ))}
@@ -364,15 +248,16 @@ export default function CreateInspectionDialog({ open, onClose, onSuccess, manag
           <div className="space-y-2">
             <Label htmlFor="inspector">Vistoriador (opcional)</Label>
             <Select
-              value={formData.inspector_id?.toString() ?? ""}
-              onValueChange={(value) => setFormData({ ...formData, inspector_id: value ? value : null })}
+              value={formData.inspector_id || "none"}
+              onValueChange={(value) => setFormData({ ...formData, inspector_id: value === "none" ? null : value })}
             >
               <SelectTrigger id="inspector">
                 <SelectValue placeholder="Nenhum vistoriador" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="none">Nenhum vistoriador</SelectItem>
                 {inspectors.map((inspector) => (
-                  <SelectItem key={inspector.id} value={inspector.id.toString()}>
+                  <SelectItem key={inspector.id} value={inspector.id}>
                     {`${inspector.name} ${inspector.last_name || ''}`.trim()}
                   </SelectItem>
                 ))}
@@ -436,7 +321,8 @@ export default function CreateInspectionDialog({ open, onClose, onSuccess, manag
             <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={loading || !formData.project_id || !formData.title}>
+            <Button type="submit" disabled={loading}>
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               {loading ? "Criando..." : "Criar Inspeção"}
             </Button>
           </div>

@@ -28,6 +28,7 @@ import TemplateCreationDialog from "./components/TemplateCreationDialog";
 import TemplateEditDialog from "./components/TemplateEditDialog";
 import ImportTemplateDialog from "./components/ImportTemplateDialog";
 import ExportTemplateDialog from "./components/ExportTemplateDialog";
+import DeleteTemplateDialog from "./components/DeleteTemplateDialog";
 
 const iconComponents = {
   'pencil-ruler': PencilRuler,
@@ -42,6 +43,7 @@ const iconComponents = {
 export default function TemplatesPage() {
   const [templates, setTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const [templateToDelete, setTemplateToDelete] = useState(null);
   const [showImport, setShowImport] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
@@ -64,7 +66,7 @@ export default function TemplatesPage() {
       
       const querySnapshot = await getDocs(templatesQuery);
       
-      // Map docs to our data structure, formatting timestamps
+      // Map documents to our data structure, formatting timestamps
       const templatesData = querySnapshot.docs.map(doc => {
         const data = doc.data();
         return {
@@ -77,7 +79,7 @@ export default function TemplatesPage() {
       
       setTemplates(templatesData || []);
     } catch (error) {
-      console.error("Error fetching templates:", error);
+      console.error("Erro ao carregar templates:", error);
       toast({
         title: "Erro ao carregar templates",
         description: error.message,
@@ -162,12 +164,21 @@ export default function TemplatesPage() {
                     {formatCurrency(template.template_price)}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      onClick={() => setSelectedTemplate(template)}
-                    >
-                      Editar
-                    </Button>
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        variant="ghost"
+                        onClick={() => setSelectedTemplate(template)}
+                      >
+                        Editar
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        className="text-destructive hover:text-destructive/90"
+                        onClick={() => setTemplateToDelete(template)}
+                      >
+                        Excluir
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -192,6 +203,16 @@ export default function TemplatesPage() {
           onSuccess={fetchTemplates}
         />
       )}
+
+      {templateToDelete && (
+        <DeleteTemplateDialog
+          template={templateToDelete}
+          open={!!templateToDelete}
+          onClose={() => setTemplateToDelete(null)}
+          onDelete={fetchTemplates}
+        />
+      )}
+
       {showImport && (
         <ImportTemplateDialog
           onClose={() => setShowImport(false)}
