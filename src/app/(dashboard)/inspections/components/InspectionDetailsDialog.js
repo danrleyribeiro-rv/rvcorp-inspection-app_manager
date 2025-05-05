@@ -30,7 +30,8 @@ import {
   MapPin,
   FileCode,
   ScrollText,
-  Home
+  Home,
+  Building
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -178,6 +179,28 @@ export default function InspectionDetailsDialog({ inspection, open, onClose }) {
     }
   };
 
+  const formatAddress = (address) => {
+    if (!address) return "Endereço não definido";
+    
+    const parts = [];
+    if (address.street) {
+      let streetPart = address.street;
+      if (address.number) streetPart += `, ${address.number}`;
+      parts.push(streetPart);
+    }
+    
+    if (address.complement) parts.push(address.complement);
+    if (address.neighborhood) parts.push(address.neighborhood);
+    
+    if (address.city || address.state) {
+      let locationPart = [address.city, address.state].filter(Boolean).join(" - ");
+      if (locationPart) parts.push(locationPart);
+    }
+    
+    if (parts.length === 0) return "Endereço não definido";
+    return parts.join(", ");
+  };
+
   if (loading) {
     return (
       <Dialog open={open} onOpenChange={onClose}>
@@ -241,6 +264,23 @@ export default function InspectionDetailsDialog({ inspection, open, onClose }) {
                         <p className="text-sm text-muted-foreground">
                           {formatDateSafely(inspection.scheduled_date)}
                         </p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {inspection.address && (
+                    <div className="flex items-start gap-2">
+                      <MapPin className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                      <div>
+                        <p className="font-medium">Endereço</p>
+                        <p className="text-sm text-muted-foreground">
+                          {formatAddress(inspection.address)}
+                        </p>
+                        {inspection.address.cep && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            CEP: {inspection.address.cep}
+                          </p>
+                        )}
                       </div>
                     </div>
                   )}
