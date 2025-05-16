@@ -54,10 +54,10 @@ export default function TopicEditor({ topics = [], onChange }) {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <Label className="text-lg font-semibold">Dependências</Label>
+        <Label className="text-lg font-semibold">Tópicos</Label>
         <Button onClick={addTopic}>
           <Plus className="mr-2 h-4 w-4" />
-          Adicionar Dependência
+          Adicionar Tópico
         </Button>
       </div>
 
@@ -73,13 +73,13 @@ export default function TopicEditor({ topics = [], onChange }) {
         topics.map((topic, index) => (
           <Card key={index}>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Dependência {index + 1}</CardTitle>
+              <CardTitle>Tópico {index + 1}</CardTitle>
               <div className="flex gap-2">
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={() => duplicateTopic(index)}
-                  title="Duplicar Dependência"
+                  title="Duplicar Tópico"
                 >
                   <Copy className="h-4 w-4" />
                 </Button>
@@ -87,7 +87,7 @@ export default function TopicEditor({ topics = [], onChange }) {
                   variant="ghost"
                   size="icon"
                   onClick={() => removeTopic(index)}
-                  title="Remover Dependência"
+                  title="Remover Tópico"
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -95,7 +95,7 @@ export default function TopicEditor({ topics = [], onChange }) {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label>Nome da Dependência</Label>
+                <Label>Nome da Tópico</Label>
                 <Input
                   value={topic.name}
                   onChange={e => updateTopic(index, "name", e.target.value)}

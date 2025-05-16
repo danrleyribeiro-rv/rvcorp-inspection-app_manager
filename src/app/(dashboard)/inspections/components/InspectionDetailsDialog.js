@@ -232,7 +232,7 @@ export default function InspectionDetailsDialog({ inspection, open, onClose }) {
           <TabsList>
             <TabsTrigger value="overview">Visão Geral</TabsTrigger>
             <TabsTrigger value="topics">
-              Dependências ({topics.length})
+              Tópicos ({topics.length})
             </TabsTrigger>
             {templateDetails && (
               <TabsTrigger value="template">Template</TabsTrigger>
