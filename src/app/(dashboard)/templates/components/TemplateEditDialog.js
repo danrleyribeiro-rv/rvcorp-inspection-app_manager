@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import RoomEditor from "./RoomEditor";
+import TopicEditor from "./TopicEditor";
 import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
@@ -21,7 +21,7 @@ export default function TemplateEditDialog({ template, open, onClose, onSuccess 
     template_price: "0",
     icon: "",
     icon_color: "",
-    rooms: []
+    topics: []
   });
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -35,7 +35,7 @@ export default function TemplateEditDialog({ template, open, onClose, onSuccess 
         template_price: template.template_price?.toString() || "0",
         icon: template.icon || "",
         icon_color: template.icon_color || "",
-        rooms: template.rooms || []
+        topics: template.topics || []
       });
     }
   }, [template]);
@@ -69,7 +69,7 @@ export default function TemplateEditDialog({ template, open, onClose, onSuccess 
         template_price: parseFloat(formData.template_price) || 0,
         icon: formData.icon || null,
         icon_color: formData.icon_color || null,
-        rooms: formData.rooms || [], // Ensure rooms is always an array
+        topics: formData.topics || [], // Ensure topics is always an array
         updated_at: serverTimestamp()
       };
 
@@ -181,9 +181,9 @@ export default function TemplateEditDialog({ template, open, onClose, onSuccess 
               </div>
             </div>
 
-            <RoomEditor
-              rooms={formData.rooms || []}  // Ensure rooms is always an array
-              onChange={rooms => setFormData({...formData, rooms})}
+            <TopicEditor
+              topics={formData.topics || []}  // Ensure topics is always an array
+              onChange={topics => setFormData({...formData, topics})}
             />
 
             <div className="flex justify-end gap-4">

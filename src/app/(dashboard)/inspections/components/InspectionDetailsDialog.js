@@ -47,7 +47,7 @@ const getStatusBadge = (status) => {
 
 export default function InspectionDetailsDialog({ inspection, open, onClose }) {
   const [loading, setLoading] = useState(true);
-  const [rooms, setRooms] = useState([]);
+  const [topics, setTopics] = useState([]);
   const [projectDetails, setProjectDetails] = useState(null);
   const [inspectorDetails, setInspectorDetails] = useState(null);
   const [templateDetails, setTemplateDetails] = useState(null);
@@ -62,40 +62,40 @@ export default function InspectionDetailsDialog({ inspection, open, onClose }) {
   const fetchDetails = async () => {
     setLoading(true);
     try {
-      // Fetch rooms
-      const roomsQuery = query(
-        collection(db, 'rooms'),
+      // Fetch topics
+      const topicsQuery = query(
+        collection(db, 'topics'),
         where('inspection_id', '==', inspection.id)
       );
       
-      const roomsSnapshot = await getDocs(roomsQuery);
-      const roomsData = roomsSnapshot.docs.map(doc => ({
+      const topicsSnapshot = await getDocs(topicsQuery);
+      const topicsData = topicsSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       }));
       
-      // For each room, fetch its items
-      for (const room of roomsData) {
-        // Verificar se room_id existe antes de usá-lo na consulta
-        if (room.room_id) {
+      // For each topic, fetch its items
+      for (const topic of topicsData) {
+        // Verificar se topic_id existe antes de usá-lo na consulta
+        if (topic.topic_id) {
           const itemsQuery = query(
-            collection(db, 'room_items'),
+            collection(db, 'topic_items'),
             where('inspection_id', '==', inspection.id),
-            where('room_id', '==', room.room_id)
+            where('topic_id', '==', topic.topic_id)
           );
           
           const itemsSnapshot = await getDocs(itemsQuery);
-          room.room_items = itemsSnapshot.docs.map(doc => ({
+          topic.topic_items = itemsSnapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data()
           }));
         } else {
-          // Se room_id não existir, inicializar room_items como um array vazio
-          room.room_items = [];
+          // Se topic_id não existir, inicializar topic_items como um array vazio
+          topic.topic_items = [];
         }
       }
       
-      setRooms(roomsData);
+      setTopics(topicsData);
       
       // Fetch project details
       if (inspection.project_id) {
@@ -231,8 +231,8 @@ export default function InspectionDetailsDialog({ inspection, open, onClose }) {
         <Tabs defaultValue="overview" className="overflow-hidden h-[calc(100%-4rem)]">
           <TabsList>
             <TabsTrigger value="overview">Visão Geral</TabsTrigger>
-            <TabsTrigger value="rooms">
-              Dependências ({rooms.length})
+            <TabsTrigger value="topics">
+              Dependências ({topics.length})
             </TabsTrigger>
             {templateDetails && (
               <TabsTrigger value="template">Template</TabsTrigger>
@@ -419,7 +419,7 @@ export default function InspectionDetailsDialog({ inspection, open, onClose }) {
                       <div>
                         <p className="font-medium">Salas</p>
                         <p className="text-sm text-muted-foreground">
-                          {templateDetails.rooms?.length || 0} tópicos definidas
+                          {templateDetails.topics?.length || 0} tópicos definidas
                         </p>
                       </div>
                     </div>
@@ -429,38 +429,38 @@ export default function InspectionDetailsDialog({ inspection, open, onClose }) {
             </div>
           </TabsContent>
 
-          <TabsContent value="rooms" className="overflow-auto h-full">
-            {rooms.length === 0 ? (
+          <TabsContent value="topics" className="overflow-auto h-full">
+            {topics.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 Nenhuma dependência encontrada para esta inspeção.
               </div>
             ) : (
               <div className="space-y-6">
-                {rooms.map((room) => (
-                  <Card key={room.id}>
+                {topics.map((topic) => (
+                  <Card key={topic.id}>
                     <CardHeader>
-                      <CardTitle>{room.room_name}</CardTitle>
-                      {room.room_label && (
-                        <CardDescription>{room.room_label}</CardDescription>
+                      <CardTitle>{topic.topic_name}</CardTitle>
+                      {topic.topic_label && (
+                        <CardDescription>{topic.topic_label}</CardDescription>
                       )}
                     </CardHeader>
                     <CardContent>
-                      {room.observation && (
+                      {topic.observation && (
                         <div className="mb-4">
                           <p className="font-medium">Observação</p>
-                          <p className="text-sm text-muted-foreground">{room.observation}</p>
+                          <p className="text-sm text-muted-foreground">{topic.observation}</p>
                         </div>
                       )}
                       
-                      {room.is_damaged && (
+                      {topic.is_damaged && (
                         <Badge variant="red" className="mb-4">Danificado</Badge>
                       )}
                       
-                      {room.room_items && room.room_items.length > 0 ? (
+                      {topic.topic_items && topic.topic_items.length > 0 ? (
                         <div>
-                          <h3 className="font-medium mb-2">Itens ({room.room_items.length})</h3>
+                          <h3 className="font-medium mb-2">Itens ({topic.topic_items.length})</h3>
                           <div className="space-y-3">
-                            {room.room_items.map((item) => (
+                            {topic.topic_items.map((item) => (
                               <div key={item.id} className="border p-3 rounded-md">
                                 <p className="font-medium">{item.item_name}</p>
                                 {item.item_label && (
@@ -494,20 +494,20 @@ export default function InspectionDetailsDialog({ inspection, open, onClose }) {
                   <CardDescription>{templateDetails.description}</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {templateDetails.rooms && templateDetails.rooms.length > 0 ? (
+                  {templateDetails.topics && templateDetails.topics.length > 0 ? (
                     <div className="space-y-6">
-                      {templateDetails.rooms.map((room, index) => (
+                      {templateDetails.topics.map((topic, index) => (
                         <div key={index} className="border p-4 rounded-md">
-                          <h3 className="font-medium text-lg mb-2">{room.name}</h3>
-                          {room.description && (
-                            <p className="text-sm text-muted-foreground mb-4">{room.description}</p>
+                          <h3 className="font-medium text-lg mb-2">{topic.name}</h3>
+                          {topic.description && (
+                            <p className="text-sm text-muted-foreground mb-4">{topic.description}</p>
                           )}
                           
-                          {room.items && room.items.length > 0 ? (
+                          {topic.items && topic.items.length > 0 ? (
                             <div className="space-y-4">
                               <h4 className="font-medium">Itens</h4>
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                {room.items.map((item, itemIndex) => (
+                                {topic.items.map((item, itemIndex) => (
                                   <div key={itemIndex} className="border p-3 rounded-md">
                                     <p className="font-medium">{item.name}</p>
                                     {item.description && (

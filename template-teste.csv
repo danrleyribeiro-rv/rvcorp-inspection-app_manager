@@ -1,4 +1,4 @@
-title,description,template_price,total_images,total_videos,room_name,room_description,item_name,item_description,detail_name,detail_type,detail_required,detail_options
+title,description,template_price,total_images,total_videos,topic_name,topic_description,item_name,item_description,detail_name,detail_type,detail_required,detail_options
 Inspeção Comercial,Template para inspeção de estabelecimentos comerciais,399.99,30,3,Área de Vendas,Inspeção da área principal de vendas,Iluminação,Verificação do sistema de iluminação,Tipo de Lâmpadas,select,true,"LED,Fluorescente,Incandescente"
 Inspeção Comercial,Template para inspeção de estabelecimentos comerciais,399.99,30,3,Área de Vendas,Inspeção da área principal de vendas,Iluminação,Verificação do sistema de iluminação,Funcionamento,boolean,true,
 Inspeção Comercial,Template para inspeção de estabelecimentos comerciais,399.99,30,3,Área de Vendas,Inspeção da área principal de vendas,Iluminação,Verificação do sistema de iluminação,Foto Geral,image,true,

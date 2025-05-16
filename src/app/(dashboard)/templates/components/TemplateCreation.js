@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import RoomEditor from "./RoomEditor";
+import TopicEditor from "./TopicEditor";
 import { addDoc, collection } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { toast } from "@/hooks/use-toast";
@@ -41,7 +41,7 @@ export default function TemplateCreation({ open, onClose }) {
     template_price: "0",
     icon: "",
     iconColor: "",
-    rooms: []
+    topics: []
   });
 
   const [loading, setLoading] = useState(false);
@@ -185,9 +185,9 @@ export default function TemplateCreation({ open, onClose }) {
               </div>
             </div>
 
-            <RoomEditor
-              rooms={formData.rooms}
-              onChange={rooms => setFormData({...formData, rooms})}
+            <TopicEditor
+              topics={formData.topics}
+              onChange={topics => setFormData({...formData, topics})}
             />
 
             <div className="flex justify-end gap-4">

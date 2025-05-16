@@ -1,4 +1,4 @@
-// app/(dashboard)/templates/components/RoomEditor.js
+// app/(dashboard)/templates/components/TopicEditor.js
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -8,9 +8,9 @@ import { Label } from "@/components/ui/label";
 import { Plus, Trash2, Copy } from "lucide-react";
 import ItemEditor from "./ItemEditor";
 
-export default function RoomEditor({ rooms = [], onChange }) {
-  const addRoom = () => {
-    onChange([...rooms, {
+export default function TopicEditor({ topics = [], onChange }) {
+  const addTopic = () => {
+    onChange([...topics, {
       name: "",
       description: "",
       items: [],
@@ -27,50 +27,50 @@ export default function RoomEditor({ rooms = [], onChange }) {
     }]);
   };
 
-  const updateRoom = (index, field, value) => {
-    const newRooms = [...rooms];
+  const updateTopic = (index, field, value) => {
+    const newTopics = [...topics];
     if (field.includes('.')) {
       const [main, sub, prop] = field.split('.');
-      newRooms[index][main] = newRooms[index][main] || {};
-      newRooms[index][main][sub] = newRooms[index][main][sub] || {};
+      newTopics[index][main] = newTopics[index][main] || {};
+      newTopics[index][main][sub] = newTopics[index][main][sub] || {};
       const numberValue = Number(value);
-      newRooms[index][main][sub][prop] = isNaN(numberValue) ? 0 : numberValue;
+      newTopics[index][main][sub][prop] = isNaN(numberValue) ? 0 : numberValue;
     } else {
-      newRooms[index][field] = value;
+      newTopics[index][field] = value;
     }
-    onChange(newRooms);
+    onChange(newTopics);
   };
 
-  const removeRoom = (index) => {
-    onChange(rooms.filter((_, i) => i !== index));
+  const removeTopic = (index) => {
+    onChange(topics.filter((_, i) => i !== index));
   };
 
-  const duplicateRoom = (index) => {
-    const newRooms = [...rooms];
-    newRooms.splice(index + 1, 0, JSON.parse(JSON.stringify(rooms[index])));
-    onChange(newRooms);
+  const duplicateTopic = (index) => {
+    const newTopics = [...topics];
+    newTopics.splice(index + 1, 0, JSON.parse(JSON.stringify(topics[index])));
+    onChange(newTopics);
   };
 
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <Label className="text-lg font-semibold">Dependências</Label>
-        <Button onClick={addRoom}>
+        <Button onClick={addTopic}>
           <Plus className="mr-2 h-4 w-4" />
           Adicionar Dependência
         </Button>
       </div>
 
-      {rooms.length === 0 ? (
+      {topics.length === 0 ? (
         <div className="text-center py-8 border border-dashed rounded-lg">
           <p className="text-muted-foreground">Ainda não há dependências definidas</p>
-          <Button onClick={addRoom} variant="outline" className="mt-2">
+          <Button onClick={addTopic} variant="outline" className="mt-2">
             <Plus className="mr-2 h-4 w-4" />
             Adicionar primeira dependência
           </Button>
         </div>
       ) : (
-        rooms.map((room, index) => (
+        topics.map((topic, index) => (
           <Card key={index}>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Dependência {index + 1}</CardTitle>
@@ -78,7 +78,7 @@ export default function RoomEditor({ rooms = [], onChange }) {
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => duplicateRoom(index)}
+                  onClick={() => duplicateTopic(index)}
                   title="Duplicar Dependência"
                 >
                   <Copy className="h-4 w-4" />
@@ -86,7 +86,7 @@ export default function RoomEditor({ rooms = [], onChange }) {
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => removeRoom(index)}
+                  onClick={() => removeTopic(index)}
                   title="Remover Dependência"
                 >
                   <Trash2 className="h-4 w-4" />
@@ -97,16 +97,16 @@ export default function RoomEditor({ rooms = [], onChange }) {
               <div className="space-y-2">
                 <Label>Nome da Dependência</Label>
                 <Input
-                  value={room.name}
-                  onChange={e => updateRoom(index, "name", e.target.value)}
+                  value={topic.name}
+                  onChange={e => updateTopic(index, "name", e.target.value)}
                   placeholder="Ex: Sala de Estar, Cozinha, Banheiro..."
                 />
               </div>
               <div className="space-y-2">
                 <Label>Descrição</Label>
                 <Input
-                  value={room.description}
-                  onChange={e => updateRoom(index, "description", e.target.value)}
+                  value={topic.description}
+                  onChange={e => updateTopic(index, "description", e.target.value)}
                   placeholder="Descrição opcional da dependência"
                 />
               </div>
@@ -120,8 +120,8 @@ export default function RoomEditor({ rooms = [], onChange }) {
                       <Input
                         type="number"
                         min="0"
-                        value={room.media_requirements?.images?.min || 0}
-                        onChange={e => updateRoom(index, "media_requirements.images.min", e.target.value)}
+                        value={topic.media_requirements?.images?.min || 0}
+                        onChange={e => updateTopic(index, "media_requirements.images.min", e.target.value)}
                       />
                     </div>
                     <div>
@@ -129,8 +129,8 @@ export default function RoomEditor({ rooms = [], onChange }) {
                       <Input
                         type="number"
                         min="0"
-                        value={room.media_requirements?.images?.max || 0}
-                        onChange={e => updateRoom(index, "media_requirements.images.max", e.target.value)}
+                        value={topic.media_requirements?.images?.max || 0}
+                        onChange={e => updateTopic(index, "media_requirements.images.max", e.target.value)}
                       />
                     </div>
                   </div>
@@ -144,8 +144,8 @@ export default function RoomEditor({ rooms = [], onChange }) {
                       <Input
                         type="number"
                         min="0"
-                        value={room.media_requirements?.videos?.min || 0}
-                        onChange={e => updateRoom(index, "media_requirements.videos.min", e.target.value)}
+                        value={topic.media_requirements?.videos?.min || 0}
+                        onChange={e => updateTopic(index, "media_requirements.videos.min", e.target.value)}
                       />
                     </div>
                     <div>
@@ -153,8 +153,8 @@ export default function RoomEditor({ rooms = [], onChange }) {
                       <Input
                         type="number"
                         min="0"
-                        value={room.media_requirements?.videos?.max || 0}
-                        onChange={e => updateRoom(index, "media_requirements.videos.max", e.target.value)}
+                        value={topic.media_requirements?.videos?.max || 0}
+                        onChange={e => updateTopic(index, "media_requirements.videos.max", e.target.value)}
                       />
                     </div>
                   </div>
@@ -162,8 +162,8 @@ export default function RoomEditor({ rooms = [], onChange }) {
               </div>
 
               <ItemEditor
-                items={room.items || []}
-                onChange={items => updateRoom(index, "items", items)}
+                items={topic.items || []}
+                onChange={items => updateTopic(index, "items", items)}
               />
             </CardContent>
           </Card>

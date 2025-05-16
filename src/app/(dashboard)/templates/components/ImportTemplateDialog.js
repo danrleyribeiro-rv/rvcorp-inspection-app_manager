@@ -29,9 +29,9 @@ export default function ImportTemplateDialog({ open, onClose, onSuccess }) {
           if (!data.title) {
             throw new Error("Imported JSON must have a 'title' property.");
           }
-          // If 'rooms' exists, ensure that it's an array
-          if (data.rooms && !Array.isArray(data.rooms)) {
-            throw new Error("The 'rooms' property must be an array.");
+          // If 'topics' exists, ensure that it's an array
+          if (data.topics && !Array.isArray(data.topics)) {
+            throw new Error("The 'topics' property must be an array.");
           }
 
           setPreview(data);
@@ -74,7 +74,7 @@ export default function ImportTemplateDialog({ open, onClose, onSuccess }) {
         template_price: parseFloat(preview.template_price) || null,
         icon: preview.icon || null,
         icon_color: preview.icon_color || null,
-        rooms: preview.rooms || [],
+        topics: preview.topics || [],
         created_at: serverTimestamp(),
         updated_at: serverTimestamp(),
         deleted_at: null

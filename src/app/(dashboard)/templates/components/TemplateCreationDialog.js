@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import RoomEditor from "./RoomEditor";
+import TopicEditor from "./TopicEditor";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
@@ -40,7 +40,7 @@ export default function TemplateCreationDialog({ open, onClose, onSuccess }) {
     template_price: "0",
     icon: "",
     icon_color: "",
-    rooms: []
+    topics: []
   });
 
   const [loading, setLoading] = useState(false);
@@ -74,7 +74,7 @@ export default function TemplateCreationDialog({ open, onClose, onSuccess }) {
         template_price: parseFloat(formData.template_price) || null, // Convert to number
         icon: formData.icon || null,
         icon_color: formData.icon_color || null,
-        rooms: formData.rooms || [], // Ensure 'rooms' is an array
+        topics: formData.topics || [], // Ensure 'topics' is an array
         created_at: serverTimestamp(),
         updated_at: serverTimestamp(),
         deleted_at: null
@@ -187,9 +187,9 @@ export default function TemplateCreationDialog({ open, onClose, onSuccess }) {
               </div>
             </div>
 
-            <RoomEditor
-              rooms={formData.rooms}
-              onChange={rooms => setFormData({...formData, rooms})}
+            <TopicEditor
+              topics={formData.topics}
+              onChange={topics => setFormData({...formData, topics})}
             />
 
             <div className="flex justify-end gap-4">

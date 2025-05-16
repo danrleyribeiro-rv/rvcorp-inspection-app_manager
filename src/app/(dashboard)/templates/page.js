@@ -156,9 +156,9 @@ export default function TemplatesPage() {
                   </TableCell>
                   <TableCell className="font-medium">{template.title}</TableCell>
                   <TableCell>{template.description}</TableCell>
-                  <TableCell>{template.rooms?.length || 0}</TableCell>
+                  <TableCell>{template.topics?.length || 0}</TableCell>
                   <TableCell>
-                    {template.rooms?.reduce((acc, room) => acc + (room.items?.length || 0), 0) || 0}
+                    {template.topics?.reduce((acc, topic) => acc + (topic.items?.length || 0), 0) || 0}
                   </TableCell>
                   <TableCell>
                     {formatCurrency(template.template_price)}
