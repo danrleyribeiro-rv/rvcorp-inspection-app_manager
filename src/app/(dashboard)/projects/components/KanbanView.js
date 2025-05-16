@@ -5,7 +5,7 @@ import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CalendarIcon, Edit, Trash2, Eye } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase";
 import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
@@ -27,32 +27,38 @@ export default function KanbanView({ projects, isLoading, onRefresh }) {
   const [editingProject, setEditingProject] = useState(null);
   const [deletingProject, setDeletingProject] = useState(null);
   const [viewingProject, setViewingProject] = useState(null);
+  const [localProjects, setLocalProjects] = useState(projects);
   const { toast } = useToast();
+
+  // Sincroniza localProjects quando projects muda
+  useEffect(() => {
+    setLocalProjects(projects);
+  }, [projects]);
 
   // Organize projects by status
   const columns = {
     "Aguardando": { 
       id: "Aguardando", 
       title: "Aguardando", 
-      projects: projects.filter(p => p.status === "Aguardando"),
+      projects: localProjects.filter(p => p.status === "Aguardando"),
       color: "bg-yellow-50 border-yellow-200"
     },
     "Em Andamento": { 
       id: "Em Andamento", 
       title: "Em Andamento", 
-      projects: projects.filter(p => p.status === "Em Andamento"),
+      projects: localProjects.filter(p => p.status === "Em Andamento"),
       color: "bg-blue-50 border-blue-200"
     },
     "Em Revisão": { 
       id: "Em Revisão", 
       title: "Em Revisão", 
-      projects: projects.filter(p => p.status === "Em Revisão"),
+      projects: localProjects.filter(p => p.status === "Em Revisão"),
       color: "bg-purple-50 border-purple-200"
     },
     "Concluído": { 
       id: "Concluído", 
       title: "Concluído", 
-      projects: projects.filter(p => p.status === "Concluído"),
+      projects: localProjects.filter(p => p.status === "Concluído"),
       color: "bg-green-50 border-green-200"
     }
   };
@@ -65,6 +71,14 @@ export default function KanbanView({ projects, isLoading, onRefresh }) {
     
     // Dropped in the same column
     if (source.droppableId === destination.droppableId) return;
+
+    // Atualização otimista
+    const prevProjects = [...localProjects];
+    setLocalProjects(projects =>
+      projects.map(p =>
+        p.id === draggableId ? { ...p, status: destination.droppableId } : p
+      )
+    );
 
     try {
       // Update project status in Firestore
@@ -79,8 +93,9 @@ export default function KanbanView({ projects, isLoading, onRefresh }) {
         title: "Status atualizado com sucesso"
       });
       
-      onRefresh();
     } catch (error) {
+      // Reverte se falhar
+      setLocalProjects(prevProjects);
       console.error("Error updating project status:", error);
       toast({
         title: "Erro ao atualizar status",

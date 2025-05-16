@@ -3,7 +3,7 @@
 
 import { useState } from "react";
 import { db } from "@/lib/firebase";
-import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { doc, deleteDoc } from "firebase/firestore";
 import {
   Dialog,
   DialogContent,
@@ -23,23 +23,16 @@ export default function DeleteTemplateDialog({ template, open, onClose, onDelete
   const handleDelete = async () => {
     setLoading(true);
     try {
-      // Soft delete by setting deleted_at timestamp
+      // Exclusão real do documento no Firestore
       const templateRef = doc(db, 'templates', template.id);
-      
-      await updateDoc(templateRef, {
-        deleted_at: serverTimestamp(),
-        updated_at: serverTimestamp()
-      });
+      await deleteDoc(templateRef);
 
       toast({
         title: "Template excluído com sucesso",
       });
-      
-      // Call onDelete callback to refresh template list
       if (typeof onDelete === 'function') {
         onDelete();
       }
-      
       onClose();
     } catch (error) {
       console.error("Error deleting template:", error);

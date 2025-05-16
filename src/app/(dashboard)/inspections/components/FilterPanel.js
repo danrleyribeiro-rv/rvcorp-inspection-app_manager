@@ -97,6 +97,29 @@ export default function FilterPanel({ filterState, onFilterChange, inspections }
     return projects.filter(project => projectIds.has(project.id));
   };
 
+  // Função utilitária para extrair estados únicos das inspeções
+  function getActiveStates() {
+    const states = new Set();
+    inspections.forEach(inspection => {
+      if (inspection.address?.state) states.add(inspection.address.state);
+    });
+    return Array.from(states);
+  }
+
+  // Função utilitária para extrair cidades únicas das inspeções, filtrando por estado se fornecido
+  function getActiveCities(selectedState) {
+    const cities = new Set();
+    inspections.forEach(inspection => {
+      if (
+        inspection.address?.city &&
+        (!selectedState || inspection.address.state === selectedState)
+      ) {
+        cities.add(inspection.address.city);
+      }
+    });
+    return Array.from(cities);
+  }
+
   const handleReset = () => {
     const resetState = {
       status: "all",
@@ -177,18 +200,59 @@ export default function FilterPanel({ filterState, onFilterChange, inspections }
           </Select>
         </div>
 
+        {/* Estado e Cidade lado a lado */}
+        <div className="flex gap-2">
+          <div className="flex-1 space-y-2">
+            <Label>Estado</Label>
+            <Select
+              value={filterState.state || "all"}
+              onValueChange={value => onFilterChange({ ...filterState, state: value, city: "all" })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Todos os estados" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                {getActiveStates().map(state => (
+                  <SelectItem key={state} value={state}>{state}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex-1 space-y-2">
+            <Label>Cidade</Label>
+            <Select
+              value={filterState.city || "all"}
+              onValueChange={value => onFilterChange({ ...filterState, city: value })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Todas as cidades" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas</SelectItem>
+                {getActiveCities(filterState.state === "all" ? null : filterState.state).map(city => (
+                  <SelectItem key={city} value={city}>{city}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Período com largura limitada */}
         <div className="space-y-2">
           <Label>Período</Label>
-          <Calendar
-            mode="range"
-            selected={dateRange}
-            onSelect={(range) => {
-              setDateRange(range);
-              onFilterChange({ ...filterState, dateRange: range });
-            }}
-            numberOfMonths={1}
-            className="rounded-md border"
-          />
+          <div className="max-w-xs">
+            <Calendar
+              mode="range"
+              selected={dateRange}
+              onSelect={range => {
+                setDateRange(range);
+                onFilterChange({ ...filterState, dateRange: range });
+              }}
+              numberOfMonths={1}
+              className="rounded-md border"
+            />
+          </div>
         </div>
 
         <Button onClick={handleReset} variant="outline" className="w-full">

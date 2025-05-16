@@ -86,96 +86,104 @@ export default function ItemDetailEditor({ details = [], onChange }) {
           </Button>
         </div>
       ) : (
-        details.map((detail, index) => (
-          <Card key={index}>
-            <CardContent className="pt-6 space-y-4">
-              <div className="flex justify-between gap-4">
-                <div className="flex-1 space-y-2">
-                  <Label>Nome do Detalhe</Label>
-                  <Input
-                    value={detail.name}
-                    onChange={e => updateDetail(index, "name", e.target.value)}
-                    placeholder="Ex: Condição, Estado, Medidas..."
-                  />
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => removeDetail(index)}
-                  title="Remover Detalhe"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Tipo de Resposta</Label>
-                  <Select
-                    value={detail.type}
-                    onValueChange={value => updateDetail(index, "type", value)}
+        <div className="max-h-48 overflow-auto">
+          {details.map((detail, index) => (
+            <Card key={index} className="mb-2 border">
+              <CardContent className="p-2 space-y-2">
+                <div className="flex justify-between gap-2">
+                  <div className="flex-1 space-y-1">
+                    <Label className="text-sm">Nome do Detalhe</Label>
+                    <Input
+                      value={detail.name}
+                      onChange={e => updateDetail(index, "name", e.target.value)}
+                      placeholder="Ex: Condição, Estado, Medidas..."
+                      className="h-7 text-sm"
+                    />
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={() => removeDetail(index)}
+                    title="Remover Detalhe"
                   >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {RESPONSE_TYPES.map(type => (
-                        <SelectItem key={type.value} value={type.value}>
-                          {type.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
                 </div>
 
-                <div className="flex items-center justify-end gap-2">
-                  <Label>Campo Obrigatório</Label>
-                  <Switch
-                    checked={detail.required}
-                    onCheckedChange={checked => updateDetail(index, "required", checked)}
-                  />
-                </div>
-              </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Tipo de Resposta</Label>
+                    <Select
+                      value={detail.type}
+                      onValueChange={value => updateDetail(index, "type", value)}
+                    >
+                      <SelectTrigger className="h-7 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {RESPONSE_TYPES.map(type => (
+                          <SelectItem key={type.value} value={type.value}>
+                            {type.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-              {detail.type === "select" && (
-                <div className="space-y-2">
-                  <Label>Opções (separadas por vírgula)</Label>
-                  <Input
-                    value={detail.optionsText || detail.options?.join(", ") || ""}
-                    onChange={e => updateOptions(index, e.target.value)}
-                    placeholder="Opção 1, Opção 2, Opção 3..."
-                  />
-                </div>
-              )}
-
-              {(detail.type === "image" || detail.type === "video") && (
-                <div className="space-y-4">
-                  <Label>Requisitos de {detail.type === "image" ? "Imagens" : "Vídeos"}</Label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <Label className="text-sm">Mínimo</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        value={detail.media_requirements?.[detail.type === "image" ? "images" : "videos"]?.min || 0}
-                        onChange={e => updateDetail(index, `media_requirements.${detail.type === "image" ? "images" : "videos"}.min`, e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-sm">Máximo</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        value={detail.media_requirements?.[detail.type === "image" ? "images" : "videos"]?.max || 0}
-                        onChange={e => updateDetail(index, `media_requirements.${detail.type === "image" ? "images" : "videos"}.max`, e.target.value)}
-                      />
-                    </div>
+                  <div className="flex items-center justify-end gap-1">
+                    <Label className="text-xs">Campo Obrigatório</Label>
+                    <Switch
+                      checked={detail.required}
+                      onCheckedChange={checked => updateDetail(index, "required", checked)}
+                      className="h-4 w-8"
+                    />
                   </div>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        ))
+
+                {detail.type === "select" && (
+                  <div className="space-y-1">
+                    <Label className="text-xs">Opções (separadas por vírgula)</Label>
+                    <Input
+                      value={detail.optionsText || detail.options?.join(", ") || ""}
+                      onChange={e => updateOptions(index, e.target.value)}
+                      placeholder="Opção 1, Opção 2, Opção 3..."
+                      className="h-7 text-sm"
+                    />
+                  </div>
+                )}
+
+                {(detail.type === "image" || detail.type === "video") && (
+                  <div className="space-y-2">
+                    <Label className="text-xs">Requisitos de {detail.type === "image" ? "Imagens" : "Vídeos"}</Label>
+                    <div className="grid grid-cols-2 gap-1">
+                      <div>
+                        <Label className="text-xs">Mínimo</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={detail.media_requirements?.[detail.type === "image" ? "images" : "videos"]?.min || 0}
+                          onChange={e => updateDetail(index, `media_requirements.${detail.type === "image" ? "images" : "videos"}.min`, e.target.value)}
+                          className="h-7 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Máximo</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={detail.media_requirements?.[detail.type === "image" ? "images" : "videos"]?.max || 0}
+                          onChange={e => updateDetail(index, `media_requirements.${detail.type === "image" ? "images" : "videos"}.max`, e.target.value)}
+                          className="h-7 text-sm"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       )}
     </div>
   );

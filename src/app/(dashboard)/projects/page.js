@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import TableView from "./components/TableView";
 import KanbanView from "./components/KanbanView";
-import CalendarView from "./components/CalendarView";
 import { CreateProjectDialog } from "./components/CreateProjectDialog";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/auth-context";
@@ -119,7 +118,6 @@ export default function ProjectsPage() {
         <TabsList>
           <TabsTrigger value="lista">Lista</TabsTrigger>
           <TabsTrigger value="kanban">Kanban</TabsTrigger>
-          <TabsTrigger value="calendario">Calendário</TabsTrigger>
         </TabsList>
 
         <TabsContent value="lista">
@@ -128,10 +126,6 @@ export default function ProjectsPage() {
 
         <TabsContent value="kanban">
           <KanbanView projects={projects} isLoading={loading} onRefresh={fetchProjects} />
-        </TabsContent>
-
-        <TabsContent value="calendario">
-          <CalendarView projects={projects} isLoading={loading} onRefresh={fetchProjects} />
         </TabsContent>
       </Tabs>
 

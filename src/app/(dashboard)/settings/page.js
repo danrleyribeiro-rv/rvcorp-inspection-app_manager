@@ -380,7 +380,6 @@ export default function SettingsPage() {
                 >
                   <option value="lista">Lista</option>
                   <option value="kanban">Kanban</option>
-                  <option value="calendario">Calendário</option>
                 </select>
               </div>
             </CardContent>

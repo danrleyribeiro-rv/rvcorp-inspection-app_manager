@@ -1,13 +1,13 @@
-// app/(dashboard)/templates/components/ImportTemplateDialog.js
+// src/app/(dashboard)/templates/components/ImportTemplateDialog.js
 "use client";
 
 import { useState, useRef } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
-import { FileJson, Upload } from "lucide-react";
+import { FileJson, Upload, Check } from "lucide-react";
 
 export default function ImportTemplateDialog({ open, onClose, onSuccess }) {
   const [file, setFile] = useState(null);
@@ -21,35 +21,47 @@ export default function ImportTemplateDialog({ open, onClose, onSuccess }) {
 
     const reader = new FileReader();
     reader.onload = async (e) => {
-      const text = e.target.result;
       try {
+        const text = e.target.result;
         if (file.name.endsWith(".json")) {
           const data = JSON.parse(text);
-          // Validate that the imported JSON has the expected structure
+          
+          // Validação básica do JSON
           if (!data.title) {
-            throw new Error("Imported JSON must have a 'title' property.");
+            throw new Error("O JSON deve ter uma propriedade 'title'");
           }
-          // If 'topics' exists, ensure that it's an array
-          if (data.topics && !Array.isArray(data.topics)) {
-            throw new Error("The 'topics' property must be an array.");
-          }
-
-          setPreview(data);
+          
+          // Garantir que todos os campos obrigatórios estejam presentes
+          const validatedData = {
+            title: data.title,
+            description: data.description || "",
+            template_price: typeof data.template_price === 'number' ? data.template_price : 0,
+            icon: data.icon || null,
+            icon_color: data.icon_color || null,
+            topics: Array.isArray(data.topics) ? data.topics.map(topic => ({
+              name: topic.name || "",
+              description: topic.description || "",
+              items: Array.isArray(topic.items) ? topic.items.map(item => ({
+                name: item.name || "",
+                description: item.description || "",
+                details: Array.isArray(item.details) ? item.details : []
+              })) : []
+            })) : []
+          };
+          
+          setPreview(validatedData);
         } else {
-          // CSV is not supported, show error immediately
           toast({
             title: "Formato não suportado",
-            description:
-              "Apenas arquivos JSON são suportados para importação de templates",
+            description: "Apenas arquivos JSON são suportados",
             variant: "destructive",
           });
-          return;  // Important: Stop processing here.
         }
       } catch (error) {
+        console.error("Erro ao processar arquivo:", error);
         toast({
           title: "Erro",
-          description:
-            error.message || "Erro ao processar arquivo. Verifique se é um JSON válido.",
+          description: error.message || "Erro ao processar arquivo JSON. Verifique o formato.",
           variant: "destructive",
         });
       }
@@ -69,12 +81,7 @@ export default function ImportTemplateDialog({ open, onClose, onSuccess }) {
     setLoading(true);
     try {
       const dataToSave = {
-        title: preview.title,
-        description: preview.description || null,
-        template_price: parseFloat(preview.template_price) || null,
-        icon: preview.icon || null,
-        icon_color: preview.icon_color || null,
-        topics: preview.topics || [],
+        ...preview,
         created_at: serverTimestamp(),
         updated_at: serverTimestamp(),
         deleted_at: null
@@ -91,7 +98,7 @@ export default function ImportTemplateDialog({ open, onClose, onSuccess }) {
       onSuccess();
       onClose();
     } catch (error) {
-      console.error("Error importing template:", error);
+      console.error("Erro ao importar template:", error);
       toast({
         title: "Erro",
         description: error.message || "Erro ao importar template",
@@ -105,15 +112,12 @@ export default function ImportTemplateDialog({ open, onClose, onSuccess }) {
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Importar Template</DialogTitle>
-          <DialogDescription>
-            Importe um template a partir de um arquivo JSON
-          </DialogDescription>
+        <DialogHeader className="pb-2">
+          <DialogTitle className="text-xl">Importar Template</DialogTitle>
         </DialogHeader>
 
         <div
-          className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer"
+          className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer"
           onDrop={handleDrop}
           onDragOver={(e) => e.preventDefault()}
           onClick={() => fileInputRef.current?.click()}
@@ -125,27 +129,35 @@ export default function ImportTemplateDialog({ open, onClose, onSuccess }) {
             accept=".json"
             onChange={(e) => handleFileSelect(e.target.files?.[0])}
           />
-          <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-          <p className="text-sm text-muted-foreground mb-2">
-            Arraste um arquivo ou clique para selecionar
+          <Upload className="w-10 h-10 mx-auto mb-2 text-muted-foreground" />
+          <p className="text-sm mb-1">
+            Arraste um arquivo JSON ou clique para selecionar
           </p>
-          <div className="flex justify-center gap-4">
-            <div className="flex items-center gap-2">
-              <FileJson className="w-4 h-4" />
-              <span className="text-sm">JSON</span>
-            </div>
+          <div className="flex justify-center items-center gap-2 mt-2">
+            <FileJson className="w-4 h-4 text-blue-500" />
+            <span className="text-sm font-medium">JSON</span>
           </div>
         </div>
 
         {file && (
-          <div className="space-y-4">
-            <p className="text-sm">Arquivo selecionado: {file.name}</p>
+          <div className="space-y-3 mt-3">
+            <p className="text-sm">
+              <span className="font-medium">Arquivo:</span> {file.name}
+            </p>
             {preview && (
               <>
-                <div className="max-h-64 overflow-auto p-4 bg-muted rounded-lg">
-                  <pre className="text-xs">
-                    {JSON.stringify(preview, null, 2)}
-                  </pre>
+                <div className="p-3 border rounded-md bg-muted/30">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Check className="h-4 w-4 text-green-500" />
+                    <p className="font-medium text-sm">{preview.title}</p>
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-1">{preview.description}</p>
+                  <p className="text-xs"><span className="font-medium">Tópicos:</span> {preview.topics?.length || 0}</p>
+                  <p className="text-xs">
+                    <span className="font-medium">Itens:</span> {
+                      preview.topics?.reduce((total, topic) => total + (topic.items?.length || 0), 0) || 0
+                    }
+                  </p>
                 </div>
                 <div className="flex justify-end">
                   <Button onClick={handleImport} disabled={loading}>

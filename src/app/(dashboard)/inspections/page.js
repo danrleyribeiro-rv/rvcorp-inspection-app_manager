@@ -202,34 +202,34 @@ export default function InspectionsPage() {
     <div className="container p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Inspeções</h1>
-        <Button onClick={() => setShowCreate(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Nova Inspeção
-        </Button>
       </div>
 
-      <div className="flex gap-4 mb-6">
-        <div className="flex-1">
-          <Input
-            placeholder="Buscar inspeções..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="max-w-md"
-          />
+      <div className="flex gap-4 mb-6 items-center justify-between">
+        <Input
+          placeholder="Buscar inspeções..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="max-w-md"
+        />
+        <div className="flex gap-4">
+          <Button onClick={() => setShowCreate(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Nova Inspeção
+          </Button>
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button variant="outline">
+                <Filter className="mr-2 h-4 w-4" />
+                Filtros
+              </Button>
+            </SheetTrigger>
+            <FilterPanel
+              filterState={filterState}
+              onFilterChange={setFilterState}
+              inspections={inspections}
+            />
+          </Sheet>
         </div>
-        <Sheet>
-          <SheetTrigger asChild>
-            <Button variant="outline">
-              <Filter className="mr-2 h-4 w-4" />
-              Filtros
-            </Button>
-          </SheetTrigger>
-          <FilterPanel
-            filterState={filterState}
-            onFilterChange={setFilterState}
-            inspections={inspections}
-          />
-        </Sheet>
       </div>
 
       {loading ? (
