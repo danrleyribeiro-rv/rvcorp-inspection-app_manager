@@ -50,7 +50,7 @@ export default function LoginPage() {
           <div className="w-32 h-32 relative mb-4">
             <Image
               src="/logo.png"
-              alt="RV Corp Logo"
+              alt="Lince Logo"
               fill
               className="object-contain"
             />

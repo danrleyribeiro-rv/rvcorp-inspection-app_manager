@@ -48,7 +48,7 @@ export default function ForgotPasswordPage() {
       <div className="mb-8 absolute top-8">
         <Image
           src="/logo.png"
-          alt="RV Corp Logo"
+          alt="Lince Logo"
           width={150}
           height={150}
           priority

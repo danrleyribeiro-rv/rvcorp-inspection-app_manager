@@ -7,8 +7,8 @@ import './globals.css';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata = {
-  title: 'RV Corp Manager',
-  description: 'Management platform for RV Corp inspections',
+  title: 'Lince - Gerenciamento de Inspeções',
+  description: 'Management platform for Lince Inspection App',
 };
 
 export default function RootLayout({ children }) {
