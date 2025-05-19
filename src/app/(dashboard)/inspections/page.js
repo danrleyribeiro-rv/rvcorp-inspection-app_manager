@@ -28,7 +28,9 @@ export default function InspectionsPage() {
     status: "all",
     project: "all",
     inspector: "all",
-    dateRange: null
+    dateRange: null,
+    state: "all",
+    city: "all"
   });
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
@@ -183,6 +185,12 @@ export default function InspectionsPage() {
       // Inspector filter
       const matchesInspector = filterState.inspector === "all" || inspection.inspector_id === filterState.inspector;
 
+      // State filter
+      const matchesState = filterState.state === "all" || inspection.address?.state === filterState.state;
+
+      // City filter
+      const matchesCity = filterState.city === "all" || inspection.address?.city === filterState.city;
+
       // Date range filter
       let matchesDateRange = true;
       if (filterState.dateRange?.from && filterState.dateRange?.to && inspection.scheduled_date) {
@@ -192,7 +200,7 @@ export default function InspectionsPage() {
           inspectionDate <= filterState.dateRange.to;
       }
 
-      return matchesSearch && matchesStatus && matchesProject && matchesInspector && matchesDateRange;
+      return matchesSearch && matchesStatus && matchesProject && matchesInspector && matchesState && matchesCity && matchesDateRange;
     });
 
     setFilteredInspections(filtered);
@@ -279,6 +287,10 @@ export default function InspectionsPage() {
           inspection={viewingInspection}
           open={!!viewingInspection}
           onClose={() => setViewingInspection(null)}
+          onEdit={(inspection) => {
+            setEditingInspection(inspection);
+            setViewingInspection(null);
+          }}
         />
       )}
 

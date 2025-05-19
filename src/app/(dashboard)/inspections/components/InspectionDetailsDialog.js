@@ -31,9 +31,12 @@ import {
   FileCode,
   ScrollText,
   Home,
-  Building
+  Building,
+  Clipboard,
+  Pencil
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 const getStatusBadge = (status) => {
   const statusMap = {
@@ -45,7 +48,7 @@ const getStatusBadge = (status) => {
   return statusMap[status] || { label: status, variant: "gray" };
 };
 
-export default function InspectionDetailsDialog({ inspection, open, onClose }) {
+export default function InspectionDetailsDialog({ inspection, open, onClose, onEdit }) {
   const [loading, setLoading] = useState(true);
   const [topics, setTopics] = useState([]);
   const [projectDetails, setProjectDetails] = useState(null);
@@ -201,10 +204,16 @@ export default function InspectionDetailsDialog({ inspection, open, onClose }) {
     return parts.join(", ");
   };
 
+  const handleEdit = () => {
+    if (onEdit) {
+      onEdit(inspection);
+    }
+  };
+
   if (loading) {
     return (
       <Dialog open={open} onOpenChange={onClose}>
-        <DialogContent className="max-w-4xl max-h-[90vh]">
+        <DialogContent className="max-w-5xl max-h-[90vh]">
           <DialogHeader>
             <DialogTitle>Carregando detalhes...</DialogTitle>
           </DialogHeader>
@@ -220,334 +229,356 @@ export default function InspectionDetailsDialog({ inspection, open, onClose }) {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
-        <DialogHeader>
-          <DialogTitle className="flex items-center justify-between">
-            <span>{inspection.title}</span>
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden p-0">
+        <DialogHeader className="p-6 pb-2 sticky top-0 bg-background z-10 border-b">
+          <div className="flex items-center justify-between">
+            <DialogTitle className="text-xl font-bold">{inspection.title}</DialogTitle>
             <Badge variant={status.variant}>{status.label}</Badge>
-          </DialogTitle>
+          </div>
         </DialogHeader>
 
-        <Tabs defaultValue="overview" className="overflow-hidden h-[calc(100%-4rem)]">
-          <TabsList>
-            <TabsTrigger value="overview">Visão Geral</TabsTrigger>
-            <TabsTrigger value="topics">
-              Tópicos ({topics.length})
-            </TabsTrigger>
-            {templateDetails && (
-              <TabsTrigger value="template">Template</TabsTrigger>
-            )}
-          </TabsList>
-
-          <TabsContent value="overview" className="overflow-auto h-full">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Detalhes da Inspeção</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {inspection.observation && (
-                    <div className="flex items-start gap-2">
-                      <FileText className="h-4 w-4 mt-0.5 text-muted-foreground" />
-                      <div>
-                        <p className="font-medium">Observação</p>
-                        <p className="text-sm text-muted-foreground">{inspection.observation}</p>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {inspection.scheduled_date && (
-                    <div className="flex items-center gap-2">
-                      <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-                      <div>
-                        <p className="font-medium">Data Agendada</p>
-                        <p className="text-sm text-muted-foreground">
-                          {formatDateSafely(inspection.scheduled_date)}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {inspection.address && (
-                    <div className="flex items-start gap-2">
-                      <MapPin className="h-4 w-4 mt-0.5 text-muted-foreground" />
-                      <div>
-                        <p className="font-medium">Endereço</p>
-                        <p className="text-sm text-muted-foreground">
-                          {formatAddress(inspection.address)}
-                        </p>
-                        {inspection.address.cep && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            CEP: {inspection.address.cep}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                  
-                  <div className="flex items-center gap-2">
-                    <ScrollText className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <p className="font-medium">Criado em</p>
-                      <p className="text-sm text-muted-foreground">
-                        {formatDateSafely(inspection.created_at)}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              
-              {projectDetails && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Projeto</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-start gap-2">
-                      <FileCode className="h-4 w-4 mt-0.5 text-muted-foreground" />
-                      <div>
-                        <p className="font-medium">Título</p>
-                        <p className="text-sm text-muted-foreground">{projectDetails.title}</p>
-                      </div>
-                    </div>
-                    
-                    {projectDetails.description && (
-                      <div className="flex items-start gap-2">
-                        <FileText className="h-4 w-4 mt-0.5 text-muted-foreground" />
-                        <div>
-                          <p className="font-medium">Descrição</p>
-                          <p className="text-sm text-muted-foreground">{projectDetails.description}</p>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {projectDetails.clients && (
-                      <div className="flex items-center gap-2">
-                        <User className="h-4 w-4 text-muted-foreground" />
-                        <div>
-                          <p className="font-medium">Cliente</p>
-                          <p className="text-sm text-muted-foreground">{projectDetails.clients.name}</p>
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
-              
-              {inspectorDetails && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Vistoriador</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center gap-2">
-                      <User className="h-4 w-4 text-muted-foreground" />
-                      <div>
-                        <p className="font-medium">Nome</p>
-                        <p className="text-sm text-muted-foreground">
-                          {`${inspectorDetails.name} ${inspectorDetails.last_name || ''}`}
-                        </p>
-                      </div>
-                    </div>
-                    
-                    {inspectorDetails.email && (
-                      <div className="flex items-center gap-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground">
-                          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-                          <polyline points="22,6 12,13 2,6"></polyline>
-                        </svg>
-                        <div>
-                          <p className="font-medium">Email</p>
-                          <p className="text-sm text-muted-foreground">{inspectorDetails.email}</p>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {inspectorDetails.phonenumber && (
-                      <div className="flex items-center gap-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground">
-                          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
-                        </svg>
-                        <div>
-                          <p className="font-medium">Telefone</p>
-                          <p className="text-sm text-muted-foreground">{inspectorDetails.phonenumber}</p>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {(inspectorDetails.city || inspectorDetails.state) && (
-                      <div className="flex items-center gap-2">
-                        <MapPin className="h-4 w-4 text-muted-foreground" />
-                        <div>
-                          <p className="font-medium">Localização</p>
-                          <p className="text-sm text-muted-foreground">
-                            {[inspectorDetails.city, inspectorDetails.state].filter(Boolean).join(", ")}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
-              
+        <Tabs defaultValue="overview" className="h-[calc(100vh-180px)]">
+          <div className="px-6 border-b">
+            <TabsList className="h-12">
+              <TabsTrigger value="overview" className="flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Visão Geral
+              </TabsTrigger>
+              <TabsTrigger value="topics" className="flex items-center gap-2">
+                <Clipboard className="h-4 w-4" />
+                Tópicos ({topics.length})
+              </TabsTrigger>
               {templateDetails && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Template</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-start gap-2">
-                      <FileCode className="h-4 w-4 mt-0.5 text-muted-foreground" />
-                      <div>
-                        <p className="font-medium">Título</p>
-                        <p className="text-sm text-muted-foreground">{templateDetails.title}</p>
-                      </div>
-                    </div>
-                    
-                    {templateDetails.description && (
-                      <div className="flex items-start gap-2">
-                        <FileText className="h-4 w-4 mt-0.5 text-muted-foreground" />
-                        <div>
-                          <p className="font-medium">Descrição</p>
-                          <p className="text-sm text-muted-foreground">{templateDetails.description}</p>
-                        </div>
-                      </div>
-                    )}
-                    
-                    <div className="flex items-center gap-2">
-                      <Home className="h-4 w-4 text-muted-foreground" />
-                      <div>
-                        <p className="font-medium">Salas</p>
-                        <p className="text-sm text-muted-foreground">
-                          {templateDetails.topics?.length || 0} tópicos definidas
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                <TabsTrigger value="template" className="flex items-center gap-2">
+                  <FileCode className="h-4 w-4" />
+                  Template
+                </TabsTrigger>
               )}
-            </div>
-          </TabsContent>
+            </TabsList>
+          </div>
 
-          <TabsContent value="topics" className="overflow-auto h-full">
-            {topics.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                Nenhuma dependência encontrada para esta inspeção.
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {topics.map((topic) => (
-                  <Card key={topic.id}>
+          <div className="h-[calc(100%-48px)] overflow-hidden">
+            <TabsContent value="overview" className="mt-0 h-full">
+              <ScrollArea className="h-full px-4 py-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
+                  <Card>
                     <CardHeader>
-                      <CardTitle>{topic.topic_name}</CardTitle>
-                      {topic.topic_label && (
-                        <CardDescription>{topic.topic_label}</CardDescription>
-                      )}
+                      <CardTitle className="text-lg">Detalhes da Inspeção</CardTitle>
                     </CardHeader>
-                    <CardContent>
-                      {topic.observation && (
-                        <div className="mb-4">
-                          <p className="font-medium">Observação</p>
-                          <p className="text-sm text-muted-foreground">{topic.observation}</p>
-                        </div>
-                      )}
-                      
-                      {topic.is_damaged && (
-                        <Badge variant="red" className="mb-4">Danificado</Badge>
-                      )}
-                      
-                      {topic.topic_items && topic.topic_items.length > 0 ? (
-                        <div>
-                          <h3 className="font-medium mb-2">Itens ({topic.topic_items.length})</h3>
-                          <div className="space-y-3">
-                            {topic.topic_items.map((item) => (
-                              <div key={item.id} className="border p-3 rounded-md">
-                                <p className="font-medium">{item.item_name}</p>
-                                {item.item_label && (
-                                  <p className="text-sm text-muted-foreground">{item.item_label}</p>
-                                )}
-                                {item.observation && (
-                                  <p className="text-sm mt-1">{item.observation}</p>
-                                )}
-                                {item.is_damaged && (
-                                  <Badge variant="red" className="mt-2">Danificado</Badge>
-                                )}
-                              </div>
-                            ))}
+                    <CardContent className="space-y-4">
+                      {inspection.observation && (
+                        <div className="flex items-start gap-2">
+                          <FileText className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                          <div>
+                            <p className="font-medium">Observação</p>
+                            <p className="text-sm text-muted-foreground">{inspection.observation}</p>
                           </div>
                         </div>
-                      ) : (
-                        <p className="text-sm text-muted-foreground">Nenhum item nesta dependência.</p>
                       )}
+                      
+                      {inspection.scheduled_date && (
+                        <div className="flex items-center gap-2">
+                          <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                          <div>
+                            <p className="font-medium">Data Agendada</p>
+                            <p className="text-sm text-muted-foreground">
+                              {formatDateSafely(inspection.scheduled_date)}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {inspection.address && (
+                        <div className="flex items-start gap-2">
+                          <MapPin className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                          <div>
+                            <p className="font-medium">Endereço</p>
+                            <p className="text-sm text-muted-foreground">
+                              {formatAddress(inspection.address)}
+                            </p>
+                            {inspection.address.cep && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                CEP: {inspection.address.cep}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      
+                      <div className="flex items-center gap-2">
+                        <ScrollText className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <p className="font-medium">Criado em</p>
+                          <p className="text-sm text-muted-foreground">
+                            {formatDateSafely(inspection.created_at)}
+                          </p>
+                        </div>
+                      </div>
                     </CardContent>
                   </Card>
-                ))}
-              </div>
-            )}
-          </TabsContent>
+                  
+                  {projectDetails && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-lg">Projeto</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="flex items-start gap-2">
+                          <FileCode className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                          <div>
+                            <p className="font-medium">Título</p>
+                            <p className="text-sm text-muted-foreground">{projectDetails.title}</p>
+                          </div>
+                        </div>
+                        
+                        {projectDetails.description && (
+                          <div className="flex items-start gap-2">
+                            <FileText className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                            <div>
+                              <p className="font-medium">Descrição</p>
+                              <p className="text-sm text-muted-foreground">{projectDetails.description}</p>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {projectDetails.clients && (
+                          <div className="flex items-center gap-2">
+                            <User className="h-4 w-4 text-muted-foreground" />
+                            <div>
+                              <p className="font-medium">Cliente</p>
+                              <p className="text-sm text-muted-foreground">{projectDetails.clients.name}</p>
+                            </div>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  )}
+                  
+                  {inspectorDetails && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-lg">Vistoriador</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4 text-muted-foreground" />
+                          <div>
+                            <p className="font-medium">Nome</p>
+                            <p className="text-sm text-muted-foreground">
+                              {`${inspectorDetails.name} ${inspectorDetails.last_name || ''}`}
+                            </p>
+                          </div>
+                        </div>
+                        
+                        {inspectorDetails.email && (
+                          <div className="flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground">
+                              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                              <polyline points="22,6 12,13 2,6"></polyline>
+                            </svg>
+                            <div>
+                              <p className="font-medium">Email</p>
+                              <p className="text-sm text-muted-foreground">{inspectorDetails.email}</p>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {inspectorDetails.phonenumber && (
+                          <div className="flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground">
+                              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                            </svg>
+                            <div>
+                              <p className="font-medium">Telefone</p>
+                              <p className="text-sm text-muted-foreground">{inspectorDetails.phonenumber}</p>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {(inspectorDetails.city || inspectorDetails.state) && (
+                          <div className="flex items-center gap-2">
+                            <MapPin className="h-4 w-4 text-muted-foreground" />
+                            <div>
+                              <p className="font-medium">Localização</p>
+                              <p className="text-sm text-muted-foreground">
+                                {[inspectorDetails.city, inspectorDetails.state].filter(Boolean).join(", ")}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  )}
+                  
+                  {templateDetails && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-lg">Template</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="flex items-start gap-1">
+                          <FileCode className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                          <div>
+                            <p className="font-medium">Título</p>
+                            <p className="text-sm text-muted-foreground">{templateDetails.title}</p>
+                          </div>
+                        </div>
+                        
+                        {templateDetails.description && (
+                          <div className="flex items-start gap-1">
+                            <FileText className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                            <div>
+                              <p className="font-medium">Descrição</p>
+                              <p className="text-sm text-muted-foreground">{templateDetails.description}</p>
+                            </div>
+                          </div>
+                        )}
+                        
+                        <div className="flex items-center gap-1">
+                          <Home className="h-4 w-4 text-muted-foreground" />
+                          <div>
+                            <p className="font-medium">Salas</p>
+                            <p className="text-sm text-muted-foreground">
+                              {templateDetails.topics?.length || 0} tópicos definidas
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              </ScrollArea>
+            </TabsContent>
 
-          {templateDetails && (
-            <TabsContent value="template" className="overflow-auto h-full">
-              <Card>
-                <CardHeader>
-                  <CardTitle>{templateDetails.title}</CardTitle>
-                  <CardDescription>{templateDetails.description}</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {templateDetails.topics && templateDetails.topics.length > 0 ? (
-                    <div className="space-y-6">
-                      {templateDetails.topics.map((topic, index) => (
-                        <div key={index} className="border p-4 rounded-md">
-                          <h3 className="font-medium text-lg mb-2">{topic.name}</h3>
-                          {topic.description && (
-                            <p className="text-sm text-muted-foreground mb-4">{topic.description}</p>
+            <TabsContent value="topics" className="mt-0 h-full">
+              <ScrollArea className="h-full px-6 py-4">
+                {topics.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    Nenhuma dependência encontrada para esta inspeção.
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {topics.map((topic) => (
+                      <Card key={topic.id}>
+                        <CardHeader>
+                          <CardTitle>{topic.topic_name}</CardTitle>
+                          {topic.topic_label && (
+                            <CardDescription>{topic.topic_label}</CardDescription>
+                          )}
+                        </CardHeader>
+                        <CardContent>
+                          {topic.observation && (
+                            <div className="mb-4">
+                              <p className="font-medium">Observação</p>
+                              <p className="text-sm text-muted-foreground">{topic.observation}</p>
+                            </div>
+                          )}
+                          {topic.is_damaged && (
+                            <Badge variant="red" className="mb-4">Danificado</Badge>
                           )}
                           
-                          {topic.items && topic.items.length > 0 ? (
-                            <div className="space-y-4">
-                              <h4 className="font-medium">Itens</h4>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                {topic.items.map((item, itemIndex) => (
-                                  <div key={itemIndex} className="border p-3 rounded-md">
-                                    <p className="font-medium">{item.name}</p>
-                                    {item.description && (
-                                      <p className="text-sm text-muted-foreground">{item.description}</p>
+                          {topic.topic_items && topic.topic_items.length > 0 ? (
+                            <div>
+                              <h3 className="font-medium mb-2">Itens ({topic.topic_items.length})</h3>
+                              <div className="space-y-3">
+                                {topic.topic_items.map((item) => (
+                                  <div key={item.id} className="border p-3 rounded-md">
+                                    <p className="font-medium">{item.item_name}</p>
+                                    {item.item_label && (
+                                      <p className="text-sm text-muted-foreground">{item.item_label}</p>
                                     )}
-                                    
-                                    {item.details && item.details.length > 0 && (
-                                      <div className="mt-2">
-                                        <h5 className="text-sm font-medium">Detalhes</h5>
-                                        <ul className="text-xs mt-1 space-y-1">
-                                          {item.details.map((detail, detailIndex) => (
-                                            <li key={detailIndex}>
-                                              {detail.name}
-                                              {detail.required && <span className="text-red-500">*</span>}
-                                              {detail.type && <span className="text-muted-foreground ml-1">({detail.type})</span>}
-                                            </li>
-                                          ))}
-                                        </ul>
-                                      </div>
+                                    {item.observation && (
+                                      <p className="text-sm mt-1">{item.observation}</p>
+                                    )}
+                                    {item.is_damaged && (
+                                      <Badge variant="red" className="mt-2">Danificado</Badge>
                                     )}
                                   </div>
                                 ))}
                               </div>
                             </div>
                           ) : (
-                            <p className="text-sm text-muted-foreground">Nenhum item definido.</p>
+                            <p className="text-sm text-muted-foreground">Nenhum item nesta dependência.</p>
                           )}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-muted-foreground">Nenhuma dependência definida neste template.</p>
-                  )}
-                </CardContent>
-              </Card>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </ScrollArea>
             </TabsContent>
-          )}
+
+            <TabsContent value="template" className="mt-0 h-full">
+              <ScrollArea className="h-full px-2 py-2">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>{templateDetails?.title}</CardTitle>
+                    <CardDescription>{templateDetails?.description}</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {templateDetails?.topics && templateDetails.topics.length > 0 ? (
+                      <div className="space-y-2">
+                        {templateDetails.topics.map((topic, index) => (
+                          <div key={index} className="border p-4 rounded-md">
+                            <h3 className="font-medium text-lg mb-1">{topic.name}</h3>
+                            {topic.description && (
+                              <p className="text-sm text-muted-foreground mb-1">{topic.description}</p>
+                            )}
+                            
+                            {topic.items && topic.items.length > 0 ? (
+                              <div className="space-y-2">
+                                <h4 className="font-medium">Itens</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
+                                  {topic.items.map((item, itemIndex) => (
+                                    <div key={itemIndex} className="border p-3 rounded-md">
+                                      <p className="font-medium">{item.name}</p>
+                                      {item.description && (
+                                        <p className="text-sm text-muted-foreground">{item.description}</p>
+                                      )}
+                                      
+                                      {item.details && item.details.length > 0 && (
+                                        <div className="mt-2">
+                                          <h5 className="text-sm font-medium">Detalhes</h5>
+                                          <ul className="text-xs mt-1 space-y-1">
+                                            {item.details.map((detail, detailIndex) => (
+                                              <li key={detailIndex}>
+                                                {detail.name}
+                                                {detail.required && <span className="text-red-500">*</span>}
+                                                {detail.type && <span className="text-muted-foreground ml-1">({detail.type})</span>}
+                                              </li>
+                                            ))}
+                                          </ul>
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : (
+                              <p className="text-sm text-muted-foreground">Nenhum item definido.</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-muted-foreground">Nenhuma dependência definida neste template.</p>
+                    )}
+                  </CardContent>
+                </Card>
+              </ScrollArea>
+            </TabsContent>
+          </div>
         </Tabs>
         
-        <div className="flex justify-end mt-4">
+        <div className="flex justify-between p-6 border-t sticky bottom-0 bg-background">
+          <Button
+            variant="outline"
+            onClick={handleEdit}
+            className="flex items-center gap-2"
+          >
+            <Pencil className="h-4 w-4" />
+            Editar Inspeção
+          </Button>
           <Button onClick={onClose}>Fechar</Button>
         </div>
       </DialogContent>
