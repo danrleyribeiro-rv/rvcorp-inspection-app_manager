@@ -1,22 +1,24 @@
-// app/(dashboard)/inspections/page.js
+// src/app/(dashboard)/inspections/page.js
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
+import { collection, query, where, getDocs, orderBy, limit, startAfter } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetTrigger } from "@/components/ui/sheet";
-import { Plus, Search, Filter } from "lucide-react";
+import { Plus, Search, Filter, Loader2 } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { useToast } from "@/hooks/use-toast";
-import InspectionCard from "./components/InspectionCard";
+import InspectionListItem from "./components/InspectionListItem";
 import CreateInspectionDialog from "./components/CreateInspectionDialog";
 import EditInspectionDialog from "./components/EditInspectionDialog";
 import InspectionDetailsDialog from "./components/InspectionDetailsDialog";
 import DeleteInspectionDialog from "./components/DeleteInspectionDialog";
 import FilterPanel from "./components/FilterPanel";
+
+const INSPECTIONS_PER_PAGE = 10;
 
 export default function InspectionsPage() {
   const [inspections, setInspections] = useState([]);
@@ -35,23 +37,58 @@ export default function InspectionsPage() {
   });
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [lastVisible, setLastVisible] = useState(null);
+  const [isFiltering, setIsFiltering] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
+  const observerRef = useRef();
+  const listEndRef = useRef(null);
 
   useEffect(() => {
     if (user) {
-      fetchInspections();
+      resetAndFetchInspections();
     }
   }, [user]);
 
   useEffect(() => {
-    filterInspections();
+    if (search !== "" || JSON.stringify(filterState) !== JSON.stringify({
+      status: "all",
+      project: "all",
+      inspector: "all",
+      dateRange: null,
+      state: "all",
+      city: "all"
+    })) {
+      setIsFiltering(true);
+      filterInspections();
+    } else {
+      setIsFiltering(false);
+      setFilteredInspections(inspections);
+    }
   }, [inspections, filterState, search]);
 
-  const fetchInspections = async () => {
+  // Reset pagination and fetch first batch
+  const resetAndFetchInspections = async () => {
+    setInspections([]);
+    setLastVisible(null);
+    setHasMore(true);
     setLoading(true);
+    await fetchInspections(true);
+  };
+
+  const fetchInspections = async (isFirstBatch = false) => {
+    if (!isFirstBatch && !hasMore) return;
+    
     try {
+      if (isFirstBatch) {
+        setLoading(true);
+      } else {
+        setLoadingMore(true);
+      }
+
       // First, get all projects for this manager
       const projectsQuery = query(
         collection(db, 'projects'),
@@ -66,18 +103,41 @@ export default function InspectionsPage() {
         setInspections([]);
         setFilteredInspections([]);
         setLoading(false);
+        setLoadingMore(false);
+        setHasMore(false);
         return;
       }
       
-      // Now, get all inspections for these projects using the new structure
-      const inspectionsQuery = query(
-        collection(db, 'inspections'),
-        where('project_id', 'in', projectIds),
-        where('deleted_at', '==', null),
-        orderBy('created_at', 'desc')
-      );
+      // Now, get inspections with pagination
+      let inspectionsQuery;
+      
+      if (isFirstBatch) {
+        inspectionsQuery = query(
+          collection(db, 'inspections'),
+          where('project_id', 'in', projectIds.slice(0, 10)), // Firestore limits 'in' to 10 values
+          where('deleted_at', '==', null),
+          orderBy('created_at', 'desc'),
+          limit(INSPECTIONS_PER_PAGE)
+        );
+      } else {
+        inspectionsQuery = query(
+          collection(db, 'inspections'),
+          where('project_id', 'in', projectIds.slice(0, 10)),
+          where('deleted_at', '==', null),
+          orderBy('created_at', 'desc'),
+          startAfter(lastVisible),
+          limit(INSPECTIONS_PER_PAGE)
+        );
+      }
       
       const inspectionsSnapshot = await getDocs(inspectionsQuery);
+      
+      // Update lastVisible for pagination
+      const lastDoc = inspectionsSnapshot.docs[inspectionsSnapshot.docs.length - 1];
+      setLastVisible(lastDoc);
+      
+      // Check if there are more results
+      setHasMore(inspectionsSnapshot.docs.length === INSPECTIONS_PER_PAGE);
       
       // Process inspections with related data
       const inspectionsData = [];
@@ -155,8 +215,13 @@ export default function InspectionsPage() {
         inspectionsData.push(inspection);
       }
       
-      setInspections(inspectionsData);
-      setFilteredInspections(inspectionsData);
+      // Update inspections state (append or replace)
+      if (isFirstBatch) {
+        setInspections(inspectionsData);
+      } else {
+        setInspections(prevInspections => [...prevInspections, ...inspectionsData]);
+      }
+      
     } catch (error) {
       console.error("Error fetching inspections:", error);
       toast({
@@ -166,8 +231,24 @@ export default function InspectionsPage() {
       });
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
+
+  // Intersection Observer for infinite scrolling
+  const lastInspectionElementRef = useCallback(node => {
+    if (loading || loadingMore) return;
+    
+    if (observerRef.current) observerRef.current.disconnect();
+    
+    observerRef.current = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting && hasMore && !isFiltering) {
+        fetchInspections();
+      }
+    });
+    
+    if (node) observerRef.current.observe(node);
+  }, [loading, loadingMore, hasMore, isFiltering]);
 
   const handleEditData = (inspection) => {
     setEditingInspection(inspection);
@@ -262,7 +343,7 @@ export default function InspectionsPage() {
         </div>
       </div>
 
-        {loading ? (
+      {loading && inspections.length === 0 ? (
         <div className="flex justify-center items-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
@@ -273,17 +354,58 @@ export default function InspectionsPage() {
             "Nenhuma inspeção corresponde aos filtros aplicados."}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredInspections.map((inspection) => (
-            <InspectionCard
-              key={inspection.id}
-              inspection={inspection}
-              onEditData={() => handleEditData(inspection)}
-              onEditInspection={() => handleEditInspection(inspection)}
-              onView={() => setViewingInspection(inspection)}
-              onDelete={() => setDeletingInspection(inspection)}
-            />
-          ))}
+        <div className="space-y-2">
+          {filteredInspections.map((inspection, index) => {
+            // If this is the last item and we're not filtering, add ref for infinite scroll
+            if (index === filteredInspections.length - 1 && !isFiltering) {
+              return (
+                <div key={inspection.id} ref={lastInspectionElementRef}>
+                  <InspectionListItem
+                    inspection={inspection}
+                    onEditData={() => handleEditData(inspection)}
+                    onEditInspection={() => handleEditInspection(inspection)}
+                    onView={() => setViewingInspection(inspection)}
+                    onDelete={() => setDeletingInspection(inspection)}
+                  />
+                </div>
+              );
+            } else {
+              return (
+                <InspectionListItem
+                  key={inspection.id}
+                  inspection={inspection}
+                  onEditData={() => handleEditData(inspection)}
+                  onEditInspection={() => handleEditInspection(inspection)}
+                  onView={() => setViewingInspection(inspection)}
+                  onDelete={() => setDeletingInspection(inspection)}
+                />
+              );
+            }
+          })}
+          
+          {/* Loading indicator for more items */}
+          {loadingMore && (
+            <div className="flex justify-center py-4">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            </div>
+          )}
+          
+          {/* If we're filtering and there are more items in the original dataset, show a load more button */}
+          {isFiltering && !loading && inspections.length > filteredInspections.length && hasMore && (
+            <div className="flex justify-center py-4">
+              <Button 
+                variant="outline" 
+                onClick={() => fetchInspections()}
+                disabled={loadingMore}
+              >
+                {loadingMore ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Carregar mais
+              </Button>
+            </div>
+          )}
+          
+          {/* End of list marker for intersection observer */}
+          <div ref={listEndRef} />
         </div>
       )}
 
@@ -291,7 +413,7 @@ export default function InspectionsPage() {
         <CreateInspectionDialog
           open={showCreate}
           onClose={() => setShowCreate(false)}
-          onSuccess={fetchInspections}
+          onSuccess={resetAndFetchInspections}
           managerId={user.uid}
         />
       )}
@@ -301,7 +423,7 @@ export default function InspectionsPage() {
           inspection={editingInspection}
           open={!!editingInspection}
           onClose={() => setEditingInspection(null)}
-          onSuccess={fetchInspections}
+          onSuccess={resetAndFetchInspections}
         />
       )}
 
@@ -322,7 +444,7 @@ export default function InspectionsPage() {
           inspection={deletingInspection}
           open={!!deletingInspection}
           onClose={() => setDeletingInspection(null)}
-          onDelete={fetchInspections}
+          onDelete={resetAndFetchInspections}
         />
       )}
     </div>
