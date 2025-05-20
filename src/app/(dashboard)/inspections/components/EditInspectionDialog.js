@@ -23,11 +23,33 @@ import {
 } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { format } from "date-fns";
+import { format, isValid, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { CalendarIcon, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import InspectionAddressForm from "./InspectionAddressForm";
+
+// Helper to safely format dates
+const formatDateSafe = (dateStr) => {
+  if (!dateStr) return null;
+  try {
+    let date;
+    if (typeof dateStr === 'string') {
+      date = parseISO(dateStr);
+    } else if (dateStr instanceof Date) {
+      date = dateStr;
+    } else {
+      return null;
+    }
+    if (!isValid(date)) {
+      return null;
+    }
+    return format(date, "PPP", { locale: ptBR });
+  } catch (error) {
+    console.error("Erro ao formatar data:", error, dateStr);
+    return null;
+  }
+};
 
 export default function EditInspectionDialog({ inspection, open, onClose, onSuccess }) {
   const [loading, setLoading] = useState(false);
@@ -336,17 +358,16 @@ export default function EditInspectionDialog({ inspection, open, onClose, onSucc
                     }`}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {formData.scheduled_date ? (
-                      format(formData.scheduled_date, "PPP", { locale: ptBR })
-                    ) : (
+                    {formData.scheduled_date ?
+                      formatDateSafe(formData.scheduled_date) :
                       <span>Selecione uma data</span>
-                    )}
+                    }
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">
                   <Calendar
                     mode="single"
-                    selected={formData.scheduled_date}
+                    selected={formData.scheduled_date ? (isValid(new Date(formData.scheduled_date)) ? new Date(formData.scheduled_date) : undefined) : undefined}
                     onSelect={(date) =>
                       setFormData({ ...formData, scheduled_date: date })
                     }

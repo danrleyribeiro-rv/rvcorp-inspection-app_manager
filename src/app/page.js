@@ -1,4 +1,4 @@
-// app/page.js (Simplified)
+// src/app/page.js (Atualizado)
 "use client";
 
 import { useEffect } from "react";
@@ -11,21 +11,20 @@ export default function Home() {
   const { user, loading } = useAuth();
 
   useEffect(() => {
-    // No need for conditional logic here.  The AuthProvider
-    // handles redirection based on the user's status.
-    if (!loading && !user) {
-      router.push("/login"); //Ensure user is redirected to the login screen if no user is set.
+    // Verificar se o usuário está autenticado e redirecionar adequadamente
+    if (!loading) {
+      if (user) {
+        router.push("/projects");
+      } else {
+        router.push("/login");
+      }
     }
   }, [user, loading, router]);
 
-  // Improved loading state
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="animate-spin h-12 w-12 text-primary" />
-      </div>
-    );
-  }
-
-  return null; // Render nothing; the redirect will happen.
+  // Estado de carregamento melhorado
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <Loader2 className="animate-spin h-12 w-12 text-primary" />
+    </div>
+  );
 }

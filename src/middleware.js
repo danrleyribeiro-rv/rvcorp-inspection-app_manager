@@ -1,10 +1,10 @@
-// src/middleware.js
+// src/middleware.js (Atualizado)
 import { NextResponse } from 'next/server';
 
 export async function middleware(request) {
   const { pathname } = request.nextUrl;
 
-  // Ignorar caminhos específicos
+  // Caminhos para ignorar
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api/') ||
@@ -13,17 +13,21 @@ export async function middleware(request) {
     return NextResponse.next();
   }
 
-  // Tratamento especial para reset de senha
-  if (pathname.startsWith('/reset-password')) {
-    return NextResponse.next();
-  }
-
   // Rotas públicas que não precisam de autenticação
-  const publicPaths = ['/login', '/forgot-password'];
+  const publicPaths = ['/login', '/forgot-password', '/reset-password'];
   const isPublicPath = publicPaths.some(path => pathname.startsWith(path));
 
-  // Obter o token da sessão dos cookies
+  // Autenticação
   const authToken = request.cookies.get('authToken')?.value;
+
+  // Rota raiz (/) - redirecionar para /projects ou /login
+  if (pathname === '/') {
+    if (authToken) {
+      return NextResponse.redirect(new URL('/projects', request.url));
+    } else {
+      return NextResponse.redirect(new URL('/login', request.url));
+    }
+  }
 
   // Se não há token e é uma rota protegida, redirecionar para login
   if (!authToken && !isPublicPath) {
