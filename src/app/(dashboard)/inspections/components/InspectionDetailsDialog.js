@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 import {
   Dialog,
   DialogContent,
@@ -21,7 +21,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   CalendarIcon,
@@ -29,11 +28,13 @@ import {
   User,
   MapPin,
   FileCode,
-  ScrollText,
   Home,
-  Building,
   Clipboard,
-  Pencil
+  Pencil,
+  AlertTriangle,
+  Image as ImageIcon,
+  Video,
+  CheckCircle
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -48,9 +49,27 @@ const getStatusBadge = (status) => {
   return statusMap[status] || { label: status, variant: "gray" };
 };
 
+const getSeverityColor = (severity) => {
+  const colors = {
+    'Baixa': 'bg-green-100 text-green-800',
+    'Média': 'bg-yellow-100 text-yellow-800',
+    'Alta': 'bg-red-100 text-red-800',
+    'Crítica': 'bg-red-600 text-white'
+  };
+  return colors[severity] || 'bg-gray-100 text-gray-800';
+};
+
+const getNCStatusColor = (status) => {
+  const colors = {
+    'pendente': 'bg-yellow-100 text-yellow-800',
+    'em_andamento': 'bg-blue-100 text-blue-800',
+    'resolvida': 'bg-green-100 text-green-800'
+  };
+  return colors[status] || 'bg-gray-100 text-gray-800';
+};
+
 export default function InspectionDetailsDialog({ inspection, open, onClose, onEdit }) {
   const [loading, setLoading] = useState(true);
-  const [topics, setTopics] = useState([]);
   const [projectDetails, setProjectDetails] = useState(null);
   const [inspectorDetails, setInspectorDetails] = useState(null);
   const [templateDetails, setTemplateDetails] = useState(null);
@@ -65,41 +84,6 @@ export default function InspectionDetailsDialog({ inspection, open, onClose, onE
   const fetchDetails = async () => {
     setLoading(true);
     try {
-      // Fetch topics
-      const topicsQuery = query(
-        collection(db, 'topics'),
-        where('inspection_id', '==', inspection.id)
-      );
-      
-      const topicsSnapshot = await getDocs(topicsQuery);
-      const topicsData = topicsSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      
-      // For each topic, fetch its items
-      for (const topic of topicsData) {
-        // Verificar se topic_id existe antes de usá-lo na consulta
-        if (topic.topic_id) {
-          const itemsQuery = query(
-            collection(db, 'topic_items'),
-            where('inspection_id', '==', inspection.id),
-            where('topic_id', '==', topic.topic_id)
-          );
-          
-          const itemsSnapshot = await getDocs(itemsQuery);
-          topic.topic_items = itemsSnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          }));
-        } else {
-          // Se topic_id não existir, inicializar topic_items como um array vazio
-          topic.topic_items = [];
-        }
-      }
-      
-      setTopics(topicsData);
-      
       // Fetch project details
       if (inspection.project_id) {
         const projectRef = doc(db, 'projects', inspection.project_id);
@@ -170,7 +154,6 @@ export default function InspectionDetailsDialog({ inspection, open, onClose, onE
       if (!dateString) return "Data não definida";
       const date = new Date(dateString);
       
-      // Check if date is valid
       if (isNaN(date.getTime())) {
         return "Data inválida";
       }
@@ -204,6 +187,56 @@ export default function InspectionDetailsDialog({ inspection, open, onClose, onE
     return parts.join(", ");
   };
 
+  // Count non-conformities in all topics
+  const getTotalNonConformities = () => {
+    if (!inspection.topics) return 0;
+    
+    let total = 0;
+    inspection.topics.forEach(topic => {
+      if (topic.items) {
+        topic.items.forEach(item => {
+          if (item.details) {
+            item.details.forEach(detail => {
+              if (detail.non_conformities && detail.non_conformities.length > 0) {
+                total += detail.non_conformities.length;
+              }
+            });
+          }
+        });
+      }
+    });
+    
+    return total;
+  };
+
+  const getHighestSeverity = () => {
+    const severities = ['Baixa', 'Média', 'Alta', 'Crítica'];
+    let highestIndex = -1;
+    
+    if (!inspection.topics) return null;
+    
+    inspection.topics.forEach(topic => {
+      if (topic.items) {
+        topic.items.forEach(item => {
+          if (item.details) {
+            item.details.forEach(detail => {
+              if (detail.non_conformities) {
+                detail.non_conformities.forEach(nc => {
+                  const index = severities.indexOf(nc.severity);
+                  if (index > highestIndex) {
+                    highestIndex = index;
+                  }
+                });
+              }
+            });
+          }
+        });
+      }
+    });
+    
+    return highestIndex >= 0 ? severities[highestIndex] : null;
+  };
+
   const handleEdit = () => {
     if (onEdit) {
       onEdit(inspection);
@@ -226,14 +259,24 @@ export default function InspectionDetailsDialog({ inspection, open, onClose, onE
   }
 
   const status = getStatusBadge(inspection.status);
+  const totalNCs = getTotalNonConformities();
+  const highestSeverity = getHighestSeverity();
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden p-0">
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden p-0">
         <DialogHeader className="p-6 pb-2 sticky top-0 bg-background z-10 border-b">
           <div className="flex items-center justify-between">
             <DialogTitle className="text-xl font-bold">{inspection.title}</DialogTitle>
-            <Badge variant={status.variant}>{status.label}</Badge>
+            <div className="flex items-center gap-2">
+              {totalNCs > 0 && (
+                <Badge variant="destructive" className="flex items-center gap-1">
+                  <AlertTriangle className="h-3 w-3" />
+                  {totalNCs} NC{totalNCs !== 1 ? 's' : ''}
+                </Badge>
+              )}
+              <Badge variant={status.variant}>{status.label}</Badge>
+            </div>
           </div>
         </DialogHeader>
 
@@ -246,8 +289,14 @@ export default function InspectionDetailsDialog({ inspection, open, onClose, onE
               </TabsTrigger>
               <TabsTrigger value="topics" className="flex items-center gap-2">
                 <Clipboard className="h-4 w-4" />
-                Tópicos ({topics.length})
+                Tópicos ({inspection.topics?.length || 0})
               </TabsTrigger>
+              {totalNCs > 0 && (
+                <TabsTrigger value="non-conformities" className="flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4" />
+                  Não Conformidades ({totalNCs})
+                </TabsTrigger>
+              )}
               {templateDetails && (
                 <TabsTrigger value="template" className="flex items-center gap-2">
                   <FileCode className="h-4 w-4" />
@@ -260,7 +309,7 @@ export default function InspectionDetailsDialog({ inspection, open, onClose, onE
           <div className="h-[calc(100%-48px)] overflow-hidden">
             <TabsContent value="overview" className="mt-0 h-full">
               <ScrollArea className="h-full px-4 py-2">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <Card>
                     <CardHeader>
                       <CardTitle className="text-lg">Detalhes da Inspeção</CardTitle>
@@ -304,9 +353,26 @@ export default function InspectionDetailsDialog({ inspection, open, onClose, onE
                           </div>
                         </div>
                       )}
+
+                      {totalNCs > 0 && (
+                        <div className="flex items-start gap-2">
+                          <AlertTriangle className="h-4 w-4 mt-0.5 text-destructive" />
+                          <div>
+                            <p className="font-medium">Não Conformidades</p>
+                            <p className="text-sm text-muted-foreground">
+                              {totalNCs} encontrada{totalNCs !== 1 ? 's' : ''}
+                              {highestSeverity && (
+                                <span className={`ml-2 px-2 py-1 rounded text-xs ${getSeverityColor(highestSeverity)}`}>
+                                  Maior severidade: {highestSeverity}
+                                </span>
+                              )}
+                            </p>
+                          </div>
+                        </div>
+                      )}
                       
                       <div className="flex items-center gap-2">
-                        <ScrollText className="h-4 w-4 text-muted-foreground" />
+                        <FileText className="h-4 w-4 text-muted-foreground" />
                         <div>
                           <p className="font-medium">Criado em</p>
                           <p className="text-sm text-muted-foreground">
@@ -382,30 +448,6 @@ export default function InspectionDetailsDialog({ inspection, open, onClose, onE
                             </div>
                           </div>
                         )}
-                        
-                        {inspectorDetails.phonenumber && (
-                          <div className="flex items-center gap-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground">
-                              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
-                            </svg>
-                            <div>
-                              <p className="font-medium">Telefone</p>
-                              <p className="text-sm text-muted-foreground">{inspectorDetails.phonenumber}</p>
-                            </div>
-                          </div>
-                        )}
-                        
-                        {(inspectorDetails.city || inspectorDetails.state) && (
-                          <div className="flex items-center gap-2">
-                            <MapPin className="h-4 w-4 text-muted-foreground" />
-                            <div>
-                              <p className="font-medium">Localização</p>
-                              <p className="text-sm text-muted-foreground">
-                                {[inspectorDetails.city, inspectorDetails.state].filter(Boolean).join(", ")}
-                              </p>
-                            </div>
-                          </div>
-                        )}
                       </CardContent>
                     </Card>
                   )}
@@ -416,7 +458,7 @@ export default function InspectionDetailsDialog({ inspection, open, onClose, onE
                         <CardTitle className="text-lg">Template</CardTitle>
                       </CardHeader>
                       <CardContent className="space-y-4">
-                        <div className="flex items-start gap-1">
+                        <div className="flex items-start gap-2">
                           <FileCode className="h-4 w-4 mt-0.5 text-muted-foreground" />
                           <div>
                             <p className="font-medium">Título</p>
@@ -425,7 +467,7 @@ export default function InspectionDetailsDialog({ inspection, open, onClose, onE
                         </div>
                         
                         {templateDetails.description && (
-                          <div className="flex items-start gap-1">
+                          <div className="flex items-start gap-2">
                             <FileText className="h-4 w-4 mt-0.5 text-muted-foreground" />
                             <div>
                               <p className="font-medium">Descrição</p>
@@ -434,12 +476,12 @@ export default function InspectionDetailsDialog({ inspection, open, onClose, onE
                           </div>
                         )}
                         
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-2">
                           <Home className="h-4 w-4 text-muted-foreground" />
                           <div>
-                            <p className="font-medium">Salas</p>
+                            <p className="font-medium">Tópicos</p>
                             <p className="text-sm text-muted-foreground">
-                              {templateDetails.topics?.length || 0} tópicos definidas
+                              {templateDetails.topics?.length || 0} definidos no template
                             </p>
                           </div>
                         </div>
@@ -452,53 +494,133 @@ export default function InspectionDetailsDialog({ inspection, open, onClose, onE
 
             <TabsContent value="topics" className="mt-0 h-full">
               <ScrollArea className="h-full px-6 py-4">
-                {topics.length === 0 ? (
+                {!inspection.topics || inspection.topics.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
-                    Nenhuma dependência encontrada para esta inspeção.
+                    Nenhum tópico encontrado para esta inspeção.
                   </div>
                 ) : (
                   <div className="space-y-6">
-                    {topics.map((topic) => (
-                      <Card key={topic.id}>
+                    {inspection.topics.map((topic, topicIndex) => (
+                      <Card key={topicIndex}>
                         <CardHeader>
-                          <CardTitle>{topic.topic_name}</CardTitle>
-                          {topic.topic_label && (
-                            <CardDescription>{topic.topic_label}</CardDescription>
-                          )}
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <CardTitle>{topic.name}</CardTitle>
+                              {topic.description && (
+                                <CardDescription className="mt-1">{topic.description}</CardDescription>
+                              )}
+                            </div>
+                            {topic.items && topic.items.some(item => 
+                              item.details && item.details.some(detail => detail.is_damaged)
+                            ) && (
+                              <Badge variant="destructive">
+                                <AlertTriangle className="h-3 w-3 mr-1" />
+                                Problemas identificados
+                              </Badge>
+                            )}
+                          </div>
                         </CardHeader>
                         <CardContent>
                           {topic.observation && (
                             <div className="mb-4">
-                              <p className="font-medium">Observação</p>
+                              <p className="font-medium">Observação do Tópico</p>
                               <p className="text-sm text-muted-foreground">{topic.observation}</p>
                             </div>
                           )}
-                          {topic.is_damaged && (
-                            <Badge variant="red" className="mb-4">Danificado</Badge>
-                          )}
                           
-                          {topic.topic_items && topic.topic_items.length > 0 ? (
+                          {topic.items && topic.items.length > 0 ? (
                             <div>
-                              <h3 className="font-medium mb-2">Itens ({topic.topic_items.length})</h3>
-                              <div className="space-y-3">
-                                {topic.topic_items.map((item) => (
-                                  <div key={item.id} className="border p-3 rounded-md">
-                                    <p className="font-medium">{item.item_name}</p>
-                                    {item.item_label && (
-                                      <p className="text-sm text-muted-foreground">{item.item_label}</p>
-                                    )}
+                              <h3 className="font-medium mb-3">Itens ({topic.items.length})</h3>
+                              <div className="space-y-4">
+                                {topic.items.map((item, itemIndex) => (
+                                  <div key={itemIndex} className="border p-4 rounded-md">
+                                    <div className="flex items-center justify-between mb-3">
+                                      <div>
+                                        <h4 className="font-medium">{item.name}</h4>
+                                        {item.description && (
+                                          <p className="text-sm text-muted-foreground">{item.description}</p>
+                                        )}
+                                      </div>
+                                      {item.details && item.details.some(detail => detail.is_damaged) && (
+                                        <Badge variant="destructive">Danificado</Badge>
+                                      )}
+                                    </div>
+
                                     {item.observation && (
-                                      <p className="text-sm mt-1">{item.observation}</p>
+                                      <div className="mb-3">
+                                        <p className="text-sm font-medium">Observação do Item</p>
+                                        <p className="text-sm text-muted-foreground">{item.observation}</p>
+                                      </div>
                                     )}
-                                    {item.is_damaged && (
-                                      <Badge variant="red" className="mt-2">Danificado</Badge>
+
+                                    {item.details && item.details.length > 0 && (
+                                      <div>
+                                        <h5 className="font-medium mb-2">Detalhes</h5>
+                                        <div className="space-y-3">
+                                          {item.details.map((detail, detailIndex) => (
+                                            <div key={detailIndex} className="bg-gray-50 p-3 rounded">
+                                              <div className="flex items-center justify-between mb-2">
+                                                <span className="font-medium text-sm">{detail.name}</span>
+                                                <div className="flex items-center gap-2">
+                                                  {detail.required && (
+                                                    <Badge variant="outline" className="text-xs">Obrigatório</Badge>
+                                                  )}
+                                                  {detail.is_damaged && (
+                                                    <Badge variant="destructive" className="text-xs">Danificado</Badge>
+                                                  )}
+                                                </div>
+                                              </div>
+
+                                              {detail.value && (
+                                                <div className="mb-2">
+                                                  <span className="text-sm font-medium">Valor: </span>
+                                                  <span className="text-sm">{detail.value}</span>
+                                                </div>
+                                              )}
+
+                                              {detail.observation && (
+                                                <div className="mb-2">
+                                                  <span className="text-sm font-medium">Observação: </span>
+                                                  <span className="text-sm">{detail.observation}</span>
+                                                </div>
+                                              )}
+
+                                              {detail.media && detail.media.length > 0 && (
+                                                <div className="mb-2">
+                                                  <span className="text-sm font-medium">Mídia: </span>
+                                                  <div className="flex items-center gap-2 mt-1">
+                                                    {detail.media.map((media, mediaIndex) => (
+                                                      <div key={mediaIndex} className="flex items-center gap-1">
+                                                        {media.type === 'image' ? (
+                                                          <ImageIcon className="h-4 w-4 text-blue-500" />
+                                                        ) : (
+                                                          <Video className="h-4 w-4 text-green-500" />
+                                                        )}
+                                                        <span className="text-xs">{media.type}</span>
+                                                      </div>
+                                                    ))}
+                                                  </div>
+                                                </div>
+                                              )}
+
+                                              {detail.non_conformities && detail.non_conformities.length > 0 && (
+                                                <div>
+                                                  <Badge variant="destructive" className="text-xs">
+                                                    {detail.non_conformities.length} Não Conformidade{detail.non_conformities.length !== 1 ? 's' : ''}
+                                                  </Badge>
+                                                </div>
+                                              )}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
                                     )}
                                   </div>
                                 ))}
                               </div>
                             </div>
                           ) : (
-                            <p className="text-sm text-muted-foreground">Nenhum item nesta dependência.</p>
+                            <p className="text-sm text-muted-foreground">Nenhum item neste tópico.</p>
                           )}
                         </CardContent>
                       </Card>
@@ -508,8 +630,102 @@ export default function InspectionDetailsDialog({ inspection, open, onClose, onE
               </ScrollArea>
             </TabsContent>
 
+            {totalNCs > 0 && (
+              <TabsContent value="non-conformities" className="mt-0 h-full">
+                <ScrollArea className="h-full px-6 py-4">
+                  <div className="space-y-6">
+                    {inspection.topics?.map((topic, topicIndex) => 
+                      topic.items?.map((item, itemIndex) =>
+                        item.details?.map((detail, detailIndex) =>
+                          detail.non_conformities?.map((nc, ncIndex) => (
+                            <Card key={`${topicIndex}-${itemIndex}-${detailIndex}-${ncIndex}`}>
+                              <CardHeader>
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <CardTitle className="text-lg">
+                                      {topic.name} → {item.name} → {detail.name}
+                                    </CardTitle>
+                                    <CardDescription className="mt-1">
+                                      Não Conformidade #{ncIndex + 1}
+                                    </CardDescription>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Badge className={getSeverityColor(nc.severity)}>
+                                      {nc.severity}
+                                    </Badge>
+                                    <Badge className={getNCStatusColor(nc.status)}>
+                                      {nc.status === 'pendente' && 'Pendente'}
+                                      {nc.status === 'em_andamento' && 'Em Andamento'}
+                                      {nc.status === 'resolvida' && 'Resolvida'}
+                                    </Badge>
+                                  </div>
+                                </div>
+                              </CardHeader>
+                              <CardContent className="space-y-4">
+                                <div>
+                                  <p className="font-medium">Descrição</p>
+                                  <p className="text-sm text-muted-foreground">{nc.description}</p>
+                                </div>
+
+                                {nc.corrective_action && (
+                                  <div>
+                                    <p className="font-medium">Ação Corretiva</p>
+                                    <p className="text-sm text-muted-foreground">{nc.corrective_action}</p>
+                                  </div>
+                                )}
+
+                                {nc.deadline && (
+                                  <div>
+                                    <p className="font-medium">Prazo</p>
+                                    <p className="text-sm text-muted-foreground">
+                                      {formatDateSafely(nc.deadline)}
+                                    </p>
+                                  </div>
+                                )}
+
+                                {nc.media && nc.media.length > 0 && (
+                                  <div>
+                                    <p className="font-medium mb-2">Mídia Anexada</p>
+                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                                      {nc.media.map((media, mediaIndex) => (
+                                        <div key={mediaIndex} className="border rounded p-2">
+                                          <div className="flex items-center gap-2">
+                                            {media.type === 'image' ? (
+                                              <ImageIcon className="h-4 w-4 text-blue-500" />
+                                            ) : (
+                                              <Video className="h-4 w-4 text-green-500" />
+                                            )}
+                                            <span className="text-sm">{media.type}</span>
+                                          </div>
+                                          {media.url && (
+                                            <a href={media.url} target="_blank" rel="noopener noreferrer" 
+                                               className="text-blue-500 text-xs hover:underline">
+                                              Ver arquivo
+                                            </a>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                <div className="flex justify-between text-xs text-muted-foreground pt-2 border-t">
+                                  <span>Criado: {formatDateSafely(nc.created_at)}</span>
+                                  <span>Atualizado: {formatDateSafely(nc.updated_at)}</span>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))
+                        )
+                      )
+                    )}
+                  </div>
+                </ScrollArea>
+              </TabsContent>
+            )}
+
             <TabsContent value="template" className="mt-0 h-full">
-              <ScrollArea className="h-full px-2 py-2">
+              <ScrollArea className="h-full px-6 py-4">
                 <Card>
                   <CardHeader>
                     <CardTitle>{templateDetails?.title}</CardTitle>
@@ -517,71 +733,71 @@ export default function InspectionDetailsDialog({ inspection, open, onClose, onE
                   </CardHeader>
                   <CardContent>
                     {templateDetails?.topics && templateDetails.topics.length > 0 ? (
-                      <div className="space-y-2">
+                      <div className="space-y-4">
                         {templateDetails.topics.map((topic, index) => (
-                          <div key={index} className="border p-4 rounded-md">
-                            <h3 className="font-medium text-lg mb-1">{topic.name}</h3>
-                            {topic.description && (
-                              <p className="text-sm text-muted-foreground mb-1">{topic.description}</p>
-                            )}
-                            
-                            {topic.items && topic.items.length > 0 ? (
-                              <div className="space-y-2">
-                                <h4 className="font-medium">Itens</h4>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
-                                  {topic.items.map((item, itemIndex) => (
-                                    <div key={itemIndex} className="border p-3 rounded-md">
-                                      <p className="font-medium">{item.name}</p>
-                                      {item.description && (
-                                        <p className="text-sm text-muted-foreground">{item.description}</p>
-                                      )}
-                                      
-                                      {item.details && item.details.length > 0 && (
-                                        <div className="mt-2">
-                                          <h5 className="text-sm font-medium">Detalhes</h5>
-                                          <ul className="text-xs mt-1 space-y-1">
-                                            {item.details.map((detail, detailIndex) => (
-                                              <li key={detailIndex}>
-                                                {detail.name}
-                                                {detail.required && <span className="text-red-500">*</span>}
-                                                {detail.type && <span className="text-muted-foreground ml-1">({detail.type})</span>}
-                                              </li>
-                                            ))}
-                                          </ul>
-                                        </div>
-                                      )}
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            ) : (
-                              <p className="text-sm text-muted-foreground">Nenhum item definido.</p>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-muted-foreground">Nenhuma dependência definida neste template.</p>
-                    )}
-                  </CardContent>
-                </Card>
-              </ScrollArea>
-            </TabsContent>
-          </div>
-        </Tabs>
-        
-        <div className="flex justify-between p-6 border-t sticky bottom-0 bg-background">
-          <Button
-            variant="outline"
-            onClick={handleEdit}
-            className="flex items-center gap-2"
-          >
-            <Pencil className="h-4 w-4" />
-            Editar Inspeção
-          </Button>
-          <Button onClick={onClose}>Fechar</Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
+<div key={index} className="border p-4 rounded-md">
+                           <h3 className="font-medium text-lg mb-2">{topic.name}</h3>
+                           {topic.description && (
+                             <p className="text-sm text-muted-foreground mb-3">{topic.description}</p>
+                           )}
+                           
+                           {topic.items && topic.items.length > 0 ? (
+                             <div className="space-y-3">
+                               <h4 className="font-medium">Itens</h4>
+                               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                 {topic.items.map((item, itemIndex) => (
+                                   <div key={itemIndex} className="border p-3 rounded-md">
+                                     <p className="font-medium">{item.name}</p>
+                                     {item.description && (
+                                       <p className="text-sm text-muted-foreground">{item.description}</p>
+                                     )}
+                                     
+                                     {item.details && item.details.length > 0 && (
+                                       <div className="mt-2">
+                                         <h5 className="text-sm font-medium">Detalhes</h5>
+                                         <ul className="text-xs mt-1 space-y-1">
+                                           {item.details.map((detail, detailIndex) => (
+                                             <li key={detailIndex}>
+                                               {detail.name}
+                                               {detail.required && <span className="text-red-500">*</span>}
+                                               {detail.type && <span className="text-muted-foreground ml-1">({detail.type})</span>}
+                                             </li>
+                                           ))}
+                                         </ul>
+                                       </div>
+                                     )}
+                                   </div>
+                                 ))}
+                               </div>
+                             </div>
+                           ) : (
+                             <p className="text-sm text-muted-foreground">Nenhum item definido.</p>
+                           )}
+                         </div>
+                       ))}
+                     </div>
+                   ) : (
+                     <p className="text-muted-foreground">Nenhum tópico definido neste template.</p>
+                   )}
+                 </CardContent>
+               </Card>
+             </ScrollArea>
+           </TabsContent>
+         </div>
+       </Tabs>
+       
+       <div className="flex justify-between p-6 border-t sticky bottom-0 bg-background">
+         <Button
+           variant="outline"
+           onClick={handleEdit}
+           className="flex items-center gap-2"
+         >
+           <Pencil className="h-4 w-4" />
+           Editar Inspeção
+         </Button>
+         <Button onClick={onClose}>Fechar</Button>
+       </div>
+     </DialogContent>
+   </Dialog>
+ );
 }

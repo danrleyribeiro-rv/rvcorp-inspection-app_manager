@@ -97,16 +97,16 @@ export default function FilterPanel({ filterState, onFilterChange, inspections }
     return projects.filter(project => projectIds.has(project.id));
   };
 
-  // Função utilitária para extrair estados únicos das inspeções
+  // Get unique states from inspections
   function getActiveStates() {
     const states = new Set();
     inspections.forEach(inspection => {
       if (inspection.address?.state) states.add(inspection.address.state);
     });
-    return Array.from(states);
+    return Array.from(states).sort();
   }
 
-  // Função utilitária para extrair cidades únicas das inspeções, filtrando por estado se fornecido
+  // Get unique cities from inspections, optionally filtered by state
   function getActiveCities(selectedState) {
     const cities = new Set();
     inspections.forEach(inspection => {
@@ -117,7 +117,7 @@ export default function FilterPanel({ filterState, onFilterChange, inspections }
         cities.add(inspection.address.city);
       }
     });
-    return Array.from(cities);
+    return Array.from(cities).sort();
   }
 
   const handleReset = () => {
@@ -125,6 +125,8 @@ export default function FilterPanel({ filterState, onFilterChange, inspections }
       status: "all",
       project: "all",
       inspector: "all",
+      state: "all",
+      city: "all",
       dateRange: null
     };
     onFilterChange(resetState);
@@ -193,7 +195,7 @@ export default function FilterPanel({ filterState, onFilterChange, inspections }
               <SelectItem value="all">Todos</SelectItem>
               {getActiveInspectors().map((inspector) => (
                 <SelectItem key={inspector.id} value={inspector.id}>
-                  {`${inspector.name} ${inspector.last_name || ''}'`}
+                  {`${inspector.name} ${inspector.last_name || ''}`}
                 </SelectItem>
               ))}
             </SelectContent>

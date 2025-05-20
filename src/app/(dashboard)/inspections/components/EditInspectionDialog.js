@@ -169,10 +169,11 @@ export default function EditInspectionDialog({ inspection, open, onClose, onSucc
         `${formData.address.street}${formData.address.number ? `, ${formData.address.number}` : ''}${formData.address.complement ? ` - ${formData.address.complement}` : ''}${formData.address.neighborhood ? `, ${formData.address.neighborhood}` : ''}${formData.address.city ? `, ${formData.address.city}` : ''}${formData.address.state ? ` - ${formData.address.state}` : ''}` : 
         null;
       
-      // Update inspection in Firestore
+      // Update inspection in Firestore - preserve existing topics structure
       const inspectionRef = doc(db, 'inspections', inspection.id);
       
-      await updateDoc(inspectionRef, {
+      // Prepare update data without overwriting the topics structure
+      const updateData = {
         title: formData.title,
         observation: formData.observation,
         project_id: formData.project_id,
@@ -183,7 +184,14 @@ export default function EditInspectionDialog({ inspection, open, onClose, onSucc
         address: formData.address,
         address_string: formattedAddress,
         updated_at: serverTimestamp()
-      });
+      };
+      
+      // Only update template_id if it changed and preserve topics
+      if (formData.template_id !== inspection.template_id) {
+        updateData.template_id = formData.template_id;
+      }
+      
+      await updateDoc(inspectionRef, updateData);
       
       toast({
         title: "Inspeção atualizada com sucesso"
@@ -290,7 +298,7 @@ export default function EditInspectionDialog({ inspection, open, onClose, onSucc
                   <SelectItem value="none">Nenhum vistoriador</SelectItem>
                   {inspectors.map((inspector) => (
                     <SelectItem key={inspector.id} value={inspector.id}>
-                      {`${inspector.name} ${inspector.last_name || ''}'`}
+                      {`${inspector.name} ${inspector.last_name || ''}`.trim()}
                     </SelectItem>
                   ))}
                 </SelectContent>

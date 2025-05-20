@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, getDoc } from "firebase/firestore";
 import {
   Dialog,
   DialogContent,
@@ -28,6 +28,7 @@ import { ptBR } from "date-fns/locale";
 import { CalendarIcon, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import InspectionAddressForm from "./InspectionAddressForm";
+import { Switch } from "@/components/ui/switch";
 
 export default function CreateInspectionDialog({ open, onClose, onSuccess, managerId }) {
   const [loading, setLoading] = useState(false);
@@ -37,11 +38,12 @@ export default function CreateInspectionDialog({ open, onClose, onSuccess, manag
   const [formData, setFormData] = useState({
     title: "",
     observation: "",
-    project_id: "", // Required
-    template_id: null,  // Optional
-    inspector_id: null, // Optional
+    project_id: "",
+    template_id: null,
+    inspector_id: null,
     status: "pending",
     scheduled_date: null,
+    is_templated: false,
     address: {
       cep: "",
       street: "",
@@ -122,6 +124,48 @@ export default function CreateInspectionDialog({ open, onClose, onSuccess, manag
     }));
   };
 
+  // Function to convert template structure to inspection topics
+  const convertTemplateToTopics = async (templateId) => {
+    if (!templateId) return [];
+    
+    try {
+      const templateRef = doc(db, 'templates', templateId);
+      const templateDoc = await getDoc(templateRef);
+      
+      if (!templateDoc.exists()) return [];
+      
+      const templateData = templateDoc.data();
+      
+      if (!templateData.topics) return [];
+      
+      // Convert template structure to inspection structure
+      return templateData.topics.map(topic => ({
+        name: topic.name,
+        description: topic.description || null,
+        observation: null,
+        items: (topic.items || []).map(item => ({
+          name: item.name,
+          description: item.description || null,
+          observation: null,
+          details: (item.details || []).map(detail => ({
+            name: detail.name,
+            type: detail.type,
+            required: detail.required || false,
+            options: detail.options || [],
+            value: null,
+            observation: null,
+            is_damaged: false,
+            media: [],
+            non_conformities: []
+          }))
+        }))
+      }));
+    } catch (error) {
+      console.error("Error converting template:", error);
+      return [];
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -146,7 +190,13 @@ export default function CreateInspectionDialog({ open, onClose, onSuccess, manag
         `${formData.address.street}${formData.address.number ? `, ${formData.address.number}` : ''}${formData.address.complement ? ` - ${formData.address.complement}` : ''}${formData.address.neighborhood ? `, ${formData.address.neighborhood}` : ''}${formData.address.city ? `, ${formData.address.city}` : ''}${formData.address.state ? ` - ${formData.address.state}` : ''}` : 
         null;
 
-      // Prepare data for Firebase
+      // Convert template to topics if template is selected
+      let topics = [];
+      if (formData.template_id && formData.is_templated) {
+        topics = await convertTemplateToTopics(formData.template_id);
+      }
+
+      // Prepare data for Firebase with new nested structure
       const inspectionData = {
         title: formData.title,
         observation: formData.observation || null,
@@ -157,6 +207,8 @@ export default function CreateInspectionDialog({ open, onClose, onSuccess, manag
         scheduled_date: formData.scheduled_date ? new Date(formData.scheduled_date) : null,
         address: formData.address,
         address_string: formattedAddress,
+        is_templated: formData.is_templated,
+        topics: topics, // Include the nested topics structure
         created_at: serverTimestamp(),
         updated_at: serverTimestamp(),
         deleted_at: null
@@ -243,7 +295,14 @@ export default function CreateInspectionDialog({ open, onClose, onSuccess, manag
               <Label htmlFor="template">Template (opcional)</Label>
               <Select
                 value={formData.template_id || "none"}
-                onValueChange={(value) => setFormData({ ...formData, template_id: value === "none" ? null : value })}
+                onValueChange={(value) => {
+                  const templateId = value === "none" ? null : value;
+                  setFormData({ 
+                    ...formData, 
+                    template_id: templateId,
+                    is_templated: templateId !== null
+                  });
+                }}
               >
                 <SelectTrigger id="template">
                   <SelectValue placeholder="Nenhum template" />
@@ -258,6 +317,18 @@ export default function CreateInspectionDialog({ open, onClose, onSuccess, manag
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Template Application Toggle */}
+            {formData.template_id && (
+              <div className="flex items-center justify-between">
+                <Label htmlFor="is_templated">Aplicar estrutura do template</Label>
+                <Switch
+                  id="is_templated"
+                  checked={formData.is_templated}
+                  onCheckedChange={(checked) => setFormData({ ...formData, is_templated: checked })}
+                />
+              </div>
+            )}
 
             {/* Inspector Selection */}
             <div className="space-y-2">

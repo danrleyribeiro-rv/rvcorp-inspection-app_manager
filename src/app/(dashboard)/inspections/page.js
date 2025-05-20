@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
@@ -36,6 +37,7 @@ export default function InspectionsPage() {
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
   const { toast } = useToast();
+  const router = useRouter();
 
   useEffect(() => {
     if (user) {
@@ -67,7 +69,7 @@ export default function InspectionsPage() {
         return;
       }
       
-      // Now, get all inspections for these projects
+      // Now, get all inspections for these projects using the new structure
       const inspectionsQuery = query(
         collection(db, 'inspections'),
         where('project_id', 'in', projectIds),
@@ -85,7 +87,7 @@ export default function InspectionsPage() {
         const inspection = {
           id: doc.id,
           ...data,
-          // Verifica e converte os timestamps de maneira segura
+          // Convert Firebase timestamps to ISO strings for easier handling
           created_at: data.created_at && typeof data.created_at.toDate === 'function' 
             ? data.created_at.toDate().toISOString() 
             : data.created_at,
@@ -167,14 +169,34 @@ export default function InspectionsPage() {
     }
   };
 
+  const handleEditData = (inspection) => {
+    setEditingInspection(inspection);
+  };
+
+  const handleEditInspection = (inspection) => {
+    router.push(`/inspections/${inspection.id}/editor`);
+  };
+
   const filterInspections = () => {
     const filtered = inspections.filter(inspection => {
-      // Search filter
-      const matchesSearch =
-        (inspection.title?.toLowerCase().includes(search.toLowerCase()) ||
-         inspection.projects?.title?.toLowerCase().includes(search.toLowerCase()) ||
-         inspection.inspectors?.name?.toLowerCase().includes(search.toLowerCase()) ||
-         inspection.projects?.clients?.name?.toLowerCase().includes(search.toLowerCase()));
+      // Search filter - now includes topics and items
+      const matchesSearch = search === "" || (
+        inspection.title?.toLowerCase().includes(search.toLowerCase()) ||
+        inspection.projects?.title?.toLowerCase().includes(search.toLowerCase()) ||
+        inspection.inspectors?.name?.toLowerCase().includes(search.toLowerCase()) ||
+        inspection.projects?.clients?.name?.toLowerCase().includes(search.toLowerCase()) ||
+        inspection.observation?.toLowerCase().includes(search.toLowerCase()) ||
+        // Search in topics
+        (inspection.topics && inspection.topics.some(topic => 
+          topic.name?.toLowerCase().includes(search.toLowerCase()) ||
+          topic.description?.toLowerCase().includes(search.toLowerCase()) ||
+          // Search in items
+          (topic.items && topic.items.some(item =>
+            item.name?.toLowerCase().includes(search.toLowerCase()) ||
+            item.description?.toLowerCase().includes(search.toLowerCase())
+          ))
+        ))
+      );
 
       // Status filter
       const matchesStatus = filterState.status === "all" || inspection.status === filterState.status;
@@ -240,7 +262,7 @@ export default function InspectionsPage() {
         </div>
       </div>
 
-      {loading ? (
+        {loading ? (
         <div className="flex justify-center items-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
@@ -256,7 +278,8 @@ export default function InspectionsPage() {
             <InspectionCard
               key={inspection.id}
               inspection={inspection}
-              onEdit={() => setEditingInspection(inspection)}
+              onEditData={() => handleEditData(inspection)}
+              onEditInspection={() => handleEditInspection(inspection)}
               onView={() => setViewingInspection(inspection)}
               onDelete={() => setDeletingInspection(inspection)}
             />
