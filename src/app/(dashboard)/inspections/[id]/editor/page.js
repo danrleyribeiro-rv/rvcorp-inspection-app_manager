@@ -19,15 +19,12 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
-import { useImageRotation } from "@/hooks/use-image-rotation";
 import { addWatermarkToImage } from "@/utils/ImageWatermark";
 import {
   ArrowLeft,
   Save,
   Plus,
   Trash2,
-  RotateCw,
-  RotateCcw,
   Move,
   X,
   ChevronRight,
@@ -51,15 +48,14 @@ export default function InspectionEditorPage({ params }) {
   const [expandedItems, setExpandedItems] = useState([]);
   const [selectedMediaContext, setSelectedMediaContext] = useState(null);
   const [showMoveDialog, setShowMoveDialog] = useState(false);
-  const [moveTarget, setMoveTarget] = useState(null);
-  const [moveDialogExpandedTopics, setMoveDialogExpandedTopics] = useState([]);
-  const [moveDialogExpandedItems, setMoveDialogExpandedItems] = useState([]);
+  const [setMoveTarget] = useState(null);
+  const [setMoveDialogExpandedTopics] = useState([]);
+  const [setMoveDialogExpandedItems] = useState([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [confirmExitDialog, setConfirmExitDialog] = useState(false);
   const mediaRef = useRef(null);
   const { toast } = useToast();
   const router = useRouter();
-  const { rotation, setRotation, rotateImage, saveRotatedImage, saving: savingRotation } = useImageRotation();
 
   // Verificar mudanças não salvas quando o usuário tenta sair
   useEffect(() => {
@@ -239,28 +235,6 @@ export default function InspectionEditorPage({ params }) {
     }
   };
 
-  // Função para salvar uma imagem rotacionada
-  const handleSaveRotatedImage = async () => {
-    if (!selectedMedia || !selectedMediaContext) return;
-    
-    try {
-      await saveRotatedImage(selectedMedia, inspectionId, selectedMediaContext, inspection, setInspection);
-      
-      toast({
-        title: "Imagem rotacionada salva com sucesso",
-      });
-      
-      // Fechar o visualizador após salvar
-      setViewerOpen(false);
-    } catch (error) {
-      toast({
-        title: "Erro ao salvar imagem rotacionada",
-        description: error.message,
-        variant: "destructive"
-      });
-    }
-  };
-
   const openMediaViewer = (media, topicIndex, itemIndex, detailIndex, mediaIndex, isNC = false, ncIndex = null) => {
     setSelectedMedia(media);
     setSelectedMediaContext({
@@ -272,7 +246,6 @@ export default function InspectionEditorPage({ params }) {
       ncIndex
     });
     setViewerOpen(true);
-    setRotation(0); // Reset rotation
   };
 
 
@@ -1020,68 +993,45 @@ export default function InspectionEditorPage({ params }) {
           </Tabs>
         </div>
         
-        {/* Media Viewer Dialog com botão de salvar rotação */}
+        {/* Media Viewer Dialog*/}
         {viewerOpen && selectedMedia && (
-          <Dialog open={viewerOpen} onOpenChange={() => setViewerOpen(false)} className="max-w-4xl">
+        <Dialog open={viewerOpen} onOpenChange={() => setViewerOpen(false)} className="max-w-4xl">
             <DialogContent className="max-w-4xl max-h-[90vh] p-0 flex flex-col">
-              <DialogHeader className="p-3 border-b flex items-center justify-between">
+            <DialogHeader className="p-3 border-b flex items-center justify-between">
                 <DialogTitle className="text-sm font-medium">Visualizador de Mídia</DialogTitle>
                 <div className="flex gap-1">
-                  <Button variant="outline" size="sm" className="h-7" onClick={() => rotateImage('left')}>
-                    <RotateCcw className="h-3 w-3" />
-                  </Button>
-                  <Button variant="outline" size="sm" className="h-7" onClick={() => rotateImage('right')}>
-                    <RotateCw className="h-3 w-3" />
-                  </Button>
-                  {rotation !== 0 && (
-                    <Button 
-                      variant="default" 
-                      size="sm" 
-                      className="h-7" 
-                      onClick={handleSaveRotatedImage}
-                      disabled={savingRotation}
-                    >
-                      {savingRotation ? (
-                        <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                      ) : (
-                        <Save className="h-3 w-3 mr-1" />
-                      )}
-                      Salvar
-                    </Button>
-                  )}
-                  <Button variant="outline" size="sm" className="h-7" onClick={() => setShowMoveDialog(true)}>
+                <Button variant="outline" size="sm" className="h-7" onClick={() => setShowMoveDialog(true)}>
                     <Move className="mr-1 h-3 w-3" />
                     <span className="text-xs">Mover</span>
-                  </Button>
-                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setViewerOpen(false)}>
+                </Button>
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setViewerOpen(false)}>
                     <X className="h-3 w-3" />
-                  </Button>
+                </Button>
                 </div>
-              </DialogHeader>
-              
-              <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-gray-50">
+            </DialogHeader>
+            
+            <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-gray-50">
                 <div 
-                  ref={mediaRef}
-                  className="max-h-full"
-                  style={{ transform: `rotate(${rotation}deg)`, transition: "transform 0.3s ease" }}
+                ref={mediaRef}
+                className="max-h-full"
                 >
-                  {selectedMedia.type === "image" ? (
+                {selectedMedia.type === "image" ? (
                     <img
-                      src={selectedMedia.url}
-                      alt="Media"
-                      className="max-h-[70vh] object-contain"
+                    src={selectedMedia.url}
+                    alt="Media"
+                    className="max-h-[70vh] object-contain"
                     />
-                  ) : (
+                ) : (
                     <video
-                      src={selectedMedia.url}
-                      controls
-                      className="max-h-[70vh]"
+                    src={selectedMedia.url}
+                    controls
+                    className="max-h-[70vh]"
                     />
-                  )}
+                )}
                 </div>
-              </div>
+            </div>
             </DialogContent>
-          </Dialog>
+        </Dialog>
         )}
         
         {/* Move Media Dialog */}
