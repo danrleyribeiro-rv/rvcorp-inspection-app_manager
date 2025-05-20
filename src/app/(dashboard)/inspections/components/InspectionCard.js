@@ -1,13 +1,40 @@
-// app/(dashboard)/inspections/components/InspectionCard.js
+// src/app/(dashboard)/inspections/components/InspectionCard.js
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { format } from "date-fns";
+import { format, isValid, parseISO } from "date-fns"; // Importar isValid e parseISO
 import { ptBR } from "date-fns/locale";
 import { Pencil, Eye, Calendar, User, Trash2, MapPin, AlertTriangle, FileText, Edit } from "lucide-react";
 
+// Função para formatar datas com verificação de validade
+const formatDateSafe = (dateStr) => {
+  if (!dateStr) return null;
+  
+  try {
+    let date;
+    
+    // Se for string, tentar converter para data
+    if (typeof dateStr === 'string') {
+      date = parseISO(dateStr);
+    } else if (dateStr instanceof Date) {
+      date = dateStr;
+    } else {
+      return null;
+    }
+    
+    // Verificar se a data é válida
+    if (!isValid(date)) {
+      return null;
+    }
+    
+    return format(date, "PPP", { locale: ptBR });
+  } catch (error) {
+    console.error("Erro ao formatar data:", error, dateStr);
+    return null;
+  }
+};
 
 const getStatusColor = (status) => {
   const statusColors = {
@@ -94,6 +121,9 @@ export default function InspectionCard({ inspection, onEdit, onView, onDelete, o
   const damaged = hasDamagedItems();
   const { topics, items } = getTopicsAndItemsCount();
   const addressText = formatAddress(inspection.address);
+  
+  // Formatar a data de forma segura
+  const scheduledDateFormatted = inspection.scheduled_date ? formatDateSafe(inspection.scheduled_date) : null;
 
   return (
     <Card className="group hover:shadow-lg transition-shadow duration-200">
@@ -120,12 +150,10 @@ export default function InspectionCard({ inspection, onEdit, onView, onDelete, o
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
-          {inspection.scheduled_date && (
+          {scheduledDateFormatted && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Calendar className="h-4 w-4" />
-              <span>
-                {format(new Date(inspection.scheduled_date), "PPP", { locale: ptBR })}
-              </span>
+              <span>{scheduledDateFormatted}</span>
             </div>
           )}
 
