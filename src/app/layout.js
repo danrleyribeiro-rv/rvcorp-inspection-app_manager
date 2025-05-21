@@ -1,6 +1,7 @@
 // src/app/layout.js
 import { AuthProvider } from '@/context/auth-context';
 import { ThemeProvider } from "@/components/theme-provider";
+import { NotificationProvider } from '@/context/notification-context';
 import { Inter } from 'next/font/google';
 import './globals.css';
 
@@ -13,7 +14,7 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="pt-br" suppressHydrationWarning>
       <body className={inter.className}>
         <ThemeProvider
           attribute="class"
@@ -22,7 +23,9 @@ export default function RootLayout({ children }) {
           disableTransitionOnChange
         >
           <AuthProvider>
-            {children}
+            <NotificationProvider>
+              {children}
+            </NotificationProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>

@@ -1,7 +1,0 @@
-title,description,template_price,total_images,total_videos,topic_name,topic_description,item_name,item_description,detail_name,detail_type,detail_required,detail_options
-Inspeção Comercial,Template para inspeção de estabelecimentos comerciais,399.99,30,3,Área de Vendas,Inspeção da área principal de vendas,Iluminação,Verificação do sistema de iluminação,Tipo de Lâmpadas,select,true,"LED,Fluorescente,Incandescente"
-Inspeção Comercial,Template para inspeção de estabelecimentos comerciais,399.99,30,3,Área de Vendas,Inspeção da área principal de vendas,Iluminação,Verificação do sistema de iluminação,Funcionamento,boolean,true,
-Inspeção Comercial,Template para inspeção de estabelecimentos comerciais,399.99,30,3,Área de Vendas,Inspeção da área principal de vendas,Iluminação,Verificação do sistema de iluminação,Foto Geral,image,true,
-Inspeção Comercial,Template para inspeção de estabelecimentos comerciais,399.99,30,3,Área de Vendas,Inspeção da área principal de vendas,Piso,Análise do piso comercial,Estado,select,true,"Ótimo,Bom,Regular,Ruim"
-Inspeção Comercial,Template para inspeção de estabelecimentos comerciais,399.99,30,3,Estoque,Área de armazenamento,Prateleiras,Inspeção das prateleiras,Capacidade,number,true,
-Inspeção Comercial,Template para inspeção de estabelecimentos comerciais,399.99,30,3,Estoque,Área de armazenamento,Prateleiras,Inspeção das prateleiras,Condição Estrutural,text,true,

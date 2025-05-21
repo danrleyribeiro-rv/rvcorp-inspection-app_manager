@@ -1,37 +1,53 @@
-// hooks/use-file-upload.js
-"use client";
-
-import { useState } from "react";
-import { storage } from "@/lib/firebase";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+// src/hooks/useFileUpload.js
+import { useState } from 'react';
+import { storage } from '@/lib/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { useToast } from '@/hooks/use-toast';
 
 export function useFileUpload() {
-  const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
-
+  const [uploading, setUploading] = useState(false);
+  const { toast } = useToast();
+  
   const uploadFile = async (file, path) => {
-    setUploading(true);
-    setProgress(0);
-
+    if (!file) return { success: false, error: 'No file provided' };
+    
     try {
-      const storageRef = ref(storage, path);
-      const snapshot = await uploadBytes(storageRef, file);
-      const url = await getDownloadURL(snapshot.ref);
+      setUploading(true);
+      setProgress(10);
       
+      // Create storage reference
+      const storageRef = ref(storage, path);
+      
+      // Upload file
+      const uploadTask = await uploadBytes(storageRef, file);
+      setProgress(70);
+      
+      // Get download URL
+      const downloadURL = await getDownloadURL(uploadTask.ref);
       setProgress(100);
-      return { url, success: true };
+      
+      return {
+        success: true,
+        url: downloadURL,
+        path: uploadTask.ref.fullPath,
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type
+      };
     } catch (error) {
-      console.error("Upload error:", error);
-      return { error: error.message, success: false };
+      console.error('Error uploading file:', error);
+      toast({
+        title: 'Upload failed',
+        description: error.message,
+        variant: 'destructive'
+      });
+      return { success: false, error: error.message };
     } finally {
       setUploading(false);
-      setProgress(0);
+      setTimeout(() => setProgress(0), 500);
     }
   };
-
-  return {
-    uploadFile,
-    uploading,
-    progress
-  };
+  
+  return { uploadFile, progress, uploading };
 }

@@ -29,6 +29,7 @@ import {
   MessageSquare
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { useUnreadCounts } from '@/hooks/use-unread-counts';
 
 // Define the navigation items
 const menuItems = [
@@ -42,9 +43,12 @@ const menuItems = [
   { href: "/settings", label: "Configurações", icon: Settings },
 ];
 
+
 // Main navigation component for desktop
 export function Sidebar({ onToggle, isCollapsed }) {
   const pathname = usePathname();
+  const unreadCounts = useUnreadCounts();
+  const totalUnread = Object.values(unreadCounts).reduce((sum, count) => sum + count, 0);
   const { theme, setTheme } = useTheme();
   const { signOut, user } = useAuth();
   const [profileData, setProfileData] = useState({
@@ -135,21 +139,49 @@ export function Sidebar({ onToggle, isCollapsed }) {
       </div>
       <nav className="flex-1 overflow-y-auto px-2 py-4">
         <ul className="space-y-1">
-          {menuItems.map((item) => (
-            <li key={item.href}>
-              <Link
-                href={item.href}
-                className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
-                  pathname === item.href || pathname.startsWith(`${item.href}/`)
-                    ? "bg-primary text-primary-foreground"
-                    : "hover:bg-accent hover:text-accent-foreground"
-                } ${isCollapsed ? "justify-center" : ""}`}
-              >
-                <item.icon className="h-5 w-5 flex-shrink-0" />
-                {!isCollapsed && <span className="truncate">{item.label}</span>}
-              </Link>
-            </li>
-          ))}
+          {menuItems.map((item) => {
+            if (item.href === "/chats") {
+              return (
+                <li key={item.href}>
+                  <Link
+                    href={item.href}
+                    className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
+                      pathname === item.href || pathname.startsWith(`${item.href}/`)
+                        ? "bg-primary text-primary-foreground"
+                        : "hover:bg-accent hover:text-accent-foreground"
+                    } ${isCollapsed ? "justify-center" : ""}`}
+                  >
+                    <MessageSquare className="h-5 w-5 flex-shrink-0" />
+                    {!isCollapsed && (
+                      <div className="flex items-center justify-between w-full">
+                        <span className="truncate">Chats</span>
+                        {totalUnread > 0 && (
+                          <span className="ml-1 h-5 w-5 rounded-full p-0 flex items-center justify-center bg-destructive text-destructive-foreground text-xs font-bold">
+                            {totalUnread}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </Link>
+                </li>
+              );
+            }
+            return (
+              <li key={item.href}>
+                <Link
+                  href={item.href}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
+                    pathname === item.href || pathname.startsWith(`${item.href}/`)
+                      ? "bg-primary text-primary-foreground"
+                      : "hover:bg-accent hover:text-accent-foreground"
+                  } ${isCollapsed ? "justify-center" : ""}`}
+                >
+                  <item.icon className="h-5 w-5 flex-shrink-0" />
+                  {!isCollapsed && <span className="truncate">{item.label}</span>}
+                </Link>
+              </li>
+            );
+          })}
         </ul>
         
         <Separator className="my-4" />

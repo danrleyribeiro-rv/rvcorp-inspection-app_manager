@@ -38,6 +38,8 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import GoToChatButton from '@/components/ToChatButton';
+
 
 const getStatusBadge = (status) => {
   const statusMap = {
@@ -786,17 +788,20 @@ export default function InspectionDetailsDialog({ inspection, open, onClose, onE
          </div>
        </Tabs>
        
-       <div className="flex justify-between p-6 border-t sticky bottom-0 bg-background">
-         <Button
-           variant="outline"
-           onClick={handleEdit}
-           className="flex items-center gap-2"
-         >
-           <Pencil className="h-4 w-4" />
-           Editar Inspeção
-         </Button>
-         <Button onClick={onClose}>Fechar</Button>
-       </div>
+      <div className="flex justify-between p-6 border-t sticky bottom-0 bg-background">
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={handleEdit}
+            className="flex items-center gap-2"
+          >
+            <Pencil className="h-4 w-4" />
+            Editar Inspeção
+          </Button>
+          <GoToChatButton inspection={inspection} inspector={inspectorDetails} />
+        </div>
+        <Button onClick={onClose}>Fechar</Button>
+      </div>
      </DialogContent>
    </Dialog>
  );
