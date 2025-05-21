@@ -20,10 +20,10 @@ export async function middleware(request) {
   // Autenticação
   const authToken = request.cookies.get('authToken')?.value;
 
-  // Rota raiz (/) - redirecionar para /projects ou /login
+  // Rota raiz (/) - redirecionar para /dashboard ou /login
   if (pathname === '/') {
     if (authToken) {
-      return NextResponse.redirect(new URL('/projects', request.url));
+      return NextResponse.redirect(new URL('/dashboard', request.url));
     } else {
       return NextResponse.redirect(new URL('/login', request.url));
     }
@@ -36,7 +36,7 @@ export async function middleware(request) {
 
   // Se há token e é uma rota pública (como login), redirecionar para dashboard
   if (authToken && isPublicPath) {
-    return NextResponse.redirect(new URL('/projects', request.url));
+    return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
   // Passar para o próximo middleware ou página

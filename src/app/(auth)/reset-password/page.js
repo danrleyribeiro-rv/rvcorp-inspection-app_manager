@@ -41,7 +41,7 @@ export default function ResetPasswordPage() {
                 // Complete sign-in
                 await signInWithEmailLink(auth, email, window.location.href);
                 window.localStorage.removeItem('emailForSignIn');
-                router.push('/projects');
+                router.push('/dashboard');
               } catch (error) {
                 console.error('Error signing in with email link:', error);
                 setTokenValid(false);

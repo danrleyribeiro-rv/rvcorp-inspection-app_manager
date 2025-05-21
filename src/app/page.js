@@ -14,7 +14,7 @@ export default function Home() {
     // Verificar se o usuário está autenticado e redirecionar adequadamente
     if (!loading) {
       if (user) {
-        router.push("/projects");
+        router.push("/dashboard");
       } else {
         router.push("/login");
       }

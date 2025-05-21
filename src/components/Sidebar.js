@@ -26,6 +26,7 @@ import {
   FileText,
   FolderKanban,
   Plus,
+  MessageSquare
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
@@ -37,6 +38,7 @@ const menuItems = [
   { href: "/templates", label: "Templates", icon: CircleDot },
   { href: "/inspectors", label: "Vistoriadores", icon: Users },
   { href: "/clients", label: "Clientes", icon: Users },
+  { href: "/chats", label: "Chats", icon: MessageSquare },
   { href: "/settings", label: "Configurações", icon: Settings },
 ];
 

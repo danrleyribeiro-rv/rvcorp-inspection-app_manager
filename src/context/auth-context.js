@@ -47,9 +47,9 @@ export function AuthProvider({ children }) {
               
               // Adicione este trecho para melhorar a navegação
               if (!loading) {
-                // Se estamos em '/' e autenticados, redirecionar para /projects
+                // Se estamos em '/' e autenticados, redirecionar para /dashboard
                 if (pathname === '/') {
-                  router.push('/projects');
+                  router.push('/dashboard');
                 }
               }
             } else {
@@ -114,7 +114,7 @@ export function AuthProvider({ children }) {
         
         // Esperar que o estado seja atualizado antes de redirecionar
         setTimeout(() => {
-          router.push("/projects");
+          router.push("/dashboard");
           setLoading(false);
         }, 100);
         
