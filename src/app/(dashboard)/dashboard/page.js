@@ -316,7 +316,7 @@ export default function DashboardPage() {
               <CardContent className="pt-2">
                 {projectsData.length > 0 ? (
                   <ChartContainer className="h-[240px]">
-                    <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height={240}>
                       <PieChart>
                         <Pie
                           data={projectsData}
@@ -355,7 +355,7 @@ export default function DashboardPage() {
               <CardContent className="pt-2">
                 {inspectionsByStatus.some(item => item.value > 0) ? (
                   <ChartContainer className="h-[240px]">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height={240}>
                       <PieChart>
                         <Pie
                           data={inspectionsByStatus.filter(item => item.value > 0)}

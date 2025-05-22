@@ -1,4 +1,4 @@
-// src/app/(dashboard)/chats/components/ChatList.jsx
+// src/app/(dashboard)/chats/components/ChatList.js
 "use client";
 
 import { useState } from 'react';
@@ -16,8 +16,31 @@ export default function ChatList({ selectedChatId, onSelectChat }) {
   const { chats, loading } = useChats();
   const unreadCounts = useUnreadCounts();
   const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState('all'); // 'all', 'unread'
+  const [filter, setFilter] = useState('all');
   const { user } = useAuth();
+
+  const getFullInspectorName = (inspector) => {
+    if (!inspector?.name) return 'Unknown Inspector';
+    const firstName = inspector.name || '';
+    const lastName = inspector.last_name || '';
+    return `${firstName} ${lastName}`.trim();
+  };
+
+  // Adicione esta função
+  const formatMessageTime = (timestamp) => {
+    try {
+      if (!timestamp) return '';
+      
+      const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+      
+      if (isNaN(date.getTime())) return '';
+      
+      return format(date, 'HH:mm');
+    } catch (error) {
+      console.error('Error formatting timestamp:', error);
+      return '';
+    }
+  };
 
   // Apply filters and search
   const filteredChats = chats.filter(chat => {
@@ -108,18 +131,22 @@ export default function ChatList({ selectedChatId, onSelectChat }) {
               <div className="flex-1 min-w-0">
                 <div className="flex justify-between items-center">
                   <h3 className="font-medium text-sm truncate">
-                    {chat.inspector?.name || 'Unknown Inspector'}
+                    {getFullInspectorName(chat.inspector)}
                   </h3>
                   <div className="flex items-center">
                     {chat.muted_by?.includes(user?.uid) && (
-                    <BellOff className="h-3 w-3 text-muted-foreground mr-1" />
+                      <BellOff className="h-3 w-3 text-muted-foreground mr-1" />
                     )}
                     <span className="text-xs text-muted-foreground">
-                      {chat.last_message?.timestamp ? 
-                        format(new Date(chat.last_message.timestamp), 'HH:mm') : ''}
+                      {formatMessageTime(chat.last_message?.timestamp)}
                     </span>
                   </div>
                 </div>
+                
+                {/* Nome da inspeção */}
+                <p className="text-xs text-muted-foreground truncate mb-1">
+                  {chat.inspection?.title || 'Inspeção'}
+                </p>
                 
                 <div className="flex justify-between items-center">
                   <p className="text-sm text-muted-foreground truncate">

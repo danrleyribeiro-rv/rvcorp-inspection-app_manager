@@ -255,25 +255,39 @@ export default function ChatDetail({ chatId }) {
     }
   };
 
-  const formatMessageTime = (timestamp) => {
-    if (!timestamp) return '';
-    
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    
-    // If it's today, show the time only
-    const today = new Date();
-    if (date.toDateString() === today.toDateString()) {
-      return format(date, 'HH:mm');
-    }
-    
-    // If it's within the last week, show the day name and time
-    if (date > new Date(today.setDate(today.getDate() - 7))) {
-      return format(date, 'EEE, HH:mm', { locale: ptBR });
-    }
-    
-    // Otherwise show the full date
-    return format(date, 'dd/MM/yyyy HH:mm');
+  const getFullInspectorName = () => {
+    if (!chatDetails?.inspector?.name) return 'Unknown Inspector';
+    const firstName = chatDetails.inspector.name || '';
+    const lastName = chatDetails.inspector.last_name || '';
+    return `${firstName} ${lastName}`.trim();
   };
+
+  const formatMessageTime = (timestamp) => {
+      try {
+        if (!timestamp) return '';
+        
+        const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+        
+        if (isNaN(date.getTime())) return '';
+        
+        // If it's today, show time only
+        const today = new Date();
+        if (date.toDateString() === today.toDateString()) {
+          return format(date, 'HH:mm');
+        }
+        
+        // If within last week, show day and time
+        if (date > new Date(today.setDate(today.getDate() - 7))) {
+          return format(date, 'EEE, HH:mm', { locale: ptBR });
+        }
+        
+        // Otherwise show full date
+        return format(date, 'dd/MM/yyyy HH:mm');
+      } catch (error) {
+        console.error('Error formatting timestamp:', error);
+        return '';
+      }
+    };
 
   const getInitials = (name) => {
     if (!chatDetails?.inspector?.name) return '??';
@@ -336,7 +350,7 @@ export default function ChatDetail({ chatId }) {
           </Avatar>
           <div>
             <h3 className="font-medium">
-              {chatDetails?.inspector?.name || 'Unknown Inspector'}
+              {getFullInspectorName()}
             </h3>
             <p className="text-xs text-muted-foreground">
               {chatDetails?.inspection?.title || 'Inspection'}
