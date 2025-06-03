@@ -140,7 +140,7 @@ export default function TemplatesPage() {
                 <TableHead className="w-12"></TableHead>
                 <TableHead>Nome</TableHead>
                 <TableHead>Descrição</TableHead>
-                <TableHead>Salas</TableHead>
+                <TableHead>Topicos</TableHead>
                 <TableHead>Itens</TableHead>
                 <TableHead>Preço</TableHead>
                 <TableHead className="text-right">Ações</TableHead>

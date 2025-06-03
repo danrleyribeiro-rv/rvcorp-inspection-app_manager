@@ -25,12 +25,10 @@ import {
   Save,
   Plus,
   Trash2,
-  Move,
   X,
-  ChevronRight,
-  ChevronDown,
   Loader2,
-  AlertTriangle
+  AlertTriangle,
+  ChevronRight
 } from "lucide-react";
 import DetailEditor from "@/components/inspection/DetailEditor";
 import MediaMoveDialog from "@/components/inspection/MediaMoveDialog";
@@ -41,38 +39,31 @@ export default function InspectionEditorPage({ params }) {
   const [originalInspection, setOriginalInspection] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState("topics");
+  const [activeTopicIndex, setActiveTopicIndex] = useState(0);
+  const [activeItemIndex, setActiveItemIndex] = useState(null);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState(null);
-  const [expandedTopics, setExpandedTopics] = useState([]);
-  const [expandedItems, setExpandedItems] = useState([]);
   const [selectedMediaContext, setSelectedMediaContext] = useState(null);
   const [showMoveDialog, setShowMoveDialog] = useState(false);
-  const [setMoveTarget] = useState(null);
-  const [setMoveDialogExpandedTopics] = useState([]);
-  const [setMoveDialogExpandedItems] = useState([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [confirmExitDialog, setConfirmExitDialog] = useState(false);
   const mediaRef = useRef(null);
   const { toast } = useToast();
   const router = useRouter();
 
-  // Verificar mudanças não salvas quando o usuário tenta sair
   useEffect(() => {
     if (inspection && originalInspection) {
-      // Verificar se houve alguma alteração
       const current = JSON.stringify(inspection);
       const original = JSON.stringify(originalInspection);
       setHasUnsavedChanges(current !== original);
     }
   }, [inspection, originalInspection]);
 
-  // Adicionar confirmação de saída quando há mudanças não salvas
   useEffect(() => {
     const handleBeforeUnload = (e) => {
       if (hasUnsavedChanges) {
         e.preventDefault();
-        e.returnValue = ""; // Mensagem padrão usada pelo navegador
+        e.returnValue = "";
       }
     };
 
@@ -108,7 +99,7 @@ export default function InspectionEditorPage({ params }) {
       };
       
       setInspection(formattedData);
-      setOriginalInspection(structuredClone(formattedData)); // Para comparar mudanças não salvas
+      setOriginalInspection(structuredClone(formattedData));
     } catch (error) {
       console.error("Error fetching inspection:", error);
       toast({
@@ -130,7 +121,6 @@ export default function InspectionEditorPage({ params }) {
         updated_at: serverTimestamp()
       });
 
-      // Após salvar com sucesso, atualize o originalInspection para a versão atual
       setOriginalInspection(structuredClone(inspection));
       setHasUnsavedChanges(false);
 
@@ -157,7 +147,6 @@ export default function InspectionEditorPage({ params }) {
     }
   };
 
-  // Função para upload de mídia com marca d'água
   const uploadMedia = async (topicIndex, itemIndex, detailIndex, file, isNC = false, ncIndex = null) => {
     try {
       const fileExtension = file.name.split('.').pop();
@@ -172,22 +161,14 @@ export default function InspectionEditorPage({ params }) {
         storagePath = `inspections/${inspectionId}/topic_${topicIndex}/item_${itemIndex}/detail_${detailIndex}/media/${fileName}`;
       }
       
-      // Se for uma imagem, adicionar marca d'água
       let fileToUpload = file;
       let url;
       
       if (mediaType === 'image') {
-        // Criar uma URL para o arquivo
         const fileURL = URL.createObjectURL(file);
-        
-        // Adicionar marca d'água
         const watermarkedImageURL = await addWatermarkToImage(fileURL, inspectionId);
-        
-        // Converter a URL de dados para um blob
         const response = await fetch(watermarkedImageURL);
         fileToUpload = await response.blob();
-        
-        // Revoke URL to avoid memory leaks
         URL.revokeObjectURL(fileURL);
       }
 
@@ -203,7 +184,6 @@ export default function InspectionEditorPage({ params }) {
         updated_at: new Date().toISOString()
       };
 
-      // Atualizar o state com a nova mídia
       setInspection(prev => {
         const updated = structuredClone(prev);
         
@@ -248,8 +228,6 @@ export default function InspectionEditorPage({ params }) {
     setViewerOpen(true);
   };
 
-
-  //diálogo de confirmação de saída
   const ConfirmExitDialog = () => (
     <Dialog open={confirmExitDialog} onOpenChange={setConfirmExitDialog}>
       <DialogContent>
@@ -360,14 +338,11 @@ export default function InspectionEditorPage({ params }) {
       ...prev,
       topics: prev.topics.filter((_, index) => index !== topicIndex)
     }));
-  };
-
-  const toggleTopic = (topicIndex) => {
-    if (expandedTopics.includes(topicIndex)) {
-      setExpandedTopics(expandedTopics.filter(i => i !== topicIndex));
-    } else {
-      setExpandedTopics([...expandedTopics, topicIndex]);
+    
+    if (activeTopicIndex >= prev.topics.length - 1) {
+      setActiveTopicIndex(Math.max(0, prev.topics.length - 2));
     }
+    setActiveItemIndex(null);
   };
 
   const addItem = (topicIndex) => {
@@ -404,14 +379,11 @@ export default function InspectionEditorPage({ params }) {
           : topic
       )
     }));
-  };
-
-  const toggleItem = (topicIndex, itemIndex) => {
-    const key = `${topicIndex}-${itemIndex}`;
-    if (expandedItems.includes(key)) {
-      setExpandedItems(expandedItems.filter(i => i !== key));
-    } else {
-      setExpandedItems([...expandedItems, key]);
+    
+    if (activeItemIndex === itemIndex) {
+      setActiveItemIndex(null);
+    } else if (activeItemIndex > itemIndex) {
+      setActiveItemIndex(activeItemIndex - 1);
     }
   };
 
@@ -469,7 +441,6 @@ export default function InspectionEditorPage({ params }) {
     }));
   };
 
-  // Função para mover mídia via drag and drop
   const handleMoveMediaDrop = (item, destination) => {
     const { media, topicIndex: srcTopicIndex, itemIndex: srcItemIndex, 
             detailIndex: srcDetailIndex, mediaIndex: srcMediaIndex, 
@@ -478,12 +449,9 @@ export default function InspectionEditorPage({ params }) {
     const { topicIndex: destTopicIndex, itemIndex: destItemIndex, 
             detailIndex: destDetailIndex, ncIndex: destNcIndex } = destination;
     
-    // Criar cópia do estado atual e mover a mídia
     const updatedInspection = structuredClone(inspection);
     
-    // Obter a mídia a ser movida
     let mediaToMove;
-    // Remove da origem
     if (srcIsNC) {
       mediaToMove = updatedInspection.topics[srcTopicIndex].items[srcItemIndex].details[srcDetailIndex].non_conformities[srcNcIndex].media[srcMediaIndex];
       updatedInspection.topics[srcTopicIndex].items[srcItemIndex].details[srcDetailIndex].non_conformities[srcNcIndex].media.splice(srcMediaIndex, 1);
@@ -492,16 +460,13 @@ export default function InspectionEditorPage({ params }) {
       updatedInspection.topics[srcTopicIndex].items[srcItemIndex].details[srcDetailIndex].media.splice(srcMediaIndex, 1);
     }
     
-    // Adiciona ao destino
     if (destNcIndex !== undefined && destNcIndex !== null) {
-      // Garante que a array existe
       if (!updatedInspection.topics[destTopicIndex].items[destItemIndex].details[destDetailIndex].non_conformities[destNcIndex].media) {
         updatedInspection.topics[destTopicIndex].items[destItemIndex].details[destDetailIndex].non_conformities[destNcIndex].media = [];
       }
       
       updatedInspection.topics[destTopicIndex].items[destItemIndex].details[destDetailIndex].non_conformities[destNcIndex].media.push(mediaToMove);
     } else {
-      // Garante que a array existe
       if (!updatedInspection.topics[destTopicIndex].items[destItemIndex].details[destDetailIndex].media) {
         updatedInspection.topics[destTopicIndex].items[destItemIndex].details[destDetailIndex].media = [];
       }
@@ -509,7 +474,6 @@ export default function InspectionEditorPage({ params }) {
       updatedInspection.topics[destTopicIndex].items[destItemIndex].details[destDetailIndex].media.push(mediaToMove);
     }
     
-    // Atualiza o estado
     setInspection(updatedInspection);
     
     toast({
@@ -527,16 +491,12 @@ export default function InspectionEditorPage({ params }) {
       isNC,
       ncIndex
     });
-    setMoveTarget(null);
-    setMoveDialogExpandedTopics([]);
-    setMoveDialogExpandedItems([]);
     setShowMoveDialog(true);
   };
 
   const removeMedia = async (topicIndex, itemIndex, detailIndex, mediaIndex, isNC = false, ncIndex = null) => {
     try {
       if (isNC) {
-        // Remove from non-conformity
         setInspection(prev => ({
           ...prev,
           topics: prev.topics.map((topic, tIndex) =>
@@ -567,7 +527,6 @@ export default function InspectionEditorPage({ params }) {
           )
         }));
       } else {
-        // Remove from detail
         setInspection(prev => ({
           ...prev,
           topics: prev.topics.map((topic, tIndex) =>
@@ -724,6 +683,9 @@ export default function InspectionEditorPage({ params }) {
     );
   }
 
+  const currentTopic = inspection.topics[activeTopicIndex];
+  const currentItem = activeItemIndex !== null ? currentTopic?.items?.[activeItemIndex] : null;
+
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="min-h-screen bg-background">
@@ -768,286 +730,298 @@ export default function InspectionEditorPage({ params }) {
 
         {/* Content */}
         <div className="p-4">
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="mb-4">
-              <TabsTrigger value="topics">Tópicos ({inspection.topics?.length || 0})</TabsTrigger>
-              <TabsTrigger value="general">Informações Gerais</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="general" className="space-y-4">
-              <Card>
-                <CardHeader className="py-3">
-                  <CardTitle className="text-base">Informações Gerais</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4 pt-0">
-                  <div>
-                    <Label htmlFor="title" className="text-sm">Título</Label>
-                    <Input
-                      id="title"
-                      value={inspection.title}
-                      onChange={e => updateInspectionField('title', e.target.value)}
-                      className="h-8 mt-1"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="observation" className="text-sm">Observação Geral</Label>
-                    <Textarea
-                      id="observation"
-                      value={inspection.observation || ''}
-                      onChange={e => updateInspectionField('observation', e.target.value)}
-                      rows={3}
-                      className="mt-1"
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
+          <Tabs value="topics" className="space-y-4">
 
             <TabsContent value="topics" className="space-y-4">
-              <div className="flex justify-between items-center">
-                <h2 className="text-base font-semibold">Tópicos da Inspeção</h2>
-                <Button size="sm" onClick={addTopic}>
-                  <Plus className="mr-2 h-3 w-3" />
-                  Adicionar Tópico
-                </Button>
-              </div>
-
-              <ScrollArea className="h-[calc(100vh-180px)]">
-                <div className="space-y-3 pr-4">
-                  {inspection.topics?.map((topic, topicIndex) => (
-                    <Card key={topicIndex} className="overflow-hidden">
-                      <div 
-                        className={`flex items-center justify-between p-2 cursor-pointer border-b ${
-                          expandedTopics.includes(topicIndex) ? 'bg-blue-50' : 'hover:bg-gray-50'
-                        }`}
-                        onClick={() => toggleTopic(topicIndex)}
-                      >
-                        <div className="flex items-center gap-2 text-sm font-medium">
-                          {expandedTopics.includes(topicIndex) ? 
-                            <ChevronDown className="h-4 w-4" /> : 
-                            <ChevronRight className="h-4 w-4" />}
-                          Tópico {topicIndex + 1}: {topic.name}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              removeTopic(topicIndex);
-                            }}
-                          >
-                            <Trash2 className="h-3 w-3 text-destructive" />
-                          </Button>
-                          <Button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              addItem(topicIndex);
-                            }} 
-                            size="sm"
-                            variant="ghost"
-                          >
-                            <Plus className="mr-1 h-3 w-3" />
-                            Item
-                          </Button>
-                        </div>
-                      </div>
-                      
-                      {expandedTopics.includes(topicIndex) && (
-                        <CardContent className="space-y-3 pt-3 pb-3">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <div>
-                              <Label className="text-xs">Nome do Tópico</Label>
-                              <Input
-                                value={topic.name}
-                                onChange={e => updateTopicField(topicIndex, 'name', e.target.value)}
-                                className="h-7 text-sm mt-1"
-                              />
-                            </div>
-                            <div>
-                              <Label className="text-xs">Descrição</Label>
-                              <Input
-                                value={topic.description || ''}
-                                onChange={e => updateTopicField(topicIndex, 'description', e.target.value)}
-                                className="h-7 text-sm mt-1"
-                              />
-                            </div>
+              <div className="grid grid-cols-12 gap-4 h-[calc(100vh-200px)]">
+                {/* Topics Column */}
+                <div className="col-span-3 border rounded-lg">
+                  <div className="p-3 border-b flex justify-between items-center">
+                    <h3 className="font-medium">Tópicos ({inspection.topics?.length || 0})</h3>
+                    <Button size="sm" onClick={addTopic}>
+                      <Plus className="h-3 w-3" />
+                    </Button>
+                  </div>
+                  <ScrollArea className="h-[calc(100vh-280px)]">
+                    <div className="p-2 space-y-1">
+                      {inspection.topics?.map((topic, topicIndex) => (
+                        <div
+                          key={topicIndex}
+                          className={`p-2 rounded cursor-pointer border ${
+                            activeTopicIndex === topicIndex 
+                              ? 'bg-primary text-primary-foreground' 
+                              : 'hover:bg-accent'
+                          }`}
+                          onClick={() => {
+                            setActiveTopicIndex(topicIndex);
+                            setActiveItemIndex(null);
+                          }}
+                        >
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm font-medium truncate">
+                              {topic.name || `Tópico ${topicIndex + 1}`}
+                            </span>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 w-6 p-0"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeTopic(topicIndex);
+                              }}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
                           </div>
+                          {topic.items?.length > 0 && (
+                            <span className="text-xs opacity-70">
+                              {topic.items.length} ite{topic.items.length !== 1 ? 'ns' : 'm'}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </div>
+
+                {/* Items Column */}
+                <div className="col-span-3 border rounded-lg">
+                  <div className="p-3 border-b flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">Tópico {activeTopicIndex + 1}</span>
+                      <ChevronRight className="h-3 w-3" />
+                      <span className="font-medium">Itens ({currentTopic?.items?.length || 0})</span>
+                    </div>
+                    {currentTopic && (
+                      <Button size="sm" onClick={() => addItem(activeTopicIndex)}>
+                        <Plus className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
+                  <ScrollArea className="h-[calc(100vh-280px)]">
+                    {currentTopic ? (
+                      <div className="p-2 space-y-3">
+                        {/* Topic fields */}
+                        <div className="space-y-2 p-2 bg-accent/20 rounded">
                           <div>
-                            <Label className="text-xs">Observação do Tópico</Label>
-                            <Textarea
-                              value={topic.observation || ''}
-                              onChange={e => updateTopicField(topicIndex, 'observation', e.target.value)}
-                              rows={2}
-                              className="text-sm mt-1"
+                            <Label className="text-xs">Nome do Tópico</Label>
+                            <Input
+                              value={currentTopic.name}
+                              onChange={e => updateTopicField(activeTopicIndex, 'name', e.target.value)}
+                              className="h-7 text-sm mt-1"
                             />
                           </div>
+                          <div>
+                            <Label className="text-xs">Descrição</Label>
+                            <Input
+                              value={currentTopic.description || ''}
+                              onChange={e => updateTopicField(activeTopicIndex, 'description', e.target.value)}
+className="h-7 text-sm mt-1"
+                           />
+                         </div>
+                         <div>
+                           <Label className="text-xs">Observação do Tópico</Label>
+                           <Textarea
+                             value={currentTopic.observation || ''}
+                             onChange={e => updateTopicField(activeTopicIndex, 'observation', e.target.value)}
+                             rows={2}
+                             className="text-sm mt-1"
+                           />
+                         </div>
+                       </div>
+                       
+                       {/* Items list */}
+                       <div className="space-y-1">
+                         {currentTopic.items?.map((item, itemIndex) => (
+                           <div
+                             key={itemIndex}
+                             className={`p-2 rounded cursor-pointer border ${
+                               activeItemIndex === itemIndex 
+                                 ? 'bg-primary text-primary-foreground' 
+                                 : 'hover:bg-accent'
+                             }`}
+                             onClick={() => setActiveItemIndex(itemIndex)}
+                           >
+                             <div className="flex justify-between items-center">
+                               <span className="text-sm font-medium truncate">
+                                 {item.name || `Item ${itemIndex + 1}`}
+                               </span>
+                               <Button
+                                 size="sm"
+                                 variant="ghost"
+                                 className="h-6 w-6 p-0"
+                                 onClick={(e) => {
+                                   e.stopPropagation();
+                                   removeItem(activeTopicIndex, itemIndex);
+                                 }}
+                               >
+                                 <Trash2 className="h-3 w-3" />
+                               </Button>
+                             </div>
+                             {item.details?.length > 0 && (
+                               <span className="text-xs opacity-70">
+                                 {item.details.length} detalhe{item.details.length !== 1 ? 's' : ''}
+                               </span>
+                             )}
+                           </div>
+                         ))}
+                       </div>
+                     </div>
+                   ) : (
+                     <div className="p-4 text-center text-muted-foreground">
+                       Selecione um tópico para ver os itens
+                     </div>
+                   )}
+                 </ScrollArea>
+               </div>
 
-                          {/* Items */}
-                          <div className="space-y-3">
-                            <h3 className="text-xs font-medium text-muted-foreground">Itens ({topic.items?.length || 0})</h3>
-                            {topic.items?.map((item, itemIndex) => (
-                              <Card key={itemIndex} className="border-l-4 border-l-blue-300">
-                                <div 
-                                  className={`flex items-center justify-between p-2 cursor-pointer border-b ${
-                                    expandedItems.includes(`${topicIndex}-${itemIndex}`) ? 'bg-blue-50/50' : 'hover:bg-gray-50'
-                                  }`}
-                                  onClick={() => toggleItem(topicIndex, itemIndex)}
-                                >
-                                  <div className="flex items-center gap-2 text-sm">
-                                    {expandedItems.includes(`${topicIndex}-${itemIndex}`) ? 
-                                      <ChevronDown className="h-3 w-3" /> : 
-                                      <ChevronRight className="h-3 w-3" />}
-                                    Item {itemIndex + 1}: {item.name}
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        removeItem(topicIndex, itemIndex);
-                                      }}
-                                    >
-                                      <Trash2 className="h-3 w-3 text-destructive" />
-                                    </Button>
-                                    <Button 
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        addDetail(topicIndex, itemIndex);
-                                      }} 
-                                      size="sm"
-                                      variant="ghost"
-                                    >
-                                      <Plus className="mr-1 h-3 w-3" />
-                                      Detalhe
-                                    </Button>
-                                  </div>
-                                </div>
-                                
-                                {expandedItems.includes(`${topicIndex}-${itemIndex}`) && (
-                                  <CardContent className="space-y-3 py-3">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                      <div>
-                                        <Label className="text-xs">Nome do Item</Label>
-                                        <Input
-                                          value={item.name}
-                                          onChange={e => updateItemField(topicIndex, itemIndex, 'name', e.target.value)}
-                                          className="h-7 text-sm mt-1"
-                                        />
-                                      </div>
-                                      <div>
-                                        <Label className="text-xs">Descrição</Label>
-                                        <Input
-                                          value={item.description || ''}
-                                          onChange={e => updateItemField(topicIndex, itemIndex, 'description', e.target.value)}
-                                          className="h-7 text-sm mt-1"
-                                        />
-                                      </div>
-                                    </div>
-                                    <div>
-                                      <Label className="text-xs">Observação do Item</Label>
-                                      <Textarea
-                                        value={item.observation || ''}
-                                        onChange={e => updateItemField(topicIndex, itemIndex, 'observation', e.target.value)}
-                                        rows={2}
-                                        className="text-sm mt-1"
-                                      />
-                                    </div>
+               {/* Details Column */}
+               <div className="col-span-6 border rounded-lg">
+                 <div className="p-3 border-b flex justify-between items-center">
+                   <div className="flex items-center gap-2">
+                     {currentItem && (
+                       <>
+                         <span className="text-sm text-muted-foreground">Tópico {activeTopicIndex + 1}</span>
+                         <ChevronRight className="h-3 w-3" />
+                         <span className="text-sm text-muted-foreground">Item {activeItemIndex + 1}</span>
+                         <ChevronRight className="h-3 w-3" />
+                       </>
+                     )}
+                     <span className="font-medium">Detalhes ({currentItem?.details?.length || 0})</span>
+                   </div>
+                   {currentItem && (
+                     <Button size="sm" onClick={() => addDetail(activeTopicIndex, activeItemIndex)}>
+                       <Plus className="h-3 w-3" />
+                     </Button>
+                   )}
+                 </div>
+                 <ScrollArea className="h-[calc(100vh-280px)]">
+                   {currentItem ? (
+                     <div className="p-4 space-y-4">
+                       {/* Item fields */}
+                       <div className="space-y-3 p-3 bg-accent/20 rounded">
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                           <div>
+                             <Label className="text-xs">Nome do Item</Label>
+                             <Input
+                               value={currentItem.name}
+                               onChange={e => updateItemField(activeTopicIndex, activeItemIndex, 'name', e.target.value)}
+                               className="h-7 text-sm mt-1"
+                             />
+                           </div>
+                           <div>
+                             <Label className="text-xs">Descrição</Label>
+                             <Input
+                               value={currentItem.description || ''}
+                               onChange={e => updateItemField(activeTopicIndex, activeItemIndex, 'description', e.target.value)}
+                               className="h-7 text-sm mt-1"
+                             />
+                           </div>
+                         </div>
+                         <div>
+                           <Label className="text-xs">Observação do Item</Label>
+                           <Textarea
+                             value={currentItem.observation || ''}
+                             onChange={e => updateItemField(activeTopicIndex, activeItemIndex, 'observation', e.target.value)}
+                             rows={2}
+                             className="text-sm mt-1"
+                           />
+                         </div>
+                       </div>
 
-                                    {/* Details */}
-                                    <div className="space-y-3">
-                                      <h4 className="text-xs font-medium text-muted-foreground">Detalhes ({item.details?.length || 0})</h4>
-                                      {item.details?.map((detail, detailIndex) => (
-                                        <DetailEditor
-                                          key={detailIndex}
-                                          detail={detail}
-                                          detailIndex={detailIndex}
-                                          topicIndex={topicIndex}
-                                          itemIndex={itemIndex}
-                                          onUpdateDetail={updateDetailField}
-                                          onRemoveDetail={removeDetail}
-                                          onAddNonConformity={addNonConformity}
-                                          onRemoveNonConformity={removeNonConformity}
-                                          onUpdateNonConformity={updateNonConformity}
-                                          onUploadMedia={uploadMedia}
-                                          onRemoveMedia={removeMedia}
-                                          onMoveMedia={openMoveDialog}
-                                          onViewMedia={openMediaViewer}
-                                          onMoveMediaDrop={handleMoveMediaDrop}
-                                        />
-                                      ))}
-                                    </div>
-                                  </CardContent>
-                                )}
-                              </Card>
-                            ))}
-                          </div>
-                        </CardContent>
-                      )}
-                    </Card>
-                  ))}
-                </div>
-              </ScrollArea>
-            </TabsContent>
-          </Tabs>
-        </div>
-        
-        {/* Media Viewer Dialog*/}
-        {viewerOpen && selectedMedia && (
-        <Dialog open={viewerOpen} onOpenChange={() => setViewerOpen(false)} className="max-w-4xl">
-            <DialogContent className="max-w-4xl max-h-[90vh] p-0 flex flex-col">
-            <DialogHeader className="p-3 border-b flex items-center justify-between">
-                <DialogTitle className="text-sm font-medium">Visualizador de Mídia</DialogTitle>
-                <div className="flex gap-1">
-                <Button variant="outline" size="sm" className="h-7" onClick={() => setShowMoveDialog(true)}>
-                    <Move className="mr-1 h-3 w-3" />
-                    <span className="text-xs">Mover</span>
-                </Button>
-                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setViewerOpen(false)}>
-                    <X className="h-3 w-3" />
-                </Button>
-                </div>
-            </DialogHeader>
-            
-            <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-gray-50">
-                <div 
-                ref={mediaRef}
-                className="max-h-full"
-                >
-                {selectedMedia.type === "image" ? (
-                    <img
-                    src={selectedMedia.url}
-                    alt="Media"
-                    className="max-h-[70vh] object-contain"
-                    />
-                ) : (
-                    <video
-                    src={selectedMedia.url}
-                    controls
-                    className="max-h-[70vh]"
-                    />
-                )}
-                </div>
-            </div>
-            </DialogContent>
-        </Dialog>
-        )}
-        
-        {/* Move Media Dialog */}
-        {showMoveDialog && selectedMedia && (
-          <MediaMoveDialog
-            open={showMoveDialog}
-            onClose={() => setShowMoveDialog(false)}
-            inspection={inspection}
-            selectedMediaContext={selectedMediaContext}
-            onMove={handleMoveMediaDrop}
-          />
-        )}
+                       {/* Details */}
+                       <div className="space-y-3">
+                         {currentItem.details?.map((detail, detailIndex) => (
+                           <DetailEditor
+                             key={detailIndex}
+                             detail={detail}
+                             detailIndex={detailIndex}
+                             topicIndex={activeTopicIndex}
+                             itemIndex={activeItemIndex}
+                             onUpdateDetail={updateDetailField}
+                             onRemoveDetail={removeDetail}
+                             onAddNonConformity={addNonConformity}
+                             onRemoveNonConformity={removeNonConformity}
+                             onUpdateNonConformity={updateNonConformity}
+                             onUploadMedia={uploadMedia}
+                             onRemoveMedia={removeMedia}
+                             onMoveMedia={openMoveDialog}
+                             onViewMedia={openMediaViewer}
+                             onMoveMediaDrop={handleMoveMediaDrop}
+                           />
+                         ))}
+                       </div>
+                     </div>
+                   ) : (
+                     <div className="p-4 text-center text-muted-foreground">
+                       {currentTopic 
+                         ? "Selecione um item para ver os detalhes" 
+                         : "Selecione um tópico e um item para ver os detalhes"
+                       }
+                     </div>
+                   )}
+                 </ScrollArea>
+               </div>
+             </div>
+           </TabsContent>
+         </Tabs>
+       </div>
+       
+       {/* Media Viewer Dialog*/}
+       {viewerOpen && selectedMedia && (
+         <Dialog open={viewerOpen} onOpenChange={() => setViewerOpen(false)} className="max-w-4xl">
+           <DialogContent className="max-w-4xl max-h-[90vh] p-0 flex flex-col">
+             <DialogHeader className="p-3 border-b flex items-center justify-between">
+               <DialogTitle className="text-sm font-medium">Visualizador de Mídia</DialogTitle>
+               <div className="flex gap-1">
+                 <Button variant="outline" size="sm" className="h-7" onClick={() => setShowMoveDialog(true)}>
+                   <Plus className="mr-1 h-3 w-3" />
+                   <span className="text-xs">Mover</span>
+                 </Button>
+                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setViewerOpen(false)}>
+                   <X className="h-3 w-3" />
+                 </Button>
+               </div>
+             </DialogHeader>
+             
+             <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-gray-50">
+               <div 
+                 ref={mediaRef}
+                 className="max-h-full"
+               >
+                 {selectedMedia.type === "image" ? (
+                   <img
+                     src={selectedMedia.url}
+                     alt="Media"
+                     className="max-h-[70vh] object-contain"
+                   />
+                 ) : (
+                   <video
+                     src={selectedMedia.url}
+                     controls
+                     className="max-h-[70vh]"
+                   />
+                 )}
+               </div>
+             </div>
+           </DialogContent>
+         </Dialog>
+       )}
+       
+       {/* Move Media Dialog */}
+       {showMoveDialog && selectedMedia && (
+         <MediaMoveDialog
+           open={showMoveDialog}
+           onClose={() => setShowMoveDialog(false)}
+           inspection={inspection}
+           selectedMediaContext={selectedMediaContext}
+           onMove={handleMoveMediaDrop}
+         />
+       )}
 
-        {/* Confirmation Dialog */}
-        <ConfirmExitDialog />
-      </div>
-    </DndProvider>
-  );
+       {/* Confirmation Dialog */}
+       <ConfirmExitDialog />
+     </div>
+   </DndProvider>
+ );
 }

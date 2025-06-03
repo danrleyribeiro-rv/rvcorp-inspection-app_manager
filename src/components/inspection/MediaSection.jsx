@@ -47,30 +47,36 @@ export default function MediaSection({
         </div>
       </div>
       
-      {media && media.length > 0 ? (
-        <div className="grid grid-cols-3 md:grid-cols-6 gap-1">
-          {media.map((mediaItem, mediaIndex) => (
-            <DraggableMedia
-              key={mediaIndex}
-              media={mediaItem}
-              topicIndex={topicIndex}
-              itemIndex={itemIndex}
-              detailIndex={detailIndex}
-              mediaIndex={mediaIndex}
-              onView={onView}
-              onRemove={onRemove}
-              onMove={onMove}
-            />
-          ))}
-        </div>
-      ) : (
-        <MediaDropzone
-          topicIndex={topicIndex}
-          itemIndex={itemIndex}
-          detailIndex={detailIndex}
-          onDrop={onMoveMediaDrop}
-        />
-      )}
+      {/* Always render drop zone as wrapper */}
+      <MediaDropzone
+        topicIndex={topicIndex}
+        itemIndex={itemIndex}
+        detailIndex={detailIndex}
+        onDrop={onMoveMediaDrop}
+        hasMedia={media && media.length > 0}
+      >
+        {media && media.length > 0 ? (
+          <div className="grid grid-cols-3 md:grid-cols-6 gap-1">
+            {media.map((mediaItem, mediaIndex) => (
+              <DraggableMedia
+                key={mediaIndex}
+                media={mediaItem}
+                topicIndex={topicIndex}
+                itemIndex={itemIndex}
+                detailIndex={detailIndex}
+                mediaIndex={mediaIndex}
+                onView={onView}
+                onRemove={onRemove}
+                onMove={onMove}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="border-2 border-dashed rounded-md p-2 min-h-[60px] flex items-center justify-center text-xs text-muted-foreground">
+            Arraste uma mídia para cá ou clique no botão acima
+          </div>
+        )}
+      </MediaDropzone>
     </div>
   );
 }

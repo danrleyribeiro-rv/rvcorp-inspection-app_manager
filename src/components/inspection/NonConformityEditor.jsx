@@ -49,7 +49,7 @@ export default function NonConformityEditor({
     <div className="space-y-2 mt-1">
       {nonConformities && nonConformities.length > 0 ? (
         <>
-          <Label className="text-xs font-medium">
+          <Label className="text-xs font-bold">
             Não Conformidades ({nonConformities.length})
           </Label>
           <div className="space-y-2">
@@ -79,7 +79,7 @@ export default function NonConformityEditor({
                 </CardHeader>
                 <CardContent className="space-y-2 py-2">
                   <div>
-                    <Label className="text-xs">Descrição</Label>
+                    <Label className="text-xs font-bold">Descrição</Label>
                     <Textarea
                       value={nc.description || ''}
                       onChange={e => onUpdateNC(topicIndex, itemIndex, detailIndex, ncIndex, 'description', e.target.value)}
@@ -90,7 +90,7 @@ export default function NonConformityEditor({
                   
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <Label className="text-xs">Severidade</Label>
+                      <Label className="text-xs font-bold">Severidade</Label>
                       <Select
                         value={nc.severity}
                         onValueChange={value => onUpdateNC(topicIndex, itemIndex, detailIndex, ncIndex, 'severity', value)}
@@ -107,7 +107,7 @@ export default function NonConformityEditor({
                       </Select>
                     </div>
                     <div>
-                      <Label className="text-xs">Status</Label>
+                      <Label className="text-xs font-bold">Status</Label>
                       <Select
                         value={nc.status}
                         onValueChange={value => onUpdateNC(topicIndex, itemIndex, detailIndex, ncIndex, 'status', value)}
@@ -125,7 +125,7 @@ export default function NonConformityEditor({
                   </div>
                   
                   <div>
-                    <Label className="text-xs">Ação Corretiva</Label>
+                    <Label className="text-xs font-bold">Ação Corretiva</Label>
                     <Textarea
                       value={nc.corrective_action || ''}
                       onChange={e => onUpdateNC(topicIndex, itemIndex, detailIndex, ncIndex, 'corrective_action', e.target.value)}
@@ -135,7 +135,7 @@ export default function NonConformityEditor({
                   </div>
                   
                   <div>
-                    <Label className="text-xs">Prazo</Label>
+                    <Label className="text-xs font-bold">Prazo</Label>
                     <Input
                       type="date"
                       value={nc.deadline ? nc.deadline.split('T')[0] : ''}
@@ -154,7 +154,7 @@ export default function NonConformityEditor({
                   {/* NC Media Section */}
                   <div>
                     <div className="flex items-center justify-between">
-                      <Label className="text-xs">Mídia da NC ({nc.media?.length || 0})</Label>
+                      <Label className="text-xs font-bold">Mídia da NC ({nc.media?.length || 0})</Label>
                       <div>
                         <input
                           type="file"
@@ -181,33 +181,39 @@ export default function NonConformityEditor({
                         </Button>
                       </div>
                     </div>
-                    {nc.media && nc.media.length > 0 ? (
-                      <div className="grid grid-cols-3 md:grid-cols-6 gap-1 mt-1">
-                        {nc.media.map((media, mediaIndex) => (
-                          <DraggableMedia
-                            key={mediaIndex}
-                            media={media}
-                            topicIndex={topicIndex}
-                            itemIndex={itemIndex}
-                            detailIndex={detailIndex}
-                            mediaIndex={mediaIndex}
-                            isNC={true}
-                            ncIndex={ncIndex}
-                            onView={onViewMedia}
-                            onRemove={onRemoveMedia}
-                            onMove={onMoveMedia}
-                          />
-                        ))}
-                      </div>
-                    ) : (
-                      <MediaDropzone
-                        topicIndex={topicIndex}
-                        itemIndex={itemIndex}
-                        detailIndex={detailIndex}
-                        ncIndex={ncIndex}
-                        onDrop={onMoveMediaDrop}
-                      />
-                    )}
+                    
+                    <MediaDropzone
+                      topicIndex={topicIndex}
+                      itemIndex={itemIndex}
+                      detailIndex={detailIndex}
+                      ncIndex={ncIndex}
+                      onDrop={onMoveMediaDrop}
+                      hasMedia={nc.media && nc.media.length > 0}
+                    >
+                      {nc.media && nc.media.length > 0 ? (
+                        <div className="grid grid-cols-3 md:grid-cols-6 gap-1 mt-1">
+                          {nc.media.map((media, mediaIndex) => (
+                            <DraggableMedia
+                              key={mediaIndex}
+                              media={media}
+                              topicIndex={topicIndex}
+                              itemIndex={itemIndex}
+                              detailIndex={detailIndex}
+                              mediaIndex={mediaIndex}
+                              isNC={true}
+                              ncIndex={ncIndex}
+                              onView={onViewMedia}
+                              onRemove={onRemoveMedia}
+                              onMove={onMoveMedia}
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="border-2 border-dashed rounded-md p-2 min-h-[60px] flex items-center justify-center text-xs text-muted-foreground mt-1">
+                          Arraste uma mídia para cá ou clique no botão acima
+                        </div>
+                      )}
+                    </MediaDropzone>
                   </div>
                 </CardContent>
               </Card>

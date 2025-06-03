@@ -8,7 +8,9 @@ export default function MediaDropzone({
   itemIndex, 
   detailIndex, 
   ncIndex = null, 
-  onDrop 
+  onDrop,
+  hasMedia = false,
+  children 
 }) {
   const [{ isOver }, drop] = useDrop({
     accept: 'MEDIA_ITEM',
@@ -28,11 +30,17 @@ export default function MediaDropzone({
   return (
     <div 
       ref={drop} 
-      className={`border-2 border-dashed rounded-md p-1 min-h-[60px] flex items-center justify-center ${
-        isOver ? 'border-primary bg-primary/10' : 'border-gray-200'
+      className={`relative ${
+        isOver ? 'ring-2 ring-primary ring-offset-2 rounded-md' : ''
       }`}
     >
-      <p className="text-xs text-muted-foreground">Arraste uma mídia para cá</p>
+      {children}
+      {/* Overlay when dragging */}
+      {isOver && (
+        <div className="absolute inset-0 bg-primary/10 border-2 border-dashed border-primary rounded-md flex items-center justify-center z-10">
+          <p className="text-sm font-medium text-primary">Solte aqui</p>
+        </div>
+      )}
     </div>
   );
 }
