@@ -68,37 +68,63 @@ export default function ViewProjectDialog({ project, open, onClose }) {
     }
   }
 
-  const fetchInspections = async () => {
-    try {
-      if (!project.id) return;
+const fetchInspections = async () => {
+  try {
+    if (!project.id) return;
+    
+    const inspectionsQuery = query(
+      collection(db, 'inspections'),
+      where('project_id', '==', project.id),
+      where('deleted_at', '==', null)
+    );
+    
+    const inspectionsSnapshot = await getDocs(inspectionsQuery);
+    
+    const inspectionsList = inspectionsSnapshot.docs.map(doc => {
+      const data = doc.data();
       
-      const inspectionsQuery = query(
-        collection(db, 'inspections'),
-        where('project_id', '==', project.id),
-        where('deleted_at', '==', null)
-      );
+      // Função helper para converter timestamps de forma segura
+      const safeTimestampToISO = (timestamp) => {
+        if (!timestamp) return null;
+        
+        // Se já é uma string, retorna
+        if (typeof timestamp === 'string') return timestamp;
+        
+        // Se tem método toDate (Firestore Timestamp)
+        if (timestamp && typeof timestamp.toDate === 'function') {
+          return timestamp.toDate().toISOString();
+        }
+        
+        // Se é um objeto Date
+        if (timestamp instanceof Date) {
+          return timestamp.toISOString();
+        }
+        
+        // Se tem propriedades seconds/nanoseconds (Timestamp serializado)
+        if (timestamp && typeof timestamp.seconds === 'number') {
+          return new Date(timestamp.seconds * 1000).toISOString();
+        }
+        
+        return null;
+      };
       
-      const inspectionsSnapshot = await getDocs(inspectionsQuery);
-      
-      const inspectionsList = inspectionsSnapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          ...data,
-          // Convert Firebase timestamps to ISO strings
-          scheduled_date: data.scheduled_date ? data.scheduled_date.toDate().toISOString() : null,
-          created_at: data.created_at ? data.created_at.toDate().toISOString() : null,
-          updated_at: data.updated_at ? data.updated_at.toDate().toISOString() : null
-        };
-      });
-      
-      setInspections(inspectionsList);
-    } catch (error) {
-      console.error("Error fetching inspections:", error);
-    } finally {
-      setLoading(false);
-    }
+      return {
+        id: doc.id,
+        ...data,
+        // Convert Firebase timestamps to ISO strings safely
+        scheduled_date: safeTimestampToISO(data.scheduled_date),
+        created_at: safeTimestampToISO(data.created_at),
+        updated_at: safeTimestampToISO(data.updated_at)
+      };
+    });
+    
+    setInspections(inspectionsList);
+  } catch (error) {
+    console.error("Error fetching inspections:", error);
+  } finally {
+    setLoading(false);
   }
+};
 
   const formatCurrency = (value) => {
     return new Intl.NumberFormat('pt-BR', {

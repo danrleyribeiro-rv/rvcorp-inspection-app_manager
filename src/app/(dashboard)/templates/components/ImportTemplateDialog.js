@@ -26,19 +26,22 @@ export default function ImportTemplateDialog({ open, onClose, onSuccess }) {
         if (file.name.endsWith(".json")) {
           const data = JSON.parse(text);
           
+          // Se é um array (múltiplos templates), processa apenas o primeiro
+          const templateData = Array.isArray(data) ? data[0] : data;
+          
           // Validação básica do JSON
-          if (!data.title) {
-            throw new Error("O JSON deve ter uma propriedade 'title'");
+          if (!templateData || !templateData.title) {
+            throw new Error("O template deve ter uma propriedade 'title'");
           }
           
           // Garantir que todos os campos obrigatórios estejam presentes
           const validatedData = {
-            title: data.title,
-            description: data.description || "",
-            template_price: typeof data.template_price === 'number' ? data.template_price : 0,
-            icon: data.icon || null,
-            icon_color: data.icon_color || null,
-            topics: Array.isArray(data.topics) ? data.topics.map(topic => ({
+            title: templateData.title,
+            description: templateData.description || "",
+            template_price: typeof templateData.template_price === 'number' ? templateData.template_price : 0,
+            icon: templateData.icon || null,
+            icon_color: templateData.icon_color || templateData.iconColor || null,
+            topics: Array.isArray(templateData.topics) ? templateData.topics.map(topic => ({
               name: topic.name || "",
               description: topic.description || "",
               items: Array.isArray(topic.items) ? topic.items.map(item => ({
@@ -50,6 +53,15 @@ export default function ImportTemplateDialog({ open, onClose, onSuccess }) {
           };
           
           setPreview(validatedData);
+          
+          // Se é um array com múltiplos templates, avisa o usuário
+          if (Array.isArray(data) && data.length > 1) {
+            toast({
+              title: "Múltiplos templates detectados",
+              description: `Arquivo contém ${data.length} templates. Apenas o primeiro será importado.`,
+              variant: "default"
+            });
+          }
         } else {
           toast({
             title: "Formato não suportado",
