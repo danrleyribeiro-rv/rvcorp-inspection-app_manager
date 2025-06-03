@@ -155,12 +155,12 @@ export default function InspectionListItem({ inspection, onEdit, onView, onDelet
           }
           <div className="flex-1">
             <div className="flex items-center gap-3 mb-1">
-              <h3 className="font-medium truncate">{inspection.title}</h3>
               {inspection.cod && (
                 <span className="font-mono text-xs bg-green-100 px-2 py-1 rounded">
                   {inspection.cod}
                 </span>
               )}
+              <h3 className="font-medium truncate">{inspection.title}</h3>
             </div>
             <div className="flex flex-wrap items-center gap-x-4 mt-1 text-sm text-muted-foreground">
               {scheduledDateFormatted && (

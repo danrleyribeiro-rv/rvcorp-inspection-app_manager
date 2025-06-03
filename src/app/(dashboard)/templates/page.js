@@ -6,7 +6,7 @@ import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Upload, Download, Search } from "lucide-react";
+import { Plus, Upload, Download, Search, Edit } from "lucide-react"; // Keep Edit if used, or remove
 import {
   Table,
   TableBody,
@@ -26,8 +26,8 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { parseCode } from "@/utils/codeGenerator";
+import { useRouter } from "next/navigation"; // Added for navigation
 import TemplateCreationDialog from "./components/TemplateCreationDialog";
-import TemplateEditDialog from "./components/TemplateEditDialog";
 import ImportTemplateDialog from "./components/ImportTemplateDialog";
 import ExportTemplateDialog from "./components/ExportTemplateDialog";
 import DeleteTemplateDialog from "./components/DeleteTemplateDialog";
@@ -45,7 +45,6 @@ const iconComponents = {
 export default function TemplatesPage() {
   const [templates, setTemplates] = useState([]);
   const [filteredTemplates, setFilteredTemplates] = useState([]);
-  const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [templateToDelete, setTemplateToDelete] = useState(null);
   const [showImport, setShowImport] = useState(false);
   const [showExport, setShowExport] = useState(false);
@@ -53,6 +52,7 @@ export default function TemplatesPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
+  const router = useRouter(); // Initialize router
 
   useEffect(() => {
     fetchTemplates();
@@ -132,21 +132,25 @@ export default function TemplatesPage() {
     return { topicsCount, itemsCount, detailsCount };
   };
 
+  const handleEditTemplate = (template) => {
+    router.push(`/templates/${template.id}/editor`);
+  };
+
   return (
-    <div className="container p-6">
-      <div className="flex justify-between items-center mb-6">
+    <div className="container p-6 mx-auto">
+      <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-6 gap-4">
         <h1 className="text-3xl font-bold">Templates</h1>
-        <div className="flex gap-4">
-          <Button onClick={() => setShowCreate(true)}>
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
+          <Button onClick={() => setShowCreate(true)} className="w-full sm:w-auto">
             <Plus className="mr-2 h-4 w-4" />
             Novo Template
           </Button>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setShowImport(true)}>
+            <Button variant="outline" onClick={() => setShowImport(true)} className="flex-1 sm:flex-none">
               <Upload className="mr-2 h-4 w-4" />
               Importar
             </Button>
-            <Button variant="outline" onClick={() => setShowExport(true)}>
+            <Button variant="outline" onClick={() => setShowExport(true)} className="flex-1 sm:flex-none">
               <Download className="mr-2 h-4 w-4" />
               Exportar
             </Button>
@@ -175,11 +179,11 @@ export default function TemplatesPage() {
         <div className="text-center py-12 text-muted-foreground">
           {templates.length === 0 
             ? "Nenhum template encontrado. Crie um novo template para começar."
-            : "Nenhum template corresponde aos filtros aplicados."
+            : "Nenhum template corresponde à sua busca."
           }
         </div>
       ) : (
-        <div className="rounded-md border">
+        <div className="rounded-md border overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -205,33 +209,31 @@ export default function TemplatesPage() {
                     </TableCell>
                     <TableCell>
                       {template.cod ? (
-                        <span className="font-mono text-sm bg-blue-100 px-2 py-1 rounded">
+                        <span className="font-mono text-xs sm:text-sm bg-blue-100 text-blue-800 px-2 py-1 rounded">
                           {template.cod}
                         </span>
                       ) : (
                         <span className="text-muted-foreground">N/A</span>
                       )}
                     </TableCell>
-                    <TableCell className="font-medium">{template.title}</TableCell>
-                    <TableCell className="max-w-xs truncate">
+                    <TableCell className="font-medium max-w-[150px] sm:max-w-xs truncate">{template.title}</TableCell>
+                    <TableCell className="max-w-[150px] sm:max-w-xs truncate text-sm text-muted-foreground">
                       {template.description || 'Sem descrição'}
                     </TableCell>
                     <TableCell>
-                      <div className="text-sm space-y-1">
-                        <div className="flex items-center gap-4">
-                          <span className="text-muted-foreground">
-                            <span className="font-medium">{topicsCount}</span> tópico{topicsCount !== 1 ? 's' : ''}
-                          </span>
-                          <span className="text-muted-foreground">
-                            <span className="font-medium">{itemsCount}</span> ite{itemsCount !== 1 ? 'ns' : 'm'}
-                          </span>
-                          <span className="text-muted-foreground">
-                            <span className="font-medium">{detailsCount}</span> detalhe{detailsCount !== 1 ? 's' : ''}
-                          </span>
+                      <div className="text-xs sm:text-sm space-y-0.5">
+                        <div>
+                          <span className="font-medium text-foreground">{topicsCount}</span> Tópico{topicsCount !== 1 ? 's' : ''}
+                        </div>
+                        <div>
+                          <span className="font-medium text-foreground">{itemsCount}</span> Ite{itemsCount !== 1 ? 'ns' : 'm'}
+                        </div>
+                        <div>
+                          <span className="font-medium text-foreground">{detailsCount}</span> Detalhe{detailsCount !== 1 ? 's' : ''}
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="font-medium">
                       {formatCurrency(template.template_price)}
                     </TableCell>
                     <TableCell className="text-right">
@@ -239,8 +241,9 @@ export default function TemplatesPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => setSelectedTemplate(template)}
+                          onClick={() => handleEditTemplate(template)} // Updated action
                         >
+                          <Edit className="h-4 w-4 mr-1 sm:mr-2" />
                           Editar
                         </Button>
                         <Button
@@ -261,6 +264,8 @@ export default function TemplatesPage() {
         </div>
       )}
 
+      {/* Statistics cards have been removed */}
+
       {showCreate && (
         <TemplateCreationDialog 
           onClose={() => setShowCreate(false)} 
@@ -269,14 +274,7 @@ export default function TemplatesPage() {
         />
       )}
 
-      {selectedTemplate && (
-        <TemplateEditDialog
-          template={selectedTemplate}
-          onClose={() => setSelectedTemplate(null)}
-          open={!!selectedTemplate}
-          onSuccess={fetchTemplates}
-        />
-      )}
+      {/* TemplateEditDialog is no longer used here */}
 
       {templateToDelete && (
         <DeleteTemplateDialog
@@ -299,7 +297,7 @@ export default function TemplatesPage() {
         <ExportTemplateDialog
           onClose={() => setShowExport(false)}
           open={showExport}
-          templates={filteredTemplates}
+          templates={filteredTemplates} // You might want to pass all templates or let ExportDialog fetch them
         />
       )}
     </div>

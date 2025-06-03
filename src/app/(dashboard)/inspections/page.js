@@ -4,7 +4,17 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs, orderBy, limit, startAfter } from "firebase/firestore";
+import { 
+  collection, 
+  query, 
+  where, 
+  getDocs, 
+  orderBy, 
+  limit, 
+  startAfter,
+  doc, // Added for fetching individual documents
+  getDoc // Added for fetching individual documents
+} from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetTrigger } from "@/components/ui/sheet";
@@ -45,41 +55,46 @@ export default function InspectionsPage() {
   const { toast } = useToast();
   const router = useRouter();
   const observerRef = useRef();
-  const listEndRef = useRef(null);
+  const listEndRef = useRef(null); // This ref can be removed if not strictly used by observer anymore
 
   useEffect(() => {
     if (user) {
       resetAndFetchInspections();
     }
-  }, [user]);
+  }, [user]); // Dependency on user
 
   useEffect(() => {
-    if (search !== "" || JSON.stringify(filterState) !== JSON.stringify({
-      status: "all",
-      project: "all",
-      inspector: "all",
-      dateRange: null,
-      state: "all",
-      city: "all"
-    })) {
+    // Determine if any filter is active besides default state
+    const defaultFilterState = {
+      status: "all", project: "all", inspector: "all",
+      dateRange: null, state: "all", city: "all"
+    };
+    const filtersApplied = search.trim() !== "" || JSON.stringify(filterState) !== JSON.stringify(defaultFilterState);
+
+    if (filtersApplied) {
       setIsFiltering(true);
       filterInspections();
     } else {
       setIsFiltering(false);
-      setFilteredInspections(inspections);
+      setFilteredInspections(inspections); // If no filters, show all fetched inspections
     }
   }, [inspections, filterState, search]);
 
-  // Reset pagination and fetch first batch
+
   const resetAndFetchInspections = async () => {
     setInspections([]);
+    setFilteredInspections([]); // Also reset filtered
     setLastVisible(null);
     setHasMore(true);
     setLoading(true);
-    await fetchInspections(true);
+    await fetchInspections(true); // Pass true for first batch
   };
 
   const fetchInspections = async (isFirstBatch = false) => {
+    if (!user) { // Ensure user is available
+        setLoading(false);
+        return;
+    }
     if (!isFirstBatch && !hasMore) return;
     
     try {
@@ -99,22 +114,25 @@ export default function InspectionsPage() {
       const projectsSnapshot = await getDocs(projectsQuery);
       const projectIds = projectsSnapshot.docs.map(doc => doc.id);
       
-      if (projectIds.length === 0) {
+      // If no projects, and it's the first batch, there are no inspections to fetch for this manager.
+      if (projectIds.length === 0 && isFirstBatch) {
         setInspections([]);
         setFilteredInspections([]);
+        setHasMore(false);
         setLoading(false);
         setLoadingMore(false);
-        setHasMore(false);
         return;
       }
       
       // Now, get inspections with pagination
       let inspectionsQuery;
+      // Firestore 'in' queries are limited. If projectIds is empty, provide a non-matching placeholder.
+      const projectIdsForQuery = projectIds.length > 0 ? projectIds : ['non-existent-project-id'];
       
       if (isFirstBatch) {
         inspectionsQuery = query(
           collection(db, 'inspections'),
-          where('project_id', 'in', projectIds.slice(0, 10)), // Firestore limits 'in' to 10 values
+          where('project_id', 'in', projectIdsForQuery.slice(0, 10)), // Max 10 for 'in'
           where('deleted_at', '==', null),
           orderBy('created_at', 'desc'),
           limit(INSPECTIONS_PER_PAGE)
@@ -122,7 +140,7 @@ export default function InspectionsPage() {
       } else {
         inspectionsQuery = query(
           collection(db, 'inspections'),
-          where('project_id', 'in', projectIds.slice(0, 10)),
+          where('project_id', 'in', projectIdsForQuery.slice(0, 10)), // Max 10 for 'in'
           where('deleted_at', '==', null),
           orderBy('created_at', 'desc'),
           startAfter(lastVisible),
@@ -132,61 +150,34 @@ export default function InspectionsPage() {
       
       const inspectionsSnapshot = await getDocs(inspectionsQuery);
       
-      // Update lastVisible for pagination
       const lastDoc = inspectionsSnapshot.docs[inspectionsSnapshot.docs.length - 1];
       setLastVisible(lastDoc);
-      
-      // Check if there are more results
       setHasMore(inspectionsSnapshot.docs.length === INSPECTIONS_PER_PAGE);
       
-      // Process inspections with related data
-      const inspectionsData = [];
-      
-      for (const doc of inspectionsSnapshot.docs) {
-        const data = doc.data();
+      const inspectionsDataPromises = inspectionsSnapshot.docs.map(async (inspectionDoc) => {
+        const data = inspectionDoc.data();
         const inspection = {
-          id: doc.id,
+          id: inspectionDoc.id,
           ...data,
-          // Convert Firebase timestamps to ISO strings for easier handling
-          created_at: data.created_at && typeof data.created_at.toDate === 'function' 
-            ? data.created_at.toDate().toISOString() 
-            : data.created_at,
-          updated_at: data.updated_at && typeof data.updated_at.toDate === 'function'
-            ? data.updated_at.toDate().toISOString()
-            : data.updated_at,
-          scheduled_date: data.scheduled_date && typeof data.scheduled_date.toDate === 'function'
-            ? data.scheduled_date.toDate().toISOString()
-            : data.scheduled_date
+          created_at: data.created_at?.toDate ? data.created_at.toDate().toISOString() : data.created_at,
+          updated_at: data.updated_at?.toDate ? data.updated_at.toDate().toISOString() : data.updated_at,
+          scheduled_date: data.scheduled_date?.toDate ? data.scheduled_date.toDate().toISOString() : data.scheduled_date
         };
         
         // Get project data
         if (inspection.project_id) {
-          const project = projectsSnapshot.docs.find(doc => doc.id === inspection.project_id);
+          const project = projectsSnapshot.docs.find(pDoc => pDoc.id === inspection.project_id);
           if (project) {
-            inspection.projects = {
-              id: project.id,
-              ...project.data()
-            };
-            
+            inspection.projects = { id: project.id, ...project.data() };
             // Get client data if available
             if (inspection.projects.client_id) {
               try {
-                const clientSnapshot = await getDocs(
-                  query(
-                    collection(db, 'clients'),
-                    where('__name__', '==', inspection.projects.client_id)
-                  )
-                );
-                
-                if (!clientSnapshot.empty) {
-                  inspection.projects.clients = {
-                    id: clientSnapshot.docs[0].id,
-                    ...clientSnapshot.docs[0].data()
-                  };
+                const clientRef = doc(db, 'clients', inspection.projects.client_id);
+                const clientSnap = await getDoc(clientRef);
+                if (clientSnap.exists()) {
+                  inspection.projects.clients = { id: clientSnap.id, ...clientSnap.data() };
                 }
-              } catch (err) {
-                console.error("Error fetching client:", err);
-              }
+              } catch (err) { console.error("Error fetching client:", err); }
             }
           }
         }
@@ -194,61 +185,64 @@ export default function InspectionsPage() {
         // Get inspector data
         if (inspection.inspector_id) {
           try {
-            const inspectorSnapshot = await getDocs(
-              query(
-                collection(db, 'inspectors'),
-                where('__name__', '==', inspection.inspector_id)
-              )
-            );
-            
-            if (!inspectorSnapshot.empty) {
-              inspection.inspectors = {
-                id: inspectorSnapshot.docs[0].id,
-                ...inspectorSnapshot.docs[0].data()
-              };
+            const inspectorRef = doc(db, 'inspectors', inspection.inspector_id);
+            const inspectorSnap = await getDoc(inspectorRef);
+            if (inspectorSnap.exists()) {
+              inspection.inspectors = { id: inspectorSnap.id, ...inspectorSnap.data() };
             }
-          } catch (err) {
-            console.error("Error fetching inspector:", err);
-          }
+          } catch (err) { console.error("Error fetching inspector:", err); }
+        }
+
+        // Fetch Template Data
+        if (inspection.template_id) {
+            try {
+              const templateRef = doc(db, 'templates', inspection.template_id);
+              const templateSnap = await getDoc(templateRef);
+              if (templateSnap.exists()) {
+                inspection.template_details = { id: templateSnap.id, ...templateSnap.data() };
+              } else {
+                inspection.template_details = null; 
+                console.warn(`Template with ID ${inspection.template_id} not found for inspection ${inspection.id}.`);
+              }
+            } catch (err) {
+              console.error(`Error fetching template details for inspection ${inspection.id}:`, err);
+              inspection.template_details = null;
+            }
         }
         
-        inspectionsData.push(inspection);
-      }
+        return inspection;
+      });
+
+      const resolvedInspectionsData = await Promise.all(inspectionsDataPromises);
       
-      // Update inspections state (append or replace)
       if (isFirstBatch) {
-        setInspections(inspectionsData);
+        setInspections(resolvedInspectionsData);
       } else {
-        setInspections(prevInspections => [...prevInspections, ...inspectionsData]);
+        setInspections(prevInspections => [...prevInspections, ...resolvedInspectionsData]);
       }
       
     } catch (error) {
       console.error("Error fetching inspections:", error);
-      toast({
-        title: "Erro ao buscar inspeções",
-        description: error.message,
-        variant: "destructive"
-      });
+      toast({ title: "Erro ao buscar inspeções", description: error.message, variant: "destructive" });
     } finally {
       setLoading(false);
       setLoadingMore(false);
     }
   };
 
-  // Intersection Observer for infinite scrolling
   const lastInspectionElementRef = useCallback(node => {
-    if (loading || loadingMore) return;
+    if (loading || loadingMore || isFiltering) return; // Don't trigger if filtering
     
     if (observerRef.current) observerRef.current.disconnect();
     
     observerRef.current = new IntersectionObserver(entries => {
-      if (entries[0].isIntersecting && hasMore && !isFiltering) {
-        fetchInspections();
+      if (entries[0].isIntersecting && hasMore) {
+        fetchInspections(); // Fetch next batch
       }
     });
     
     if (node) observerRef.current.observe(node);
-  }, [loading, loadingMore, hasMore, isFiltering]);
+  }, [loading, loadingMore, hasMore, isFiltering, fetchInspections]); // Added fetchInspections to dependencies
 
   const handleEditData = (inspection) => {
     setEditingInspection(inspection);
@@ -259,77 +253,67 @@ export default function InspectionsPage() {
   };
 
   const filterInspections = () => {
+    const lowerCaseSearch = search.toLowerCase();
     const filtered = inspections.filter(inspection => {
-      // Search filter - now includes topics and items
-      const matchesSearch = search === "" || (
-        inspection.title?.toLowerCase().includes(search.toLowerCase()) ||
-        inspection.projects?.title?.toLowerCase().includes(search.toLowerCase()) ||
-        inspection.inspectors?.name?.toLowerCase().includes(search.toLowerCase()) ||
-        inspection.projects?.clients?.name?.toLowerCase().includes(search.toLowerCase()) ||
-        inspection.observation?.toLowerCase().includes(search.toLowerCase()) ||
-        // Search in topics
+      const matchesSearch = search.trim() === "" || (
+        inspection.title?.toLowerCase().includes(lowerCaseSearch) ||
+        inspection.cod?.toLowerCase().includes(lowerCaseSearch) ||
+        inspection.projects?.title?.toLowerCase().includes(lowerCaseSearch) ||
+        inspection.inspectors?.name?.toLowerCase().includes(lowerCaseSearch) ||
+        inspection.projects?.clients?.name?.toLowerCase().includes(lowerCaseSearch) ||
+        inspection.observation?.toLowerCase().includes(lowerCaseSearch) ||
         (inspection.topics && inspection.topics.some(topic => 
-          topic.name?.toLowerCase().includes(search.toLowerCase()) ||
-          topic.description?.toLowerCase().includes(search.toLowerCase()) ||
-          // Search in items
+          topic.name?.toLowerCase().includes(lowerCaseSearch) ||
+          topic.description?.toLowerCase().includes(lowerCaseSearch) ||
           (topic.items && topic.items.some(item =>
-            item.name?.toLowerCase().includes(search.toLowerCase()) ||
-            item.description?.toLowerCase().includes(search.toLowerCase())
+            item.name?.toLowerCase().includes(lowerCaseSearch) ||
+            item.description?.toLowerCase().includes(lowerCaseSearch)
           ))
         ))
       );
 
-      // Status filter
       const matchesStatus = filterState.status === "all" || inspection.status === filterState.status;
-
-      // Project filter
       const matchesProject = filterState.project === "all" || inspection.project_id === filterState.project;
-
-      // Inspector filter
       const matchesInspector = filterState.inspector === "all" || inspection.inspector_id === filterState.inspector;
-
-      // State filter
       const matchesState = filterState.state === "all" || inspection.address?.state === filterState.state;
-
-      // City filter
       const matchesCity = filterState.city === "all" || inspection.address?.city === filterState.city;
 
-      // Date range filter
       let matchesDateRange = true;
       if (filterState.dateRange?.from && filterState.dateRange?.to && inspection.scheduled_date) {
         const inspectionDate = new Date(inspection.scheduled_date);
-        matchesDateRange =
-          inspectionDate >= filterState.dateRange.from &&
-          inspectionDate <= filterState.dateRange.to;
+        const fromDate = new Date(filterState.dateRange.from);
+        const toDate = new Date(filterState.dateRange.to);
+        // Set time to ensure full day coverage
+        fromDate.setHours(0, 0, 0, 0);
+        toDate.setHours(23, 59, 59, 999);
+        matchesDateRange = inspectionDate >= fromDate && inspectionDate <= toDate;
       }
-
       return matchesSearch && matchesStatus && matchesProject && matchesInspector && matchesState && matchesCity && matchesDateRange;
     });
-
     setFilteredInspections(filtered);
   };
 
   return (
-    <div className="container p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Inspeções</h1>
+    <div className="container p-4 md:p-6 mx-auto">
+      <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-6 gap-3">
+        <h1 className="text-2xl md:text-3xl font-bold">Inspeções</h1>
       </div>
 
-      <div className="flex gap-4 mb-6 items-center justify-between">
+      <div className="flex flex-col sm:flex-row gap-3 mb-6 items-center justify-between">
         <Input
-          placeholder="Buscar inspeções..."
+          placeholder="Buscar inspeções (título, cod, projeto, cliente...)"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="max-w-md"
+          className="max-w-full sm:max-w-md lg:max-w-lg"
         />
-        <div className="flex gap-4">
-          <Button onClick={() => setShowCreate(true)}>
+        <div className="flex gap-2 sm:gap-4 w-full sm:w-auto">
+          <Button onClick={() => setShowCreate(true)} className="flex-1 sm:flex-none">
             <Plus className="mr-2 h-4 w-4" />
             Nova Inspeção
           </Button>
           <Sheet>
             <SheetTrigger asChild>
-              <Button variant="outline">
+              <Button variant="outline" className="flex-1 sm:flex-none">
                 <Filter className="mr-2 h-4 w-4" />
                 Filtros
               </Button>
@@ -337,7 +321,7 @@ export default function InspectionsPage() {
             <FilterPanel
               filterState={filterState}
               onFilterChange={setFilterState}
-              inspections={inspections}
+              inspections={inspections} // Pass original inspections for filter options
             />
           </Sheet>
         </div>
@@ -345,19 +329,18 @@ export default function InspectionsPage() {
 
       {loading && inspections.length === 0 ? (
         <div className="flex justify-center items-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <Loader2 className="animate-spin h-8 w-8 text-primary" />
         </div>
       ) : filteredInspections.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           {inspections.length === 0 ?
             "Nenhuma inspeção encontrada. Crie uma nova inspeção para começar." :
-            "Nenhuma inspeção corresponde aos filtros aplicados."}
+            "Nenhuma inspeção corresponde aos filtros e busca aplicados."}
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-3">
           {filteredInspections.map((inspection, index) => {
-            // If this is the last item and we're not filtering, add ref for infinite scroll
-            if (index === filteredInspections.length - 1 && !isFiltering) {
+            if (index === filteredInspections.length - 1 && !isFiltering && hasMore) {
               return (
                 <div key={inspection.id} ref={lastInspectionElementRef}>
                   <InspectionListItem
@@ -383,29 +366,15 @@ export default function InspectionsPage() {
             }
           })}
           
-          {/* Loading indicator for more items */}
           {loadingMore && (
             <div className="flex justify-center py-4">
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
             </div>
           )}
           
-          {/* If we're filtering and there are more items in the original dataset, show a load more button */}
-          {isFiltering && !loading && inspections.length > filteredInspections.length && hasMore && (
-            <div className="flex justify-center py-4">
-              <Button 
-                variant="outline" 
-                onClick={() => fetchInspections()}
-                disabled={loadingMore}
-              >
-                {loadingMore ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                Carregar mais
-              </Button>
-            </div>
+          {!hasMore && !loading && inspections.length > 0 && !isFiltering && (
+             <p className="text-center text-sm text-muted-foreground py-4">Fim da lista de inspeções.</p>
           )}
-          
-          {/* End of list marker for intersection observer */}
-          <div ref={listEndRef} />
         </div>
       )}
 
@@ -414,7 +383,7 @@ export default function InspectionsPage() {
           open={showCreate}
           onClose={() => setShowCreate(false)}
           onSuccess={resetAndFetchInspections}
-          managerId={user.uid}
+          managerId={user?.uid} // Pass user.uid safely
         />
       )}
 
@@ -432,9 +401,9 @@ export default function InspectionsPage() {
           inspection={viewingInspection}
           open={!!viewingInspection}
           onClose={() => setViewingInspection(null)}
-          onEdit={(inspection) => {
-            setEditingInspection(inspection);
-            setViewingInspection(null);
+          onEdit={(inspectionToEdit) => { // Renamed param for clarity
+            setEditingInspection(inspectionToEdit);
+            setViewingInspection(null); // Close details when opening edit
           }}
         />
       )}

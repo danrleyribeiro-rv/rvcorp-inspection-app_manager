@@ -3,285 +3,302 @@
 
 import { useState, useEffect } from "react"
 import { db } from "@/lib/firebase"
-import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore"
+import { doc, getDoc, collection, query, where, getDocs, orderBy } from "firebase/firestore" // Added orderBy
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter, // Added for close button
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { format } from "date-fns"
+import { format, parseISO, isValid } from "date-fns" // Added parseISO, isValid
 import { ptBR } from "date-fns/locale"
 import {
   Card,
   CardContent,
-  CardDescription,
+  CardDescription, // Keep if used, otherwise remove
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
+import { ScrollArea } from "@/components/ui/scroll-area" // For inspections list
+import { Skeleton } from "@/components/ui/skeleton" // For loading states
 import {
-  CalendarIcon,
-  FileIcon,
-  UserIcon,
+  CalendarDaysIcon, // Changed from CalendarIcon for more specificity
+  FileTextIcon,     // Changed from FileIcon
+  UsersIcon,        // Changed from UserIcon for client/responsible
   TagIcon,
   DollarSignIcon,
-  ClockIcon
+  ClockIcon,
+  MailIcon,         // New
+  PhoneIcon,        // New
+  ClipboardListIcon, // New for inspections title
+  BriefcaseIcon,    // New for project type
+  InfoIcon          // For "Sem descrição" etc.
 } from "lucide-react"
 
-const statusColors = {
-  "Aguardando": "yellow",
-  "Em Andamento": "blue",
-  "Em Revisão": "purple",
-  "Concluído": "green"
-}
+// Status mapping similar to KanbanView
+const projectStatusConfig = {
+  "Aguardando": { text: "Aguardando", badgeClass: "bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900/50 dark:text-yellow-300 dark:border-yellow-700", iconColor: "text-yellow-600" },
+  "Em Andamento": { text: "Em Andamento", badgeClass: "bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/50 dark:text-blue-300 dark:border-blue-700", iconColor: "text-blue-600" },
+  "Em Revisão": { text: "Em Revisão", badgeClass: "bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-900/50 dark:text-purple-300 dark:border-purple-700", iconColor: "text-purple-600" },
+  "Concluído": { text: "Concluído", badgeClass: "bg-green-100 text-green-800 border-green-300 dark:bg-green-900/50 dark:text-green-300 dark:border-green-700", iconColor: "text-green-600" }
+};
 
-export default function ViewProjectDialog({ project, open, onClose }) {
-  const [clientDetails, setClientDetails] = useState(null)
-  const [inspections, setInspections] = useState([])
-  const [loading, setLoading] = useState(true)
+const defaultStatusConfig = { text: "Desconhecido", badgeClass: "bg-gray-100 text-gray-800 border-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-500", iconColor: "text-gray-500" };
 
-  useEffect(() => {
-    if (project?.client_id) {
-      fetchClientDetails()
-      fetchInspections()
-    }
-  }, [project])
 
-  const fetchClientDetails = async () => {
-    try {
-      if (!project.client_id) return;
-      
-      const clientRef = doc(db, 'clients', project.client_id);
-      const clientDoc = await getDoc(clientRef);
-      
-      if (clientDoc.exists()) {
-        setClientDetails({
-          id: clientDoc.id,
-          ...clientDoc.data()
-        });
-      }
-    } catch (error) {
-      console.error("Error fetching client details:", error);
-    }
-  }
-
-const fetchInspections = async () => {
+// Helper for safe date formatting
+const formatDateSafe = (dateInput, dateFormat = "PPP") => {
+  if (!dateInput) return "N/A";
   try {
-    if (!project.id) return;
-    
-    const inspectionsQuery = query(
-      collection(db, 'inspections'),
-      where('project_id', '==', project.id),
-      where('deleted_at', '==', null)
-    );
-    
-    const inspectionsSnapshot = await getDocs(inspectionsQuery);
-    
-    const inspectionsList = inspectionsSnapshot.docs.map(doc => {
-      const data = doc.data();
-      
-      // Função helper para converter timestamps de forma segura
-      const safeTimestampToISO = (timestamp) => {
-        if (!timestamp) return null;
-        
-        // Se já é uma string, retorna
-        if (typeof timestamp === 'string') return timestamp;
-        
-        // Se tem método toDate (Firestore Timestamp)
-        if (timestamp && typeof timestamp.toDate === 'function') {
-          return timestamp.toDate().toISOString();
-        }
-        
-        // Se é um objeto Date
-        if (timestamp instanceof Date) {
-          return timestamp.toISOString();
-        }
-        
-        // Se tem propriedades seconds/nanoseconds (Timestamp serializado)
-        if (timestamp && typeof timestamp.seconds === 'number') {
-          return new Date(timestamp.seconds * 1000).toISOString();
-        }
-        
-        return null;
-      };
-      
-      return {
-        id: doc.id,
-        ...data,
-        // Convert Firebase timestamps to ISO strings safely
-        scheduled_date: safeTimestampToISO(data.scheduled_date),
-        created_at: safeTimestampToISO(data.created_at),
-        updated_at: safeTimestampToISO(data.updated_at)
-      };
-    });
-    
-    setInspections(inspectionsList);
+    const date = typeof dateInput === 'string' ? parseISO(dateInput) : dateInput;
+    if (isValid(date)) {
+      return format(date, dateFormat, { locale: ptBR });
+    }
+    return "Data inválida";
   } catch (error) {
-    console.error("Error fetching inspections:", error);
-  } finally {
-    setLoading(false);
+    return "Erro na data";
   }
 };
 
-  const formatCurrency = (value) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    }).format(value || 0);
+// Helper for status badge in inspections list
+const getInspectionStatusBadgeVariant = (status) => {
+  switch (status?.toLowerCase()) {
+    case 'pending': return 'warning';
+    case 'in_progress': return 'info';
+    case 'completed': return 'success';
+    case 'canceled': return 'destructive';
+    default: return 'secondary';
+  }
+};
+const getInspectionStatusText = (status) => {
+  const map = {
+    pending: 'Pendente',
+    in_progress: 'Em Andamento',
+    completed: 'Concluída',
+    canceled: 'Cancelada',
   };
+  return map[status?.toLowerCase()] || status || 'Desconhecido';
+};
+
+
+export default function ViewProjectDialog({ project, open, onClose }) {
+  const [clientDetails, setClientDetails] = useState(null);
+  const [inspections, setInspections] = useState([]);
+  const [loadingClient, setLoadingClient] = useState(true);
+  const [loadingInspections, setLoadingInspections] = useState(true);
+
+  useEffect(() => {
+    if (open && project) { // Fetch only when dialog is open and project exists
+      setLoadingClient(true);
+      setLoadingInspections(true);
+      setClientDetails(null); // Reset on open
+      setInspections([]);   // Reset on open
+
+      if (project.client_id) {
+        fetchClientDetails(project.client_id);
+      } else {
+        setLoadingClient(false);
+      }
+      if (project.id) {
+        fetchInspections(project.id);
+      } else {
+        setLoadingInspections(false);
+      }
+    }
+  }, [project, open]); // Depend on 'open' as well
+
+  const fetchClientDetails = async (clientId) => {
+    try {
+      const clientRef = doc(db, 'clients', clientId);
+      const clientDoc = await getDoc(clientRef);
+      if (clientDoc.exists()) {
+        setClientDetails({ id: clientDoc.id, ...clientDoc.data() });
+      } else {
+        setClientDetails(null); // Client not found
+      }
+    } catch (error) {
+      console.error("Error fetching client details:", error);
+      setClientDetails(null);
+    } finally {
+      setLoadingClient(false);
+    }
+  };
+
+  const fetchInspections = async (projectId) => {
+    try {
+      const inspectionsQuery = query(
+        collection(db, 'inspections'),
+        where('project_id', '==', projectId),
+        where('deleted_at', '==', null),
+        orderBy('scheduled_date', 'desc') // Order by scheduled date
+      );
+      const inspectionsSnapshot = await getDocs(inspectionsQuery);
+      const inspectionsList = inspectionsSnapshot.docs.map(doc => {
+        const data = doc.data();
+        const safeTimestampToISO = (timestamp) => {
+          if (!timestamp) return null;
+          if (typeof timestamp === 'string') return timestamp;
+          if (timestamp && typeof timestamp.toDate === 'function') return timestamp.toDate().toISOString();
+          if (timestamp instanceof Date) return timestamp.toISOString();
+          if (timestamp && typeof timestamp.seconds === 'number') return new Date(timestamp.seconds * 1000).toISOString();
+          return null;
+        };
+        return {
+          id: doc.id,
+          ...data,
+          scheduled_date: safeTimestampToISO(data.scheduled_date),
+          created_at: safeTimestampToISO(data.created_at),
+          updated_at: safeTimestampToISO(data.updated_at)
+        };
+      });
+      setInspections(inspectionsList);
+    } catch (error) {
+      console.error("Error fetching inspections:", error);
+    } finally {
+      setLoadingInspections(false);
+    }
+  };
+
+  const formatCurrency = (value) => {
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
+  };
+
+  if (!project) return null; // Don't render if no project
+
+  const currentStatusConfig = projectStatusConfig[project.status] || defaultStatusConfig;
+
+  const DetailItem = ({ icon: Icon, label, value, isMissing = false }) => (
+    <div className="flex items-start gap-3 py-2">
+      <Icon className={`h-5 w-5 mt-0.5 ${isMissing ? 'text-orange-400' : 'text-muted-foreground'}`} />
+      <div>
+        <p className="text-xs text-muted-foreground">{label}</p>
+        <p className={`text-sm font-medium ${isMissing ? 'text-orange-500 italic' : 'text-foreground'}`}>
+          {value || (isMissing ? "Não informado" : "N/A")}
+        </p>
+      </div>
+    </div>
+  );
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl">
-        <DialogHeader>
-          <DialogTitle className="flex items-center justify-between">
-            <span>{project.title}</span>
-            <Badge variant={statusColors[project.status]}>{project.status}</Badge>
+      <DialogContent className="max-w-3xl p-0">
+        <DialogHeader className="p-6 pb-4 border-b">
+          <DialogTitle className="flex items-center justify-between text-xl">
+            <span className="truncate pr-4">{project.title}</span>
+            <Badge className={`px-2.5 py-1 text-xs ${currentStatusConfig.badgeClass}`}>
+              {currentStatusConfig.text}
+            </Badge>
           </DialogTitle>
         </DialogHeader>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Detalhes do Projeto</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-start gap-2">
-                <FileIcon className="h-4 w-4 mt-0.5 text-muted-foreground" />
-                <div>
-                  <p className="font-medium">Descrição</p>
-                  <p className="text-sm text-muted-foreground">{project.description || "Sem descrição"}</p>
-                </div>
-              </div>
+        <ScrollArea className="max-h-[calc(100vh-150px)]">
+          <div className="p-6 space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <BriefcaseIcon className="h-5 w-5 text-primary" />
+                    Detalhes do Projeto
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-1">
+                  <DetailItem icon={FileTextIcon} label="Descrição" value={project.description} isMissing={!project.description} />
+                  <Separator />
+                  <DetailItem icon={TagIcon} label="Tipo" value={project.type} isMissing={!project.type} />
+                  <Separator />
+                  <DetailItem icon={DollarSignIcon} label="Valor" value={formatCurrency(project.project_price)} />
+                  <Separator />
+                  <DetailItem icon={CalendarDaysIcon} label="Data da Inspeção (Projeto)" value={formatDateSafe(project.inspection_date)} isMissing={!project.inspection_date} />
+                  <Separator />
+                  <DetailItem icon={ClockIcon} label="Criado em" value={formatDateSafe(project.created_at)} />
+                </CardContent>
+              </Card>
               
-              <div className="flex items-center gap-2">
-                <TagIcon className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <p className="font-medium">Tipo</p>
-                  <p className="text-sm text-muted-foreground">{project.type || "Não especificado"}</p>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-2">
-                <DollarSignIcon className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <p className="font-medium">Valor</p>
-                  <p className="text-sm text-muted-foreground">{formatCurrency(project.project_price)}</p>
-                </div>
-              </div>
-              
-              {project.inspection_date && (
-                <div className="flex items-center gap-2">
-                  <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <p className="font-medium">Data da Inspeção</p>
-                    <p className="text-sm text-muted-foreground">
-                      {format(new Date(project.inspection_date), "PPP", { locale: ptBR })}
-                    </p>
-                  </div>
-                </div>
-              )}
-              
-              <div className="flex items-center gap-2">
-                <ClockIcon className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <p className="font-medium">Criado em</p>
-                  <p className="text-sm text-muted-foreground">
-                    {project.created_at ? format(new Date(project.created_at), "PPP", { locale: ptBR }) : "Data desconhecida"}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Cliente</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {clientDetails ? (
-                <>
-                  <div className="flex items-center gap-2">
-                    <UserIcon className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <p className="font-medium">Nome</p>
-                      <p className="text-sm text-muted-foreground">{clientDetails.name}</p>
-                    </div>
-                  </div>
-                  
-                  {(clientDetails.responsible_name || clientDetails.responsible_surname) && (
-                    <div className="flex items-center gap-2">
-                      <UserIcon className="h-4 w-4 text-muted-foreground" />
-                      <div>
-                        <p className="font-medium">Responsável</p>
-                        <p className="text-sm text-muted-foreground">
-                          {`${clientDetails.responsible_name || ''} ${clientDetails.responsible_surname || ''}`}
-                        </p>
-                      </div>
-                    </div>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <UsersIcon className="h-5 w-5 text-primary" />
+                    Cliente
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-1">
+                  {loadingClient ? (
+                    <>
+                      <Skeleton className="h-10 w-full" />
+                      <Skeleton className="h-10 w-full mt-2" />
+                      <Skeleton className="h-10 w-full mt-2" />
+                    </>
+                  ) : clientDetails ? (
+                    <>
+                      <DetailItem icon={UsersIcon} label="Nome do Cliente" value={clientDetails.name} />
+                      <Separator />
+                      {(clientDetails.responsible_name || clientDetails.responsible_surname) && (
+                        <>
+                        <DetailItem 
+                            icon={UsersIcon} 
+                            label="Responsável" 
+                            value={`${clientDetails.responsible_name || ''} ${clientDetails.responsible_surname || ''}`.trim()} 
+                        />
+                        <Separator />
+                        </>
+                      )}
+                      <DetailItem icon={PhoneIcon} label="Telefone" value={clientDetails.phonenumber} isMissing={!clientDetails.phonenumber} />
+                      <Separator />
+                      <DetailItem icon={MailIcon} label="Email" value={clientDetails.email} isMissing={!clientDetails.email} />
+                    </>
+                  ) : (
+                    <DetailItem icon={InfoIcon} label="Cliente" value="Informações do cliente não encontradas." isMissing={true} />
                   )}
-                  
-                  <div className="flex items-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground">
-                      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
-                    </svg>
-                    <div>
-                      <p className="font-medium">Telefone</p>
-                      <p className="text-sm text-muted-foreground">{clientDetails.phonenumber || "Não informado"}</p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground">
-                      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-                      <polyline points="22,6 12,13 2,6"></polyline>
-                    </svg>
-                    <div>
-                      <p className="font-medium">Email</p>
-                      <p className="text-sm text-muted-foreground">{clientDetails.email || "Não informado"}</p>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <p className="text-sm text-muted-foreground">Carregando informações do cliente...</p>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-        
-        <Separator className="my-4" />
-        
-        <div>
-          <h3 className="text-lg font-medium mb-4">Inspeções</h3>
-          {loading ? (
-            <p className="text-sm text-muted-foreground">Carregando inspeções...</p>
-          ) : inspections.length > 0 ? (
-            <div className="space-y-2">
-              {inspections.map((inspection) => (
-                <div key={inspection.id} className="flex items-center justify-between p-3 border rounded-md">
-                  <div>
-                    <p className="font-medium">{inspection.title}</p>
-                    {inspection.scheduled_date && (
-                      <p className="text-sm text-muted-foreground">
-                        {format(new Date(inspection.scheduled_date), "PPP", { locale: ptBR })}
-                      </p>
-                    )}
-                  </div>
-                  <Badge>{inspection.status}</Badge>
-                </div>
-              ))}
+                </CardContent>
+              </Card>
             </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">Nenhuma inspeção encontrada para este projeto.</p>
-          )}
-        </div>
+            
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <ClipboardListIcon className="h-5 w-5 text-primary" />
+                  Inspeções Vinculadas ({inspections.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loadingInspections ? (
+                  <div className="space-y-3">
+                    <Skeleton className="h-12 w-full" />
+                    <Skeleton className="h-12 w-full" />
+                  </div>
+                ) : inspections.length > 0 ? (
+                  <ScrollArea className="h-[200px] pr-3"> {/* Max height for scroll */}
+                    <div className="space-y-3">
+                      {inspections.map((inspection) => (
+                        <div key={inspection.id} className="flex items-center justify-between p-3 border rounded-md bg-background hover:bg-muted/50 transition-colors">
+                          <div>
+                            <p className="font-medium text-sm text-foreground">{inspection.title || "Inspeção Sem Título"}</p>
+                            <p className="text-xs text-muted-foreground">
+                              Agendada para: {formatDateSafe(inspection.scheduled_date, "dd/MM/yy HH:mm")}
+                            </p>
+                          </div>
+                          <Badge variant={getInspectionStatusBadgeVariant(inspection.status)} className="text-xs px-2 py-0.5">
+                            {getInspectionStatusText(inspection.status)}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                ) : (
+                  <p className="text-sm text-muted-foreground py-4 text-center">Nenhuma inspeção encontrada para este projeto.</p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </ScrollArea>
         
-        <div className="flex justify-end mt-4">
-          <Button onClick={onClose}>Fechar</Button>
-        </div>
+        <DialogFooter className="p-6 pt-4 border-t">
+          <Button variant="outline" onClick={onClose}>Fechar</Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )
