@@ -8,10 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 import { TEMPLATE_ICONS, TEMPLATE_COLORS } from "@/lib/constants";
+import { codeService } from "@/services/code-service";
 import TopicEditor from "./TopicEditor";
 
 export default function TemplateCreationDialog({ open, onClose, onSuccess }) {
@@ -23,8 +22,9 @@ export default function TemplateCreationDialog({ open, onClose, onSuccess }) {
     icon_color: "",
     topics: []
   });
-
   const [loading, setLoading] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
+  const [showConfirmClose, setShowConfirmClose] = useState(false);
   const { toast } = useToast();
 
   const handleNumberChange = (e) => {
@@ -35,9 +35,30 @@ export default function TemplateCreationDialog({ open, onClose, onSuccess }) {
       ...prev,
       [name]: parsedValue.toString()
     }));
+    setHasChanges(true);
   };
 
-  const handleSubmit = async () => {
+  const handleFieldChange = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    setHasChanges(true);
+  };
+
+  const handleClose = () => {
+    if (hasChanges) {
+      setShowConfirmClose(true);
+    } else {
+      onClose();
+    }
+  };
+
+  const handleConfirmClose = () => {
+    setShowConfirmClose(false);
+    onClose();
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
     if (!formData.title.trim()) {
       toast({
         title: "Erro",
@@ -55,21 +76,20 @@ export default function TemplateCreationDialog({ open, onClose, onSuccess }) {
         template_price: parseFloat(formData.template_price) || 0,
         icon: formData.icon || null,
         icon_color: formData.icon_color || null,
-        topics: formData.topics || [],
-        created_at: serverTimestamp(),
-        updated_at: serverTimestamp(),
-        deleted_at: null
+        topics: formData.topics || []
       };
 
-      await addDoc(collection(db, 'templates'), dataToSave);
+      const result = await codeService.createTemplateWithCode(dataToSave);
 
-      toast({
-        title: "Sucesso",
-        description: "Template criado com sucesso"
-      });
-
-      onSuccess();
-      onClose();
+      if (result.success) {
+        toast({
+          title: "Sucesso",
+          description: `Template criado com código ${result.code}`
+        });
+        setHasChanges(false);
+        onSuccess();
+        onClose();
+      }
     } catch (error) {
       console.error("Erro ao criar template:", error);
       toast({
@@ -83,113 +103,150 @@ export default function TemplateCreationDialog({ open, onClose, onSuccess }) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
-        <DialogHeader className="pb-2">
-          <DialogTitle className="text-xl">Criar Novo Template</DialogTitle>
-        </DialogHeader>
-        <div className="h-[calc(100vh-200px)]">
-          <ScrollArea className="h-full pb-4">
-            <div className="space-y-4 pr-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label className="text-sm" htmlFor="title">Título</Label>
-                  <Input
-                    id="title"
-                    value={formData.title}
-                    onChange={e => setFormData({...formData, title: e.target.value})}
-                    className="h-9 mt-1"
-                  />
+    <>
+      <Dialog open={open} onOpenChange={handleClose}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
+          <DialogHeader className="pb-2">
+            <DialogTitle className="text-xl">Criar Novo Template</DialogTitle>
+          </DialogHeader>
+          
+          <form onSubmit={handleSubmit} className="h-[calc(100vh-200px)] flex flex-col">
+            <ScrollArea className="flex-1 pb-4">
+              <div className="space-y-4 pr-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-sm" htmlFor="title">Título</Label>
+                    <Input
+                      id="title"
+                      value={formData.title}
+                      onChange={e => handleFieldChange('title', e.target.value)}
+                      className="h-9 mt-1"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-sm" htmlFor="price">Preço</Label>
+                    <Input
+                      id="price"
+                      type="number"
+                      name="template_price"
+                      min="0"
+                      step="0.01"
+                      value={formData.template_price}
+                      onChange={handleNumberChange}
+                      className="h-9 mt-1"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <Label className="text-sm" htmlFor="price">Preço</Label>
-                  <Input
-                    id="price"
-                    type="number"
-                    name="template_price"
-                    min="0"
-                    step="0.01"
-                    value={formData.template_price}
-                    onChange={handleNumberChange}
-                    className="h-9 mt-1"
-                  />
-                </div>
-              </div>
 
-              <div>
-                <Label className="text-sm" htmlFor="description">Descrição</Label>
-                <Input
-                  id="description"
-                  value={formData.description}
-                  onChange={e => setFormData({...formData, description: e.target.value})}
-                  className="h-9 mt-1"
+                <div>
+                  <Label className="text-sm" htmlFor="description">Descrição</Label>
+                  <Input
+                    id="description"
+                    value={formData.description}
+                    onChange={e => handleFieldChange('description', e.target.value)}
+                    className="h-9 mt-1"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-sm" htmlFor="icon">Ícone</Label>
+                    <Select
+                      value={formData.icon}
+                      onValueChange={value => handleFieldChange('icon', value)}
+                    >
+                      <SelectTrigger className="h-9 mt-1">
+                        <SelectValue placeholder="Selecione um ícone" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TEMPLATE_ICONS.map(icon => (
+                          <SelectItem key={icon.value} value={icon.value}>
+                            {icon.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label className="text-sm" htmlFor="icon-color">Cor do Ícone</Label>
+                    <Select
+                      value={formData.icon_color}
+                      onValueChange={value => handleFieldChange('icon_color', value)}
+                    >
+                      <SelectTrigger className="h-9 mt-1">
+                        <SelectValue placeholder="Selecione uma cor" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TEMPLATE_COLORS.map(color => (
+                          <SelectItem key={color.value} value={color.value}>
+                            <div className="flex items-center gap-2">
+                              <div className={`w-4 h-4 rounded-full ${color.class}`} />
+                              {color.label}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <TopicEditor
+                  topics={formData.topics}
+                  onChange={topics => handleFieldChange('topics', topics)}
                 />
               </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label className="text-sm" htmlFor="icon">Ícone</Label>
-                  <Select
-                    id="icon"
-                    value={formData.icon}
-                    onValueChange={value => setFormData({...formData, icon: value})}
-                  >
-                    <SelectTrigger className="h-9 mt-1">
-                      <SelectValue placeholder="Selecione um ícone" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {TEMPLATE_ICONS.map(icon => (
-                        <SelectItem key={icon.value} value={icon.value}>
-                          <div className="flex items-center gap-2">
-                            {icon.label}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label className="text-sm" htmlFor="icon-color">Cor do Ícone</Label>
-                  <Select
-                    id="icon-color"
-                    value={formData.icon_color}
-                    onValueChange={value => setFormData({...formData, icon_color: value})}
-                  >
-                    <SelectTrigger className="h-9 mt-1">
-                      <SelectValue placeholder="Selecione uma cor" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {TEMPLATE_COLORS.map(color => (
-                        <SelectItem key={color.value} value={color.value}>
-                          <div className="flex items-center gap-2">
-                            <div className={`w-4 h-4 rounded-full ${color.class}`} />
-                            {color.label}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <TopicEditor
-                topics={formData.topics}
-                onChange={topics => setFormData({...formData, topics})}
-              />
+              <ScrollBar />
+            </ScrollArea>
+            
+            <div className="flex justify-end gap-2 pt-4 border-t mt-2">
+              <Button 
+                type="button" 
+                variant="outline" 
+                size="sm" 
+                onClick={handleClose} 
+                disabled={loading}
+              >
+                Cancelar
+              </Button>
+              <Button 
+                type="submit" 
+                size="sm" 
+                disabled={loading}
+              >
+                {loading ? "Criando..." : "Criar Template"}
+              </Button>
             </div>
-            <ScrollBar />
-          </ScrollArea>
-        </div>
-        <div className="flex justify-end gap-2 pt-4 border-t mt-2">
-          <Button variant="outline" size="sm" onClick={onClose} disabled={loading}>
-            Cancelar
-          </Button>
-          <Button size="sm" onClick={handleSubmit} disabled={loading}>
-            {loading ? "Criando..." : "Criar Template"}
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm Close Dialog */}
+      <Dialog open={showConfirmClose} onOpenChange={setShowConfirmClose}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Descartar alterações?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground mb-4">
+            Você tem alterações não salvas. Tem certeza que deseja fechar?
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowConfirmClose(false)}
+            >
+              Cancelar
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleConfirmClose}
+            >
+              Descartar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

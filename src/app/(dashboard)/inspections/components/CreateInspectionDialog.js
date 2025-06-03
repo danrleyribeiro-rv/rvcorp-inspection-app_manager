@@ -1,9 +1,9 @@
-// app/(dashboard)/inspections/components/CreateInspectionDialog.js
+// src/app/(dashboard)/inspections/components/CreateInspectionDialog.js
 "use client";
 
 import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, getDoc } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
 import {
   Dialog,
   DialogContent,
@@ -27,14 +27,16 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { CalendarIcon, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import InspectionAddressForm from "./InspectionAddressForm";
 import { Switch } from "@/components/ui/switch";
+import { codeService } from "@/services/code-service";
+import InspectionAddressForm from "./InspectionAddressForm";
 
 export default function CreateInspectionDialog({ open, onClose, onSuccess, managerId }) {
   const [loading, setLoading] = useState(false);
   const [projects, setProjects] = useState([]);
   const [templates, setTemplates] = useState([]);
   const [inspectors, setInspectors] = useState([]);
+  const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [formData, setFormData] = useState({
     title: "",
     observation: "",
@@ -124,6 +126,23 @@ export default function CreateInspectionDialog({ open, onClose, onSuccess, manag
     }));
   };
 
+  const handleTemplateChange = async (templateId) => {
+    setFormData(prev => ({ ...prev, template_id: templateId }));
+    
+    if (templateId) {
+      try {
+        const templateDoc = await getDoc(doc(db, 'templates', templateId));
+        if (templateDoc.exists()) {
+          setSelectedTemplate(templateDoc.data());
+        }
+      } catch (error) {
+        console.error("Error fetching template:", error);
+      }
+    } else {
+      setSelectedTemplate(null);
+    }
+  };
+
   // Function to convert template structure to inspection topics
   const convertTemplateToTopics = async (templateId) => {
     if (!templateId) return [];
@@ -208,21 +227,21 @@ export default function CreateInspectionDialog({ open, onClose, onSuccess, manag
         address: formData.address,
         address_string: formattedAddress,
         is_templated: formData.is_templated,
-        topics: topics, // Include the nested topics structure
-        created_at: serverTimestamp(),
-        updated_at: serverTimestamp(),
-        deleted_at: null
+        topics: topics
       };
 
-      // Add inspection to Firestore
-      const docRef = await addDoc(collection(db, 'inspections'), inspectionData);
+      // Create inspection using the code service
+      const result = await codeService.createInspectionWithCode(inspectionData);
       
-      toast({
-        title: "Inspeção criada com sucesso"
-      });
+      if (result.success) {
+        toast({
+          title: "Inspeção criada com sucesso",
+          description: `Código gerado: ${result.code}`
+        });
 
-      onSuccess();
-      onClose();
+        onSuccess();
+        onClose();
+      }
     } catch (error) {
       console.error("Error creating inspection:", error);
       toast({
@@ -297,6 +316,7 @@ export default function CreateInspectionDialog({ open, onClose, onSuccess, manag
                 value={formData.template_id || "none"}
                 onValueChange={(value) => {
                   const templateId = value === "none" ? null : value;
+                  handleTemplateChange(templateId);
                   setFormData({ 
                     ...formData, 
                     template_id: templateId,
@@ -317,6 +337,31 @@ export default function CreateInspectionDialog({ open, onClose, onSuccess, manag
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Template Information Display */}
+            {selectedTemplate && (
+              <div className="p-3 bg-blue-50 rounded-md border border-blue-200">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="font-medium text-blue-900">Template Selecionado</h4>
+                  {selectedTemplate.cod && (
+                    <span className="text-xs font-mono bg-blue-100 px-2 py-1 rounded">
+                      {selectedTemplate.cod}
+                    </span>
+                  )}
+                </div>
+                {selectedTemplate.description && (
+                  <p className="text-sm text-blue-700 mb-2">{selectedTemplate.description}</p>
+                )}
+                <div className="text-xs text-blue-600">
+                  <span className="font-medium">Tópicos:</span> {selectedTemplate.topics?.length || 0} | 
+                  <span className="font-medium ml-2">Itens:</span> {
+                    selectedTemplate.topics?.reduce((total, topic) => 
+                      total + (topic.items?.length || 0), 0
+                    ) || 0
+                  }
+                </div>
+              </div>
+            )}
 
             {/* Template Application Toggle */}
             {formData.template_id && (

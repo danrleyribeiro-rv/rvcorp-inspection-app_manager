@@ -1,11 +1,12 @@
-// app/(dashboard)/templates/page.js
+// src/app/(dashboard)/templates/page.js
 "use client";
 
 import { useState, useEffect } from "react";
 import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
-import { Plus, Upload, Download } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Plus, Upload, Download, Search } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -24,6 +25,7 @@ import {
   Store,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { parseCode } from "@/utils/codeGenerator";
 import TemplateCreationDialog from "./components/TemplateCreationDialog";
 import TemplateEditDialog from "./components/TemplateEditDialog";
 import ImportTemplateDialog from "./components/ImportTemplateDialog";
@@ -42,26 +44,42 @@ const iconComponents = {
 
 export default function TemplatesPage() {
   const [templates, setTemplates] = useState([]);
+  const [filteredTemplates, setFilteredTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [templateToDelete, setTemplateToDelete] = useState(null);
   const [showImport, setShowImport] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
 
   useEffect(() => {
     fetchTemplates();
   }, []);
 
+  useEffect(() => {
+    // Filter templates based on search term
+    if (searchTerm.trim() === "") {
+      setFilteredTemplates(templates);
+    } else {
+      const filtered = templates.filter(template => 
+        template.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        template.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        template.cod?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      setFilteredTemplates(filtered);
+    }
+  }, [templates, searchTerm]);
+
   const fetchTemplates = async () => {
     setLoading(true);
     try {
-      // Create query to get all non-deleted templates
+      // Create query to get all non-deleted templates, ordered by code
       const templatesQuery = query(
         collection(db, 'templates'),
         where('deleted_at', '==', null),
-        orderBy('title')
+        orderBy('cod', 'asc')
       );
       
       const querySnapshot = await getDocs(templatesQuery);
@@ -73,7 +91,8 @@ export default function TemplatesPage() {
           id: doc.id,
           ...data,
           created_at: data.created_at?.toDate().toISOString(),
-          updated_at: data.updated_at?.toDate().toISOString()
+          updated_at: data.updated_at?.toDate().toISOString(),
+          parsedCode: data.cod ? parseCode(data.cod) : null
         };
       });
       
@@ -102,6 +121,17 @@ export default function TemplatesPage() {
     }).format(value || 0);
   };
 
+  const getTemplateStats = (template) => {
+    const topicsCount = template.topics?.length || 0;
+    const itemsCount = template.topics?.reduce((acc, topic) => 
+      acc + (topic.items?.length || 0), 0) || 0;
+    const detailsCount = template.topics?.reduce((acc, topic) => 
+      acc + (topic.items?.reduce((itemAcc, item) => 
+        itemAcc + (item.details?.length || 0), 0) || 0), 0) || 0;
+    
+    return { topicsCount, itemsCount, detailsCount };
+  };
+
   return (
     <div className="container p-6">
       <div className="flex justify-between items-center mb-6">
@@ -124,13 +154,29 @@ export default function TemplatesPage() {
         </div>
       </div>
 
+      {/* Search Bar */}
+      <div className="mb-6">
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por título, descrição ou código..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+      </div>
+
       {loading ? (
         <div className="flex justify-center items-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
-      ) : templates.length === 0 ? (
+      ) : filteredTemplates.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
-          Nenhum template encontrado. Crie um novo template para começar.
+          {templates.length === 0 
+            ? "Nenhum template encontrado. Crie um novo template para começar."
+            : "Nenhum template corresponde aos filtros aplicados."
+          }
         </div>
       ) : (
         <div className="rounded-md border">
@@ -138,50 +184,78 @@ export default function TemplatesPage() {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-12"></TableHead>
+                <TableHead>Código</TableHead>
                 <TableHead>Nome</TableHead>
                 <TableHead>Descrição</TableHead>
-                <TableHead>Topicos</TableHead>
-                <TableHead>Itens</TableHead>
+                <TableHead>Estrutura</TableHead>
                 <TableHead>Preço</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {templates.map((template) => (
-                <TableRow key={template.id}>
-                  <TableCell>
-                    <div className={template.icon_color || 'text-gray-700'}>
-                      {getIconComponent(template.icon)}
-                    </div>
-                  </TableCell>
-                  <TableCell className="font-medium">{template.title}</TableCell>
-                  <TableCell>{template.description}</TableCell>
-                  <TableCell>{template.topics?.length || 0}</TableCell>
-                  <TableCell>
-                    {template.topics?.reduce((acc, topic) => acc + (topic.items?.length || 0), 0) || 0}
-                  </TableCell>
-                  <TableCell>
-                    {formatCurrency(template.template_price)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        onClick={() => setSelectedTemplate(template)}
-                      >
-                        Editar
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        className="text-destructive hover:text-destructive/90"
-                        onClick={() => setTemplateToDelete(template)}
-                      >
-                        Excluir
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {filteredTemplates.map((template) => {
+                const { topicsCount, itemsCount, detailsCount } = getTemplateStats(template);
+                
+                return (
+                  <TableRow key={template.id}>
+                    <TableCell>
+                      <div className={template.icon_color || 'text-gray-700'}>
+                        {getIconComponent(template.icon)}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {template.cod ? (
+                        <span className="font-mono text-sm bg-blue-100 px-2 py-1 rounded">
+                          {template.cod}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">N/A</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="font-medium">{template.title}</TableCell>
+                    <TableCell className="max-w-xs truncate">
+                      {template.description || 'Sem descrição'}
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm space-y-1">
+                        <div className="flex items-center gap-4">
+                          <span className="text-muted-foreground">
+                            <span className="font-medium">{topicsCount}</span> tópico{topicsCount !== 1 ? 's' : ''}
+                          </span>
+                          <span className="text-muted-foreground">
+                            <span className="font-medium">{itemsCount}</span> ite{itemsCount !== 1 ? 'ns' : 'm'}
+                          </span>
+                          <span className="text-muted-foreground">
+                            <span className="font-medium">{detailsCount}</span> detalhe{detailsCount !== 1 ? 's' : ''}
+                          </span>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {formatCurrency(template.template_price)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setSelectedTemplate(template)}
+                        >
+                          Editar
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:text-destructive/90"
+                          onClick={() => setTemplateToDelete(template)}
+                        >
+                          Excluir
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>
@@ -225,7 +299,7 @@ export default function TemplatesPage() {
         <ExportTemplateDialog
           onClose={() => setShowExport(false)}
           open={showExport}
-          templates={templates}
+          templates={filteredTemplates}
         />
       )}
     </div>

@@ -6,7 +6,22 @@ import { format, isValid, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Pencil, Eye, Calendar, User, Trash2, MapPin, AlertTriangle, FileText, Edit, ChevronDown, ChevronRight } from "lucide-react";
+import { parseCode } from "@/utils/codeGenerator";
+import { 
+  Pencil, 
+  Eye, 
+  Calendar, 
+  User, 
+  Trash2, 
+  MapPin, 
+  AlertTriangle, 
+  FileText, 
+  Edit, 
+  ChevronDown, 
+  ChevronRight,
+  Clock,
+  Hash
+} from "lucide-react";
 
 // Função para formatar datas com verificação de validade
 const formatDateSafe = (dateStr) => {
@@ -123,9 +138,8 @@ export default function InspectionListItem({ inspection, onEdit, onView, onDelet
   const damaged = hasDamagedItems();
   const { topics, items } = getTopicsAndItemsCount();
   const addressText = formatAddress(inspection.address);
-  
-  // Formatar a data de forma segura
   const scheduledDateFormatted = inspection.scheduled_date ? formatDateSafe(inspection.scheduled_date) : null;
+  const parsedCode = inspection.cod ? parseCode(inspection.cod) : null;
 
   return (
     <div className="border rounded-lg mb-3 overflow-hidden hover:shadow-md transition-shadow duration-200">
@@ -140,7 +154,14 @@ export default function InspectionListItem({ inspection, onEdit, onView, onDelet
             <ChevronRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />
           }
           <div className="flex-1">
-            <h3 className="font-medium truncate">{inspection.title}</h3>
+            <div className="flex items-center gap-3 mb-1">
+              <h3 className="font-medium truncate">{inspection.title}</h3>
+              {inspection.cod && (
+                <span className="font-mono text-xs bg-green-100 px-2 py-1 rounded">
+                  {inspection.cod}
+                </span>
+              )}
+            </div>
             <div className="flex flex-wrap items-center gap-x-4 mt-1 text-sm text-muted-foreground">
               {scheduledDateFormatted && (
                 <div className="flex items-center gap-1">
@@ -157,6 +178,13 @@ export default function InspectionListItem({ inspection, onEdit, onView, onDelet
                 <div className="flex items-center gap-1">
                   <User className="h-3.5 w-3.5" />
                   <span>{`${inspection.inspectors.name} ${inspection.inspectors.last_name || ''}`}</span>
+                </div>
+              )}
+
+              {parsedCode && (
+                <div className="flex items-center gap-1">
+                  <Clock className="h-3.5 w-3.5" />
+                  <span>{parsedCode.date}</span>
                 </div>
               )}
             </div>
@@ -204,6 +232,12 @@ export default function InspectionListItem({ inspection, onEdit, onView, onDelet
                   <span className="font-medium">Progresso:</span> {topics} tópico{topics !== 1 ? 's' : ''}, {items} ite{items !== 1 ? 'ns' : 'm'}
                 </div>
               )}
+
+              {inspection.template_id && (
+                <div className="text-sm text-muted-foreground">
+                  <span className="font-medium">Template:</span> {inspection.template_id}
+                </div>
+              )}
             </div>
             
             <div className="space-y-2">
@@ -211,6 +245,12 @@ export default function InspectionListItem({ inspection, onEdit, onView, onDelet
                 <div className="text-sm text-muted-foreground">
                   <span className="font-medium">Observação:</span> 
                   <p className="line-clamp-3">{inspection.observation}</p>
+                </div>
+              )}
+
+              {parsedCode && (
+                <div className="text-sm text-muted-foreground">
+                  <span className="font-medium">Sequência do dia:</span> #{parsedCode.sequence}
                 </div>
               )}
             </div>
