@@ -19,7 +19,8 @@ import {
   Star,
   Filter,
   MapPin,
-  Building
+  Building,
+  Search
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,6 +33,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import InspectorCard from "./components/InspectorCard";
 import RatingDialog from "./components/RatingDialog";
+import InspectorProfileDialog from "./components/InspectorProfileDialog";
 
 export default function InspectorsPage() {
   const [inspectors, setInspectors] = useState([]);
@@ -39,6 +41,7 @@ export default function InspectorsPage() {
   const [states, setStates] = useState([]);
   const [cities, setCities] = useState([]);
   const [selectedInspector, setSelectedInspector] = useState(null);
+  const [profileInspector, setProfileInspector] = useState(null);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({
@@ -86,26 +89,8 @@ export default function InspectorsPage() {
           ...doc.data()
         };
         
-        // Fetch profile images if they exist
-        if (inspectorData.profile_image_id) {
-          try {
-            const imagesQuery = query(
-              collection(db, 'profile_images'),
-              where('inspector_id', '==', doc.id)
-            );
-            
-            const imagesSnapshot = await getDocs(imagesQuery);
-            
-            const images = imagesSnapshot.docs.map(imgDoc => ({
-              id: imgDoc.id,
-              ...imgDoc.data()
-            }));
-            
-            inspectorData.profile_images = images;
-          } catch (err) {
-            console.error("Error fetching inspector images:", err);
-          }
-        }
+        // Não precisa mais buscar profile_images separadamente
+        // pois a URL está no campo profileImageUrl do documento
         
         inspectorsList.push(inspectorData);
       }
@@ -161,7 +146,9 @@ export default function InspectorsPage() {
         (inspector) =>
           inspector.name?.toLowerCase().includes(search.toLowerCase()) ||
           inspector.last_name?.toLowerCase().includes(search.toLowerCase()) ||
-          inspector.email?.toLowerCase().includes(search.toLowerCase())
+          inspector.email?.toLowerCase().includes(search.toLowerCase()) ||
+          inspector.profession?.toLowerCase().includes(search.toLowerCase()) ||
+          inspector.training?.some(t => t.toLowerCase().includes(search.toLowerCase()))
       );
     }
     
@@ -183,58 +170,101 @@ export default function InspectorsPage() {
     if (filters.rating && filters.rating !== "all") {
       const ratingValue = parseInt(filters.rating);
       filtered = filtered.filter(
-        (inspector) => (parseFloat(inspector.rating) || 0) >= ratingValue
+        (inspector) => {
+          const rating = parseFloat(inspector.rating) || 0;
+          return rating >= ratingValue;
+        }
       );
     }
     
     setFilteredInspectors(filtered);
   };
 
-  const openChat = (inspector) => {
-    // Navigate to chat with selected inspector
-    router.push(`/chats?inspector=${inspector.id}`);
-  };
+const handleRateInspector = async (inspector, ratingData) => {
+  try {
+    // Busca avaliações existentes do inspetor
+    const ratingsQuery = query(
+      collection(db, 'inspector_ratings'),
+      where('inspector_id', '==', inspector.id)
+    );
+    
+    const ratingsSnapshot = await getDocs(ratingsQuery);
+    
+    // Processa todas as avaliações existentes
+    const existingRatings = [];
+    let userHasRated = false;
+    let userRatingDocId = null;
 
-  const handleRateInspector = async (inspector, rating, comment) => {
-    try {
-      // Calculate new average rating
-      const currentRating = parseFloat(inspector.rating) || 0;
-      const ratingCount = inspector.rating_count || 0;
-      
-      const newRatingCount = ratingCount + 1;
-      const newAverageRating = ((currentRating * ratingCount) + rating) / newRatingCount;
-      
-      // Update inspector rating in Firestore
-      const inspectorRef = doc(db, 'inspectors', inspector.id);
-      
-      await updateDoc(inspectorRef, {
-        rating: newAverageRating.toFixed(1),
-        rating_count: increment(1),
+    ratingsSnapshot.docs.forEach(doc => {
+      const rating = { id: doc.id, ...doc.data() };
+      if (rating.manager_id === ratingData.manager_id) {
+        userHasRated = true;
+        userRatingDocId = doc.id;
+      }
+      existingRatings.push(rating);
+    });
+
+    // Adiciona ou atualiza a avaliação do usuário atual
+    if (userHasRated) {
+      // Atualiza avaliação existente
+      await updateDoc(doc(db, 'inspector_ratings', userRatingDocId), {
+        ...ratingData,
         updated_at: serverTimestamp()
       });
       
-      // Store rating record
-      await addDoc(collection(db, 'inspector_ratings'), {
+      // Atualiza no array local
+      const updatedRatings = existingRatings.map(rating => 
+        rating.id === userRatingDocId 
+          ? { ...rating, ...ratingData }
+          : rating
+      );
+      existingRatings.splice(0, existingRatings.length, ...updatedRatings);
+    } else {
+      // Cria nova avaliação
+      const newRatingRef = await addDoc(collection(db, 'inspector_ratings'), {
         inspector_id: inspector.id,
-        rater_id: null, // Could be the manager's ID if needed
-        rating,
-        comment,
+        ...ratingData,
         created_at: serverTimestamp()
       });
       
-      toast({
-        title: "Avaliação enviada com sucesso"
-      });
-      
-      fetchInspectors();
-    } catch (error) {
-      console.error("Error rating inspector:", error);
-      toast({
-        title: "Erro ao enviar avaliação",
-        description: error.message,
-        variant: "destructive"
+      existingRatings.push({
+        id: newRatingRef.id,
+        inspector_id: inspector.id,
+        ...ratingData
       });
     }
+
+    // Calcula nova média geral
+    const allRatings = existingRatings.map(r => r.overall_rating);
+    const newAverageRating = allRatings.reduce((sum, rating) => sum + rating, 0) / allRatings.length;
+
+    // Atualiza documento do inspetor
+    const inspectorRef = doc(db, 'inspectors', inspector.id);
+    await updateDoc(inspectorRef, {
+      rating: newAverageRating.toFixed(1),
+      rating_count: allRatings.length,
+      detailed_ratings: existingRatings.map(({ id, ...rating }) => rating), // Remove IDs para salvar no documento
+      updated_at: serverTimestamp()
+    });
+
+    toast({
+      title: userHasRated ? "Avaliação atualizada com sucesso" : "Avaliação enviada com sucesso"
+    });
+
+    // Recarrega dados
+    fetchInspectors();
+  } catch (error) {
+    console.error("Error rating inspector:", error);
+    toast({
+      title: "Erro ao enviar avaliação",
+      description: error.message,
+      variant: "destructive"
+    });
+  }
+};
+
+  const handleViewProfile = (inspector) => {
+    setProfileInspector(inspector);
   };
 
   return (
@@ -316,13 +346,22 @@ export default function InspectorsPage() {
         </Sheet>
       </div>
 
+      {/* Barra de pesquisa */}
       <div className="mb-6">
-        <Input
-          placeholder="Buscar vistoriador..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="max-w-md"
-        />
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por nome, email, profissão ou especialização..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        {search && (
+          <p className="text-sm text-muted-foreground mt-2">
+            {filteredInspectors.length} vistoriador(es) encontrado(s) para "{search}"
+          </p>
+        )}
       </div>
 
       {loading ? (
@@ -331,7 +370,10 @@ export default function InspectorsPage() {
         </div>
       ) : filteredInspectors.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
-          Nenhum vistoriador encontrado com os filtros atuais.
+          {search || filters.state !== "all" || filters.city !== "all" || filters.rating !== "all" 
+            ? "Nenhum vistoriador encontrado com os filtros atuais."
+            : "Nenhum vistoriador cadastrado no sistema."
+          }
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -340,18 +382,28 @@ export default function InspectorsPage() {
               key={inspector.id}
               inspector={inspector}
               onRate={() => setSelectedInspector(inspector)}
-              onChat={() => openChat(inspector)}
+              onViewProfile={() => handleViewProfile(inspector)}
             />
           ))}
         </div>
       )}
 
+      {/* Dialog de avaliação */}
       {selectedInspector && (
         <RatingDialog
           inspector={selectedInspector}
           open={!!selectedInspector}
           onClose={() => setSelectedInspector(null)}
           onRate={handleRateInspector}
+        />
+      )}
+
+      {/* Dialog de perfil */}
+      {profileInspector && (
+        <InspectorProfileDialog
+          inspector={profileInspector}
+          open={!!profileInspector}
+          onClose={() => setProfileInspector(null)}
         />
       )}
     </div>

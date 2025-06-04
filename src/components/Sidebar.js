@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
@@ -43,10 +43,10 @@ const menuItems = [
   { href: "/settings", label: "Configurações", icon: Settings },
 ];
 
-
 // Main navigation component for desktop
 export function Sidebar({ onToggle, isCollapsed }) {
   const pathname = usePathname();
+  const router = useRouter();
   const unreadCounts = useUnreadCounts();
   const totalUnread = Object.values(unreadCounts).reduce((sum, count) => sum + count, 0);
   const { theme, setTheme } = useTheme();
@@ -99,6 +99,19 @@ export function Sidebar({ onToggle, isCollapsed }) {
 
   const getAvatarLetters = () => {
     return `${profileData.name.charAt(0)}${profileData.last_name.charAt(0)}`.toUpperCase();
+  };
+
+  // Navigation handlers for the action buttons
+  const handleNewInspection = () => {
+    router.push('/inspections/create');
+  };
+
+  const handleNewTemplate = () => {
+    router.push('/templates/new/editor');
+  };
+
+  const handleNewProject = () => {
+    router.push('/projects/create');
   };
 
   return (
@@ -186,14 +199,38 @@ export function Sidebar({ onToggle, isCollapsed }) {
         
         <Separator className="my-4" />
         
-        <div className="px-3 py-2">
+        <div className="px-3 py-2 space-y-2">
           <Button
             variant="outline"
             size="sm"
             className={`${isCollapsed ? "justify-center w-9 px-0" : "w-full justify-start"}`}
+            onClick={handleNewInspection}
+            title="Nova Inspeção"
           >
             <Plus className={`h-4 w-4 ${!isCollapsed && "mr-2"}`} />
             {!isCollapsed && <span className="truncate">Nova Inspeção</span>}
+          </Button>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            className={`${isCollapsed ? "justify-center w-9 px-0" : "w-full justify-start"}`}
+            onClick={handleNewTemplate}
+            title="Novo Template"
+          >
+            <CircleDot className={`h-4 w-4 ${!isCollapsed && "mr-2"}`} />
+            {!isCollapsed && <span className="truncate">Novo Template</span>}
+          </Button>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            className={`${isCollapsed ? "justify-center w-9 px-0" : "w-full justify-start"}`}
+            onClick={handleNewProject}
+            title="Novo Projeto"
+          >
+            <FolderKanban className={`h-4 w-4 ${!isCollapsed && "mr-2"}`} />
+            {!isCollapsed && <span className="truncate">Novo Projeto</span>}
           </Button>
         </div>
       </nav>
@@ -228,6 +265,7 @@ export function Sidebar({ onToggle, isCollapsed }) {
 // Mobile navigation component
 export function MobileNav() {
   const pathname = usePathname();
+  const router = useRouter();
   const { theme, setTheme } = useTheme();
   const { signOut, user } = useAuth();
   const [profileData, setProfileData] = useState({
@@ -279,6 +317,19 @@ export function MobileNav() {
     return `${profileData.name.charAt(0)}${profileData.last_name.charAt(0)}`.toUpperCase();
   };
 
+  // Navigation handlers for mobile
+  const handleNewInspection = () => {
+    router.push('/inspections/create');
+  };
+
+  const handleNewTemplate = () => {
+    router.push('/templates/new/editor');
+  };
+
+  const handleNewProject = () => {
+    router.push('/projects/create');
+  };
+
   return (
     <header className="flex h-14 lg:h-[60px] items-center gap-4 border-b bg-background px-4 lg:px-6 md:hidden sticky top-0 z-40">
       <Sheet>
@@ -326,14 +377,35 @@ export function MobileNav() {
             
             <Separator className="my-4" />
             
-            <div className="px-3 py-2">
+            <div className="px-3 py-2 space-y-2">
               <Button
                 variant="outline"
                 size="sm"
                 className="w-full justify-start"
+                onClick={handleNewInspection}
               >
                 <Plus className="mr-2 h-4 w-4" />
                 <span className="truncate">Nova Inspeção</span>
+              </Button>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full justify-start"
+                onClick={handleNewTemplate}
+              >
+                <CircleDot className="mr-2 h-4 w-4" />
+                <span className="truncate">Novo Template</span>
+              </Button>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full justify-start"
+                onClick={handleNewProject}
+              >
+                <FolderKanban className="mr-2 h-4 w-4" />
+                <span className="truncate">Novo Projeto</span>
               </Button>
             </div>
             

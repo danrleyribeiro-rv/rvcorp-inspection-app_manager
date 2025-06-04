@@ -38,8 +38,8 @@ export const generateTemplateCode = async () => {
   }
 };
 
-// Gera código para inspeção: INSP250603-001
-export const generateInspectionCode = async (date = new Date()) => {
+// Gera código para inspeção: INSP250603-001.TP0001
+export const generateInspectionCode = async (date = new Date(), templateCode = null) => {
   try {
     const dateCode = formatDateCode(date);
     const baseCode = `INSP${dateCode}`;
@@ -56,31 +56,40 @@ export const generateInspectionCode = async (date = new Date()) => {
     
     const snapshot = await getDocs(inspectionsQuery);
     
-    if (snapshot.empty) {
-      return `${baseCode}-001`;
+    let sequenceNumber = 1;
+    if (!snapshot.empty) {
+      const lastInspection = snapshot.docs[0].data();
+      const lastCode = lastInspection.cod || `${baseCode}-000`;
+      // Extrai apenas a parte do sequencial (antes do ponto se houver)
+      const codeParts = lastCode.split('.');
+      const sequencePart = codeParts[0].split('-')[1];
+      sequenceNumber = parseInt(sequencePart) + 1;
     }
     
-    const lastInspection = snapshot.docs[0].data();
-    const lastCode = lastInspection.cod || `${baseCode}-000`;
-    const lastSequence = parseInt(lastCode.split('-')[1]);
-    const nextSequence = lastSequence + 1;
+    const inspectionCode = `${baseCode}-${sequenceNumber.toString().padStart(3, '0')}`;
     
-    return `${baseCode}-${nextSequence.toString().padStart(3, '0')}`;
+    // Se tem código do template, adiciona ao final
+    if (templateCode) {
+      return `${inspectionCode}.${templateCode}`;
+    }
+    
+    return inspectionCode;
   } catch (error) {
     console.error('Error generating inspection code:', error);
     const dateCode = formatDateCode(date);
-    return `INSP${dateCode}-001`;
+    const fallbackCode = `INSP${dateCode}-001`;
+    return templateCode ? `${fallbackCode}.${templateCode}` : fallbackCode;
   }
 };
 
 // Gera código para relatório: RLT01-INSP250603-001.TP0001
-export const generateReportCode = async (inspectionCode, templateCode, reportVersion = 1) => {
+export const generateReportCode = async (inspectionCode, reportVersion = 1) => {
   try {
     const reportPrefix = `RLT${reportVersion.toString().padStart(2, '0')}`;
-    return `${reportPrefix}-${inspectionCode}.${templateCode}`;
+    return `${reportPrefix}-${inspectionCode}`;
   } catch (error) {
     console.error('Error generating report code:', error);
-    return `RLT01-${inspectionCode}.${templateCode}`;
+    return `RLT01-${inspectionCode}`;
   }
 };
 
@@ -93,16 +102,71 @@ export const parseCode = (code) => {
     };
   }
   
-  if (/^INSP\d{6}-\d{3}$/.test(code)) {
-    const [base, sequence] = code.split('-');
+  if (/^INSP\d{6}-\d{3}(\.TP\d{4})?$/.test(code)) {
+    const parts = code.split('.');
+    const basePart = parts[0]; // INSP250603-001
+    const templatePart = parts[1]; // TP0001 (se existir)
+    
+    const [base, sequence] = basePart.split('-');
     const dateStr = base.replace('INSP', '');
     
     return {
       type: 'inspection',
       date: `20${dateStr.slice(0, 2)}-${dateStr.slice(2, 4)}-${dateStr.slice(4, 6)}`,
-      sequence: parseInt(sequence)
+      sequence: parseInt(sequence),
+      template: templatePart || null
     };
   }
   
   return null;
+};
+
+// Valida formato do código
+export const validateCode = (code, type) => {
+  if (!code || typeof code !== 'string') return false;
+  
+  switch (type) {
+    case 'template':
+      return /^TP\d{4}$/.test(code);
+    case 'inspection':
+      return /^INSP\d{6}-\d{3}(\.TP\d{4})?$/.test(code);
+    case 'report':
+      return /^RLT\d{2}-INSP\d{6}-\d{3}(\.TP\d{4})?$/.test(code);
+    default:
+      return false;
+  }
+};
+
+// Verifica se código já existe
+export const codeExists = async (code, collectionName) => {
+  try {
+    const q = query(
+      collection(db, collectionName),
+      where('cod', '==', code),
+      where('deleted_at', '==', null),
+      limit(1)
+    );
+    
+    const snapshot = await getDocs(q);
+    return !snapshot.empty;
+  } catch (error) {
+    console.error('Error checking code existence:', error);
+    return false;
+  }
+};
+
+// Gera próximo código disponível
+export const getNextAvailableCode = async (type, options = {}) => {
+  const { date, templateCode, reportVersion } = options;
+  
+  switch (type) {
+    case 'template':
+      return await generateTemplateCode();
+    case 'inspection':
+      return await generateInspectionCode(date, templateCode);
+    case 'report':
+      return await generateReportCode(options.inspectionCode, reportVersion);
+    default:
+      throw new Error(`Unknown code type: ${type}`);
+  }
 };

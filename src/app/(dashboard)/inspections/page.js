@@ -22,8 +22,6 @@ import { Plus, Search, Filter, Loader2 } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import InspectionListItem from "./components/InspectionListItem";
-import CreateInspectionDialog from "./components/CreateInspectionDialog";
-import EditInspectionDialog from "./components/EditInspectionDialog";
 import InspectionDetailsDialog from "./components/InspectionDetailsDialog";
 import DeleteInspectionDialog from "./components/DeleteInspectionDialog";
 import FilterPanel from "./components/FilterPanel";
@@ -306,25 +304,25 @@ export default function InspectionsPage() {
           onChange={(e) => setSearch(e.target.value)}
           className="max-w-full sm:max-w-md lg:max-w-lg"
         />
-        <div className="flex gap-2 sm:gap-4 w-full sm:w-auto">
-          <Button onClick={() => setShowCreate(true)} className="flex-1 sm:flex-none">
-            <Plus className="mr-2 h-4 w-4" />
-            Nova Inspeção
-          </Button>
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button variant="outline" className="flex-1 sm:flex-none">
-                <Filter className="mr-2 h-4 w-4" />
-                Filtros
-              </Button>
-            </SheetTrigger>
-            <FilterPanel
-              filterState={filterState}
-              onFilterChange={setFilterState}
-              inspections={inspections} // Pass original inspections for filter options
-            />
-          </Sheet>
-        </div>
+      <div className="flex gap-2 sm:gap-4 w-full sm:w-auto">
+        <Button onClick={() => router.push('/inspections/create')} className="flex-1 sm:flex-none">
+          <Plus className="mr-2 h-4 w-4" />
+          Nova Inspeção
+        </Button>
+        <Sheet>
+          <SheetTrigger asChild>
+            <Button variant="outline" className="flex-1 sm:flex-none">
+              <Filter className="mr-2 h-4 w-4" />
+              Filtros
+            </Button>
+          </SheetTrigger>
+          <FilterPanel
+            filterState={filterState}
+            onFilterChange={setFilterState}
+            inspections={inspections}
+          />
+        </Sheet>
+      </div>
       </div>
 
       {loading && inspections.length === 0 ? (

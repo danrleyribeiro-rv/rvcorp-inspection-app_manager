@@ -12,12 +12,15 @@ import KanbanView from "./components/KanbanView";
 import { CreateProjectDialog } from "./components/CreateProjectDialog";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/auth-context";
+import { useRouter } from "next/navigation";
+
 
 export default function ProjectsPage() {
   const [activeView, setActiveView] = useState("lista");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -108,7 +111,7 @@ export default function ProjectsPage() {
     <div className="container p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Projetos</h1>
-        <Button onClick={() => setShowCreateModal(true)}>
+        <Button onClick={() => router.push('/projects/create')} className="flex-1 sm:flex-none">
           <Plus className="mr-2 h-4 w-4" />
           Novo Projeto
         </Button>

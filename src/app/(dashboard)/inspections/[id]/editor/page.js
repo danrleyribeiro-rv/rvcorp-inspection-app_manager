@@ -16,6 +16,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent} from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Settings, ListChecks } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { addWatermarkToImage } from "@/utils/ImageWatermark";
@@ -46,6 +48,7 @@ export default function InspectionEditorPage({ params }) {
   const [showMoveDialog, setShowMoveDialog] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [confirmExitDialog, setConfirmExitDialog] = useState(false);
+  const [activeTab, setActiveTab] = useState("general");
   const mediaRef = useRef(null);
   const { toast } = useToast();
   const router = useRouter();
@@ -225,6 +228,50 @@ export default function InspectionEditorPage({ params }) {
       ncIndex
     });
     setViewerOpen(true);
+  };
+
+  const formatFirestoreDate = (timestamp) => {
+    if (!timestamp) return "Não informado";
+    
+    try {
+      let date;
+      
+      // Se é um Firestore Timestamp
+      if (timestamp && typeof timestamp.toDate === 'function') {
+        date = timestamp.toDate();
+      }
+      // Se é uma string ISO
+      else if (typeof timestamp === 'string') {
+        date = new Date(timestamp);
+      }
+      // Se já é um objeto Date
+      else if (timestamp instanceof Date) {
+        date = timestamp;
+      }
+      // Se tem seconds (formato Firestore)
+      else if (timestamp && timestamp.seconds) {
+        date = new Date(timestamp.seconds * 1000);
+      }
+      else {
+        return "Data inválida";
+      }
+
+      // Verifica se a data é válida
+      if (isNaN(date.getTime())) {
+        return "Data inválida";
+      }
+
+      return date.toLocaleString('pt-BR', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      console.error('Erro ao formatar data:', error, timestamp);
+      return "Data inválida";
+    }
   };
 
   const ConfirmExitDialog = () => (
@@ -729,7 +776,75 @@ export default function InspectionEditorPage({ params }) {
 
         {/* Content */}
         <div className="p-4">
-          <Tabs value="topics" className="space-y-4">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+            <TabsList className="mb-4">
+              <TabsTrigger value="general" className="flex items-center gap-2">
+                <Settings className="h-4 w-4" />
+                Informações Gerais
+              </TabsTrigger>
+              <TabsTrigger value="topics" className="flex items-center gap-2">
+                <ListChecks className="h-4 w-4" />
+                Estrutura da Inspeção
+              </TabsTrigger>
+            </TabsList>
+
+              <TabsContent value="general" className="space-y-4">
+                <div className="bg-card border rounded-lg p-6">
+                  <h2 className="text-lg font-semibold mb-4">Informações Básicas</h2>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <Label htmlFor="title">Título da Inspeção</Label>
+                      <Input
+                        id="title"
+                        value={inspection?.title || ''}
+                        onChange={e => updateInspectionField('title', e.target.value)}
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="area">Metragem (m²)</Label>
+                      <Input
+                        id="area"
+                        type="number"
+                        value={inspection?.area || ''}
+                        onChange={e => updateInspectionField('area', e.target.value)}
+                        className="mt-1"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 mb-4">
+                    <Label htmlFor="observation">Observações</Label>
+                    <Textarea
+                      id="observation"
+                      value={inspection?.observation || ''}
+                      onChange={e => updateInspectionField('observation', e.target.value)}
+                      rows={3}
+                      className="mt-1"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label>Data de Criação</Label>
+                      <Input
+                        value={formatFirestoreDate(inspection?.created_at)}
+                        disabled
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label>Última Atualização</Label>
+                      <Input
+                        value={formatFirestoreDate(inspection?.updated_at)}
+                        disabled
+                        className="mt-1"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </TabsContent>
 
             <TabsContent value="topics" className="space-y-4">
               <div className="grid grid-cols-12 gap-4 h-[calc(100vh-200px)]">
