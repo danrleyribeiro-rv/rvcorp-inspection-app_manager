@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import DetailEditor from "@/components/inspection/DetailEditor";
 import MediaMoveDialog from "@/components/inspection/MediaMoveDialog";
+import InspectionControlPanel from "@/components/inspection/InspectionControlPanel";
 
 export default function InspectionEditorPage({ params }) {
   const inspectionId = use(params).id;
@@ -49,6 +50,7 @@ export default function InspectionEditorPage({ params }) {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [confirmExitDialog, setConfirmExitDialog] = useState(false);
   const [activeTab, setActiveTab] = useState("general");
+  const [inspectionControlData, setInspectionControlData] = useState(null);
   const mediaRef = useRef(null);
   const { toast } = useToast();
   const router = useRouter();
@@ -707,6 +709,23 @@ export default function InspectionEditorPage({ params }) {
     }));
   };
 
+  useEffect(() => {
+    if (inspection) {
+      setInspectionControlData({
+        ...inspection,
+        delivered: inspection.delivered || false,
+        delivered_at: inspection.delivered_at || null,
+        inspection_edit_blocked: inspection.inspection_edit_blocked || false,
+        last_editor: inspection.last_editor || null
+      });
+    }
+  }, [inspection]);
+
+  // Função para atualizar dados de controle
+  const handleControlUpdate = async () => {
+    await fetchInspection();
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -786,65 +805,69 @@ export default function InspectionEditorPage({ params }) {
                 <ListChecks className="h-4 w-4" />
                 Estrutura da Inspeção
               </TabsTrigger>
+              {/* Nova aba Controle */}
+              <TabsTrigger value="control" className="flex items-center gap-2">
+                <Settings className="h-4 w-4" />
+                Controle
+              </TabsTrigger>
             </TabsList>
-
-              <TabsContent value="general" className="space-y-4">
-                <div className="bg-card border rounded-lg p-6">
-                  <h2 className="text-lg font-semibold mb-4">Informações Básicas</h2>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <Label htmlFor="title">Título da Inspeção</Label>
-                      <Input
-                        id="title"
-                        value={inspection?.title || ''}
-                        onChange={e => updateInspectionField('title', e.target.value)}
-                        className="mt-1"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="area">Metragem (m²)</Label>
-                      <Input
-                        id="area"
-                        type="number"
-                        value={inspection?.area || ''}
-                        onChange={e => updateInspectionField('area', e.target.value)}
-                        className="mt-1"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2 mb-4">
-                    <Label htmlFor="observation">Observações</Label>
-                    <Textarea
-                      id="observation"
-                      value={inspection?.observation || ''}
-                      onChange={e => updateInspectionField('observation', e.target.value)}
-                      rows={3}
+            <TabsContent value="general" className="space-y-4">
+              <div className="bg-card border rounded-lg p-6">
+                <h2 className="text-lg font-semibold mb-4">Informações Básicas</h2>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <Label htmlFor="title">Título da Inspeção</Label>
+                    <Input
+                      id="title"
+                      value={inspection?.title || ''}
+                      onChange={e => updateInspectionField('title', e.target.value)}
                       className="mt-1"
                     />
                   </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label>Data de Criação</Label>
-                      <Input
-                        value={formatFirestoreDate(inspection?.created_at)}
-                        disabled
-                        className="mt-1"
-                      />
-                    </div>
-                    <div>
-                      <Label>Última Atualização</Label>
-                      <Input
-                        value={formatFirestoreDate(inspection?.updated_at)}
-                        disabled
-                        className="mt-1"
-                      />
-                    </div>
+                  <div>
+                    <Label htmlFor="area">Metragem (m²)</Label>
+                    <Input
+                      id="area"
+                      type="number"
+                      value={inspection?.area || ''}
+                      onChange={e => updateInspectionField('area', e.target.value)}
+                      className="mt-1"
+                    />
                   </div>
                 </div>
-              </TabsContent>
+
+                <div className="space-y-2 mb-4">
+                  <Label htmlFor="observation">Observações</Label>
+                  <Textarea
+                    id="observation"
+                    value={inspection?.observation || ''}
+                    onChange={e => updateInspectionField('observation', e.target.value)}
+                    rows={3}
+                    className="mt-1"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label>Data de Criação</Label>
+                    <Input
+                      value={formatFirestoreDate(inspection?.created_at)}
+                      disabled
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label>Última Atualização</Label>
+                    <Input
+                      value={formatFirestoreDate(inspection?.updated_at)}
+                      disabled
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
 
             <TabsContent value="topics" className="space-y-4">
               <div className="grid grid-cols-12 gap-4 h-[calc(100vh-200px)]">
@@ -1078,6 +1101,15 @@ className="h-7 text-sm mt-1"
                </div>
              </div>
            </TabsContent>
+           {/* Novo conteúdo da aba Controle */}
+           <TabsContent value="control" className="space-y-4">
+              {inspectionControlData && (
+                <InspectionControlPanel 
+                  inspection={inspectionControlData}
+                  onUpdate={handleControlUpdate}
+                />
+              )}
+            </TabsContent>
          </Tabs>
        </div>
        

@@ -7,6 +7,7 @@ import { ptBR } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { parseCode } from "@/utils/codeGenerator";
+import DeliveryStatus from "@/components/inspection/DeliveryStatus";
 import { 
   Pencil, 
   Eye, 
@@ -20,7 +21,8 @@ import {
   ChevronDown, 
   ChevronRight,
   Clock,
-  Hash
+  Hash,
+  Lock
 } from "lucide-react";
 
 // Função para formatar datas com verificação de validade
@@ -204,6 +206,15 @@ export default function InspectionListItem({ inspection, onEdit, onView, onDelet
           {damaged && (
             <Badge variant="outline" className="text-xs border-orange-300 text-orange-700">
               Problemas
+            </Badge>
+          )}
+          {/* Status de entrega */}
+          <DeliveryStatus inspection={inspection} />
+          {/* Bloqueio de edição */}
+          {inspection.inspection_edit_blocked && (
+            <Badge variant="outline" className="text-xs border-orange-300 text-orange-700">
+              <Lock className="h-3 w-3 mr-1" />
+              Bloqueada
             </Badge>
           )}
         </div>
