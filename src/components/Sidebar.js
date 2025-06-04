@@ -36,6 +36,7 @@ const menuItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/projects", label: "Projetos", icon: FolderKanban },
   { href: "/inspections", label: "Inspeções", icon: Search },
+  { href: "/reports", label: "Relatórios", icon: FileText }, // Nova entrada
   { href: "/templates", label: "Templates", icon: CircleDot },
   { href: "/inspectors", label: "Vistoriadores", icon: Users },
   { href: "/clients", label: "Clientes", icon: Users },
