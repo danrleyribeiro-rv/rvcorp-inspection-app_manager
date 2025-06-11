@@ -27,7 +27,7 @@ import {
   ChevronRight,
   Settings,
   ListChecks,
-  PencilRuler, // Added specific icons
+  PencilRuler,
   Ruler,
   Wrench,
   Puzzle,
@@ -56,7 +56,6 @@ const defaultNewTemplate = {
   cod: null,
 };
 
-// Define iconComponents mapping here
 const editorIconComponents = {
   'pencil-ruler': PencilRuler,
   'ruler': Ruler,
@@ -65,14 +64,11 @@ const editorIconComponents = {
   'house': Home,
   'building': Building,
   'store': Store,
-  // Add other icons from TEMPLATE_ICONS if needed
 };
-
 
 export default function TemplateEditorPage({ params: routeParams }) {
   const { id: initialTemplateId } = use(routeParams);
   const [templateId, setTemplateId] = useState(initialTemplateId);
-
   const [template, setTemplate] = useState(null);
   const [originalTemplate, setOriginalTemplate] = useState(null);
   const [isCreatingNew, setIsCreatingNew] = useState(initialTemplateId === NEW_TEMPLATE_ID);
@@ -87,6 +83,9 @@ export default function TemplateEditorPage({ params: routeParams }) {
   const { toast } = useToast();
   const router = useRouter();
 
+  // Função para gerar IDs únicos e estáveis
+  const generateStableId = (prefix, index) => `${prefix}-${index}`;
+
   // Helper function to get the icon component instance
   const getVisualIcon = (iconName) => {
     const IconComponent = editorIconComponents[iconName];
@@ -98,16 +97,15 @@ export default function TemplateEditorPage({ params: routeParams }) {
     return TEMPLATE_COLORS.find(c => c.value === colorValue);
   };
 
-
   useEffect(() => {
     if (template && originalTemplate) {
       const current = JSON.stringify(template);
       const original = JSON.stringify(originalTemplate);
       setHasUnsavedChanges(current !== original);
     } else if (template && !originalTemplate && isCreatingNew) {
-        const current = JSON.stringify(template);
-        const initial = JSON.stringify(defaultNewTemplate);
-        setHasUnsavedChanges(current !== initial);
+      const current = JSON.stringify(template);
+      const initial = JSON.stringify(defaultNewTemplate);
+      setHasUnsavedChanges(current !== initial);
     }
   }, [template, originalTemplate, isCreatingNew]);
 
@@ -171,9 +169,9 @@ export default function TemplateEditorPage({ params: routeParams }) {
 
   const saveTemplate = async () => {
     if (!template.title?.trim()) {
-        toast({ title: "Erro de Validação", description: "O título do template é obrigatório.", variant: "destructive"});
-        setActiveTab("general");
-        return;
+      toast({ title: "Erro de Validação", description: "O título do template é obrigatório.", variant: "destructive"});
+      setActiveTab("general");
+      return;
     }
     setSaving(true);
     try {
@@ -194,7 +192,7 @@ export default function TemplateEditorPage({ params: routeParams }) {
 
         toast({ title: "Template criado com sucesso!", description: `Código: ${newCode}` });
         
-        const newlySavedTemplate = { ...docData, id: newId, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }; // Simulate Firestore timestamp behavior for immediate UI update
+        const newlySavedTemplate = { ...docData, id: newId, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
         setTemplate(newlySavedTemplate);
         setOriginalTemplate(structuredClone(newlySavedTemplate));
         setIsCreatingNew(false);
@@ -305,7 +303,7 @@ export default function TemplateEditorPage({ params: routeParams }) {
       topics: [
         ...(prev.topics || []),
         {
-          name: `Novo Tópico ${ (prev.topics?.length || 0) + 1}`,
+          name: `Novo Tópico ${(prev.topics?.length || 0) + 1}`,
           description: "",
           items: []
         }
@@ -445,7 +443,7 @@ export default function TemplateEditorPage({ params: routeParams }) {
             onClick={async () => {
               await saveTemplate();
               if (!saving) {
-                 router.push("/templates");
+                router.push("/templates");
               }
             }}
             disabled={saving}
@@ -513,7 +511,7 @@ export default function TemplateEditorPage({ params: routeParams }) {
             <Button 
               size="sm" 
               onClick={saveTemplate} 
-              disabled={saving || (!hasUnsavedChanges && !isCreatingNew && templateId !== NEW_TEMPLATE_ID) }
+              disabled={saving || (!hasUnsavedChanges && !isCreatingNew && templateId !== NEW_TEMPLATE_ID)}
             >
               {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
               {isCreatingNew ? "Criar e Salvar" : "Salvar Alterações"}
@@ -533,104 +531,101 @@ export default function TemplateEditorPage({ params: routeParams }) {
         </TabsList>
 
         <TabsContent value="general" className="flex-1 overflow-y-auto space-y-6 p-1">
-            <ScrollArea className="h-full pr-2">
-                <div className="space-y-6 py-4 px-4">
-                    <div>
-                        <Label htmlFor="templateTitle" className="font-medium">Título do Template <span className="text-red-500">*</span></Label>
-                        <Input 
-                            id="templateTitle" 
-                            value={template.title} 
-                            onChange={e => updateTemplateField('title', e.target.value)}
-                            placeholder="Ex: Inspeção de Equipamento X"
-                            className="mt-1"
-                        />
-                    </div>
-                    <div>
-                        <Label htmlFor="templateDescription" className="font-medium">Descrição</Label>
-                        <Textarea 
-                            id="templateDescription" 
-                            value={template.description} 
-                            onChange={e => updateTemplateField('description', e.target.value)}
-                            placeholder="Detalhes sobre este template..."
-                            className="mt-1 min-h-[100px]"
-                        />
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                            <Label htmlFor="templatePrice" className="font-medium">Preço (R$)</Label>
-                            <Input 
-                                id="templatePrice" 
-                                type="text" 
-                                value={template.template_price} 
-                                onChange={handlePriceChange}
-                                onBlur={handlePriceBlur}
-                                placeholder="0.00"
-                                className="mt-1"
-                            />
-                        </div>
-                        <div>
-                            <Label htmlFor="templateIcon" className="font-medium">Ícone</Label>
-                            <Select value={template.icon} onValueChange={val => updateTemplateField('icon', val)}>
-                                <SelectTrigger id="templateIcon" className="mt-1">
-                                    {/* Directly render custom content within SelectTrigger */}
-                                    <div className="flex items-center w-full"> {/* w-full to take available space */}
-                                        {template.icon ? (
-                                            <>
-                                                {getVisualIcon(template.icon)}
-                                                <span>{TEMPLATE_ICONS.find(i => i.value === template.icon)?.label}</span>
-                                            </>
-                                        ) : (
-                                            <span className="text-muted-foreground">Selecione um ícone</span> // Placeholder text
-                                        )}
-                                    </div>
-                                    {/* Radix SelectTrigger usually adds its own caret icon. We don't need to add one manually. */}
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {TEMPLATE_ICONS.map(iconOption => (
-                                    <SelectItem key={iconOption.value} value={iconOption.value}>
-                                        <div className="flex items-center">
-                                            {getVisualIcon(iconOption.value)}
-                                            {iconOption.label}
-                                        </div>
-                                    </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        {/* For Cor do Ícone */}
-                        <div>
-                            <Label htmlFor="templateIconColor" className="font-medium">Cor do Ícone</Label>
-                            <Select value={template.icon_color} onValueChange={val => updateTemplateField('icon_color', val)}>
-                                <SelectTrigger id="templateIconColor" className="mt-1 w-full"> {/* Added w-full */}
-                                    <div className="flex items-center flex-1"> {/* flex-1 */}
-                                        {template.icon_color && getSelectedColorData(template.icon_color) ? (
-                                            <>
-                                                <div className={`w-3.5 h-3.5 rounded-full mr-2 shrink-0 ${getSelectedColorData(template.icon_color)?.class}`} />
-                                                <span className="truncate"> {/* Added truncate */}
-                                                    {getSelectedColorData(template.icon_color)?.label}
-                                                </span>
-                                            </>
-                                        ) : (
-                                            <span className="text-muted-foreground">Selecione uma cor</span>
-                                        )}
-                                    </div>
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {TEMPLATE_COLORS.map(colorOption => (
-                                    <SelectItem key={colorOption.value} value={colorOption.value}>
-                                        <div className="flex items-center gap-2">
-                                            <div className={`w-3.5 h-3.5 rounded-full ${colorOption.class}`} />
-                                            {colorOption.label}
-                                        </div>
-                                    </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </div>
+          <ScrollArea className="h-full pr-2">
+            <div className="space-y-6 py-4 px-4">
+              <div>
+                <Label htmlFor="templateTitle" className="font-medium">Título do Template <span className="text-red-500">*</span></Label>
+                <Input 
+                  id="templateTitle" 
+                  value={template.title} 
+                  onChange={e => updateTemplateField('title', e.target.value)}
+                  placeholder="Ex: Inspeção de Equipamento X"
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="templateDescription" className="font-medium">Descrição</Label>
+                <Textarea 
+                  id="templateDescription" 
+                  value={template.description} 
+                  onChange={e => updateTemplateField('description', e.target.value)}
+                  placeholder="Detalhes sobre este template..."
+                  className="mt-1 min-h-[100px]"
+                />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="templatePrice" className="font-medium">Preço (R$)</Label>
+                  <Input 
+                    id="templatePrice" 
+                    type="text" 
+                    value={template.template_price} 
+                    onChange={handlePriceChange}
+                    onBlur={handlePriceBlur}
+                    placeholder="0.00"
+                    className="mt-1"
+                  />
                 </div>
-            </ScrollArea>
+                <div>
+                  <Label htmlFor="templateIcon" className="font-medium">Ícone</Label>
+                  <Select value={template.icon} onValueChange={val => updateTemplateField('icon', val)}>
+                    <SelectTrigger id="templateIcon" className="mt-1">
+                      <div className="flex items-center w-full">
+                        {template.icon ? (
+                          <>
+                            {getVisualIcon(template.icon)}
+                            <span>{TEMPLATE_ICONS.find(i => i.value === template.icon)?.label}</span>
+                          </>
+                        ) : (
+                          <span className="text-muted-foreground">Selecione um ícone</span>
+                        )}
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TEMPLATE_ICONS.map(iconOption => (
+                        <SelectItem key={iconOption.value} value={iconOption.value}>
+                          <div className="flex items-center">
+                            {getVisualIcon(iconOption.value)}
+                            {iconOption.label}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="templateIconColor" className="font-medium">Cor do Ícone</Label>
+                  <Select value={template.icon_color} onValueChange={val => updateTemplateField('icon_color', val)}>
+                    <SelectTrigger id="templateIconColor" className="mt-1 w-full">
+                      <div className="flex items-center flex-1">
+                        {template.icon_color && getSelectedColorData(template.icon_color) ? (
+                          <>
+                            <div className={`w-3.5 h-3.5 rounded-full mr-2 shrink-0 ${getSelectedColorData(template.icon_color)?.class}`} />
+                            <span className="truncate">
+                              {getSelectedColorData(template.icon_color)?.label}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-muted-foreground">Selecione uma cor</span>
+                        )}
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TEMPLATE_COLORS.map(colorOption => (
+                        <SelectItem key={colorOption.value} value={colorOption.value}>
+                          <div className="flex items-center gap-2">
+                            <div className={`w-3.5 h-3.5 rounded-full ${colorOption.class}`} />
+                            {colorOption.label}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+          </ScrollArea>
         </TabsContent>
 
         <TabsContent value="structure" className="flex-1 overflow-hidden">
@@ -643,7 +638,7 @@ export default function TemplateEditorPage({ params: routeParams }) {
               <ScrollArea className="flex-1 p-2 space-y-1">
                 {template.topics?.map((topic, topicIndex) => (
                   <div
-                    key={`topic-${topicIndex}-${topic.name}`} 
+                    key={generateStableId('topic', topicIndex)} // Chave estável
                     className={`p-2 rounded cursor-pointer border ${
                       activeTopicIndex === topicIndex 
                         ? 'bg-primary text-primary-foreground shadow-md' 
@@ -686,24 +681,24 @@ export default function TemplateEditorPage({ params: routeParams }) {
                       </div>
                     </div>
                     <div className="space-y-1">
-                        {currentTopic.items?.map((item, itemIndex) => (
+                      {currentTopic.items?.map((item, itemIndex) => (
                         <div
-                            key={`item-${activeTopicIndex}-${itemIndex}-${item.name}`}
-                            className={`p-2 rounded cursor-pointer border ${
+                          key={generateStableId('item', itemIndex)} // Chave estável
+                          className={`p-2 rounded cursor-pointer border ${
                             activeItemIndex === itemIndex ? 'bg-primary text-primary-foreground shadow-md' : 'hover:bg-accent'
-                            }`}
-                            onClick={() => setActiveItemIndex(itemIndex)}
+                          }`}
+                          onClick={() => setActiveItemIndex(itemIndex)}
                         >
-                            <div className="flex justify-between items-center">
+                          <div className="flex justify-between items-center">
                             <span className="text-sm font-medium truncate pr-1">{item.name || `Item ${itemIndex + 1}`}</span>
                             <Button size="icon" variant="ghost" className="h-6 w-6 p-0 shrink-0" onClick={(e) => { e.stopPropagation(); removeItem(activeTopicIndex, itemIndex);}}>
-                                <Trash2 className="h-3 w-3" />
+                              <Trash2 className="h-3 w-3" />
                             </Button>
-                            </div>
-                            {item.details?.length > 0 && <span className="text-xs opacity-70">{item.details.length} detalhe{item.details.length !== 1 ? 's' : ''}</span>}
+                          </div>
+                          {item.details?.length > 0 && <span className="text-xs opacity-70">{item.details.length} detalhe{item.details.length !== 1 ? 's' : ''}</span>}
                         </div>
-                        ))}
-                        {currentTopic.items?.length === 0 && <p className="text-sm text-muted-foreground p-4 text-center">Nenhum item neste tópico.</p>}
+                      ))}
+                      {currentTopic.items?.length === 0 && <p className="text-sm text-muted-foreground p-4 text-center">Nenhum item neste tópico.</p>}
                     </div>
                   </div>
                 ) : (
@@ -718,77 +713,86 @@ export default function TemplateEditorPage({ params: routeParams }) {
                   {currentItem && (
                     <>
                       <span className="text-xs text-muted-foreground hidden lg:inline">Tópico {activeTopicIndex + 1}</span><ChevronRight className="h-3 w-3 hidden lg:inline" />
-                      <span className="text-xs text-muted-foreground hidden lg:inline">Item {activeItemIndex + 1}</span><ChevronRight className="h-3 w-3 hidden lg:inline" />
-                    </>
-                  )}
-                  <span className="font-medium">Detalhes ({currentItem?.details?.length || 0})</span>
-                </div>
-                {currentItem && <Button size="sm" variant="outline" onClick={() => addDetail(activeTopicIndex, activeItemIndex)}><Plus className="h-3 w-3" /></Button>}
-              </div>
-              <ScrollArea className="flex-1">
-                {currentItem ? (
-                  <div className="p-3 space-y-4">
-                    <div className="space-y-3 p-3 bg-muted/30 rounded border">
-                        <Label className="text-sm font-medium">Configurações do Item</Label>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <div>
-                                <Label className="text-xs">Nome do Item</Label>
-                                <Input value={currentItem.name} onChange={e => updateItemField(activeTopicIndex, activeItemIndex, 'name', e.target.value)} className="h-8 text-sm mt-1" />
-                            </div>
-                            <div>
-                                <Label className="text-xs">Descrição do Item</Label>
-                                <Input value={currentItem.description || ''} onChange={e => updateItemField(activeTopicIndex, activeItemIndex, 'description', e.target.value)} className="h-8 text-sm mt-1" />
-                            </div>
-                        </div>
-                    </div>
-                    <div className="space-y-3">
-                      <Label className="text-sm font-medium">Campos de Detalhe</Label>
-                      {currentItem.details?.map((detail, detailIndex) => (
-                        <div key={`detail-${activeTopicIndex}-${activeItemIndex}-${detailIndex}-${detail.name}`} className="border rounded-md p-3 space-y-3 bg-card shadow-sm">
-                          <div className="flex justify-between items-center">
-                            <Label className="text-xs font-semibold">Detalhe {detailIndex + 1}</Label>
-                            <Button size="icon" variant="ghost" className="h-6 w-6 p-0 text-destructive hover:text-destructive/80" onClick={() => removeDetail(activeTopicIndex, activeItemIndex, detailIndex)}>
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <div>
-                              <Label className="text-xs">Nome do Detalhe</Label>
-                              <Input value={detail.name} onChange={e => updateDetailField(activeTopicIndex, activeItemIndex, detailIndex, 'name', e.target.value)} className="h-8 text-sm mt-1" />
-                            </div>
-                            <div>
-                              <Label className="text-xs">Tipo de Resposta</Label>
-                              <Select value={detail.type} onValueChange={value => updateDetailField(activeTopicIndex, activeItemIndex, detailIndex, 'type', value)}>
-                                <SelectTrigger className="h-8 text-sm mt-1"><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                  {RESPONSE_TYPES.map(type => <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>)}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </div>
-                          {detail.type === "select" && (
-                            <div>
-                              <Label className="text-xs">Opções (separadas por vírgula)</Label>
-                              <Input value={detail.optionsText || detail.options?.join(", ") || ""} onChange={e => updateOptions(activeTopicIndex, activeItemIndex, detailIndex, e.target.value)} placeholder="Opção 1, Opção 2..." className="h-8 text-sm mt-1" />
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                       {currentItem.details?.length === 0 && <p className="text-sm text-muted-foreground p-4 text-center">Nenhum detalhe adicionado a este item.</p>}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="p-4 text-center text-sm text-muted-foreground">
-                    {currentTopic ? "Selecione um item para ver/adicionar detalhes." : "Selecione um tópico e um item."}
-                  </div>
-                )}
-              </ScrollArea>
-            </div>
-          </div>
-        </TabsContent>
-      </Tabs>
-       
-      <ConfirmExitDialogComponent />
-    </div>
-  );
+<span className="text-xs text-muted-foreground hidden lg:inline">Item {activeItemIndex + 1}</span><ChevronRight className="h-3 w-3 hidden lg:inline" />
+                   </>
+                 )}
+                 <span className="font-medium">Detalhes ({currentItem?.details?.length || 0})</span>
+               </div>
+               {currentItem && <Button size="sm" variant="outline" onClick={() => addDetail(activeTopicIndex, activeItemIndex)}><Plus className="h-3 w-3" /></Button>}
+             </div>
+             <ScrollArea className="flex-1">
+               {currentItem ? (
+                 <div className="p-3 space-y-4">
+                   <div className="space-y-3 p-3 bg-muted/30 rounded border">
+                     <Label className="text-sm font-medium">Configurações do Item</Label>
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                       <div>
+                         <Label className="text-xs">Nome do Item</Label>
+                         <Input value={currentItem.name} onChange={e => updateItemField(activeTopicIndex, activeItemIndex, 'name', e.target.value)} className="h-8 text-sm mt-1" />
+                       </div>
+                       <div>
+                         <Label className="text-xs">Descrição do Item</Label>
+                         <Input value={currentItem.description || ''} onChange={e => updateItemField(activeTopicIndex, activeItemIndex, 'description', e.target.value)} className="h-8 text-sm mt-1" />
+                       </div>
+                     </div>
+                   </div>
+                   <div className="space-y-3">
+                     <Label className="text-sm font-medium">Campos de Detalhe</Label>
+                     {currentItem.details?.map((detail, detailIndex) => (
+                       <div key={generateStableId('detail', detailIndex)} className="border rounded-md p-3 space-y-3 bg-card shadow-sm">
+                         <div className="flex justify-between items-center">
+                           <Label className="text-xs font-semibold">Detalhe {detailIndex + 1}</Label>
+                           <Button size="icon" variant="ghost" className="h-6 w-6 p-0 text-destructive hover:text-destructive/80" onClick={() => removeDetail(activeTopicIndex, activeItemIndex, detailIndex)}>
+                             <Trash2 className="h-3.5 w-3.5" />
+                           </Button>
+                         </div>
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                           <div>
+                             <Label className="text-xs">Nome do Detalhe</Label>
+                             <Input 
+                               value={detail.name} 
+                               onChange={e => updateDetailField(activeTopicIndex, activeItemIndex, detailIndex, 'name', e.target.value)} 
+                               className="h-8 text-sm mt-1" 
+                             />
+                           </div>
+                           <div>
+                             <Label className="text-xs">Tipo de Resposta</Label>
+                             <Select value={detail.type} onValueChange={value => updateDetailField(activeTopicIndex, activeItemIndex, detailIndex, 'type', value)}>
+                               <SelectTrigger className="h-8 text-sm mt-1"><SelectValue /></SelectTrigger>
+                               <SelectContent>
+                                 {RESPONSE_TYPES.map(type => <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>)}
+                               </SelectContent>
+                             </Select>
+                           </div>
+                         </div>
+                         {detail.type === "select" && (
+                           <div>
+                             <Label className="text-xs">Opções (separadas por vírgula)</Label>
+                             <Input 
+                               value={detail.optionsText || detail.options?.join(", ") || ""} 
+                               onChange={e => updateOptions(activeTopicIndex, activeItemIndex, detailIndex, e.target.value)} 
+                               placeholder="Opção 1, Opção 2..." 
+                               className="h-8 text-sm mt-1" 
+                             />
+                           </div>
+                         )}
+                       </div>
+                     ))}
+                     {currentItem.details?.length === 0 && <p className="text-sm text-muted-foreground p-4 text-center">Nenhum detalhe adicionado a este item.</p>}
+                   </div>
+                 </div>
+               ) : (
+                 <div className="p-4 text-center text-sm text-muted-foreground">
+                   {currentTopic ? "Selecione um item para ver/adicionar detalhes." : "Selecione um tópico e um item."}
+                 </div>
+               )}
+             </ScrollArea>
+           </div>
+         </div>
+       </TabsContent>
+     </Tabs>
+      
+     <ConfirmExitDialogComponent />
+   </div>
+ );
 }
