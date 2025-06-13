@@ -175,7 +175,8 @@ export default function EditProjectDialog({ project, open, onClose, onSuccess })
 
           <Input
             type="number"
-            step="0.01"
+            min="0"
+            step="1.00"
             placeholder="Valor do Projeto"
             value={formData.project_price}
             onChange={(e) =>

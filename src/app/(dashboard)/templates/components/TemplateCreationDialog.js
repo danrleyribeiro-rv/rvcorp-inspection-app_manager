@@ -131,7 +131,7 @@ export default function TemplateCreationDialog({ open, onClose, onSuccess }) {
                       type="number"
                       name="template_price"
                       min="0"
-                      step="0.01"
+                      step="1.00"
                       value={formData.template_price}
                       onChange={handleNumberChange}
                       className="h-9 mt-1"

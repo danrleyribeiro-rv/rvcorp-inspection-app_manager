@@ -164,7 +164,8 @@ export function CreateProjectDialog({ open, onClose, onSuccess, managerId }) {
 
                     <Input
                         type="number"
-                        step="0.01"
+                        min="0"
+                        step="1.00"
                         placeholder="Valor do Projeto"
                         value={formData.project_price}
                         onChange={(e) =>

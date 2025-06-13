@@ -830,6 +830,8 @@ export default function InspectionEditorPage({ params }) {
                     <Input
                       id="area"
                       type="number"
+                      min="0"
+                      step="1.0"
                       value={inspection?.area || ''}
                       onChange={e => updateInspectionField('area', e.target.value)}
                       className="mt-1"

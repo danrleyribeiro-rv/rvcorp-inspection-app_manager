@@ -414,6 +414,8 @@ export default function CreateInspectionPage() {
                   <Input
                       id="shared-area"
                       type="number"
+                      min="0"
+                      step="1.0"
                       value={sharedData.area}
                       onChange={e => setSharedData(prev => ({ ...prev, area: e.target.value }))}
                       placeholder="Ex: 120"
@@ -542,6 +544,8 @@ export default function CreateInspectionPage() {
                         <Input
                           id={`area-${index}`}
                           type="number"
+                          min="0"
+                          step="1.0"
                           value={inspection.area || ''}
                           onChange={e => updateBulkInspection(index, 'area', e.target.value)}
                           placeholder="120"

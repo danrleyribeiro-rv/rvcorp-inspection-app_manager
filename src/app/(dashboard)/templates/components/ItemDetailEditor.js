@@ -161,7 +161,7 @@ export default function ItemDetailEditor({ details = [], onChange }) {
                         <Label className="text-xs">Mínimo</Label>
                         <Input
                           type="number"
-                          min="0"
+                          min="0"            
                           value={detail.media_requirements?.[detail.type === "image" ? "images" : "videos"]?.min || 0}
                           onChange={e => updateDetail(index, `media_requirements.${detail.type === "image" ? "images" : "videos"}.min`, e.target.value)}
                           className="h-7 text-sm"

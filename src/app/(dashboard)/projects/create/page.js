@@ -222,7 +222,7 @@ export default function CreateProjectPage() {
                 <Input
                   id="project_price"
                   type="number"
-                  step="0.01"
+                  step="1.00"
                   placeholder="Valor do Projeto"
                   value={formData.project_price}
                   onChange={(e) => updateField('project_price', e.target.value)}
