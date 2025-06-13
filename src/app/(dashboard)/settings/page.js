@@ -4,7 +4,7 @@
 import { useState, useEffect } from "react";
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { db, auth, storage } from "@/lib/firebase";
-import { updatePassword } from "firebase/auth";
+import { updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth";
 import { useTheme } from "next-themes";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
@@ -56,18 +56,17 @@ export default function SettingsPage() {
     settings: true,
     password: false
   });
-  const { theme, setTheme } = useTheme();
-  const { user } = useAuth();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const { theme, setTheme } = useTheme();
 
   useEffect(() => {
     if (user) {
-      loadSettings();
+      fetchSettings();
     }
   }, [user]);
 
-  const loadSettings = async () => {
-    setLoading(prev => ({ ...prev, settings: true }));
+  const fetchSettings = async () => {
     try {
       if (!user?.uid) return;
       
@@ -75,77 +74,36 @@ export default function SettingsPage() {
       const settingsDoc = await getDoc(userSettingsRef);
       
       if (settingsDoc.exists()) {
-        const settingsData = settingsDoc.data();
-        if (settingsData.settings) {
-          setSettings(settingsData.settings);
-          
-          // Apply theme from settings if it exists
-          if (settingsData.settings.theme) {
-            setTheme(settingsData.settings.theme);
-          }
-        } else {
-          // If settings object doesn't exist in the document
-          setSettings(defaultSettings);
-        }
-      } else {
-        // If document doesn't exist yet, use defaults
-        setSettings(defaultSettings);
+        const data = settingsDoc.data();
+        setSettings({ ...defaultSettings, ...data.settings });
       }
     } catch (error) {
-      console.error("Error loading settings:", error);
-      toast({
-        title: "Erro",
-        description: "Falha ao carregar configurações",
-        variant: "destructive",
-      });
+      console.error("Erro ao carregar configurações:", error);
     } finally {
       setLoading(prev => ({ ...prev, settings: false }));
     }
   };
 
   const saveSettings = async (newSettings) => {
-    setLoading(prev => ({ ...prev, settings: true }));
     try {
       if (!user?.uid) return;
       
       const userSettingsRef = doc(db, 'user_settings', user.uid);
-      
-      // Check if the document already exists
-      const docSnap = await getDoc(userSettingsRef);
-      
-      if (docSnap.exists()) {
-        // Update existing document
-        await updateDoc(userSettingsRef, {
-          settings: newSettings,
-          updated_at: serverTimestamp()
-        });
-      } else {
-        // Create new document
-        await setDoc(userSettingsRef, {
-          settings: newSettings,
-          user_id: user.uid,
-          created_at: serverTimestamp(),
-          updated_at: serverTimestamp()
-        });
-      }
-
-      toast({
-        title: "Sucesso",
-        description: "Configurações salvas com sucesso",
-      });
+      await setDoc(userSettingsRef, {
+        settings: newSettings,
+        updated_at: serverTimestamp()
+      }, { merge: true });
     } catch (error) {
-      console.error("Error saving settings:", error);
+      console.error("Erro ao salvar configurações:", error);
       toast({
         title: "Erro",
         description: "Falha ao salvar configurações",
         variant: "destructive",
       });
-    } finally {
-      setLoading(prev => ({ ...prev, settings: false }));
     }
   };
 
-  const updateNotificationSetting = (key) => {
+  const handleNotificationChange = (key) => {
     const newSettings = {
       ...settings,
       notifications: {
@@ -157,7 +115,7 @@ export default function SettingsPage() {
     saveSettings(newSettings);
   };
 
-  const updateAppSetting = (key, value) => {
+  const handleAppSettingChange = (key, value) => {
     const newSettings = {
       ...settings,
       app: {
@@ -182,7 +140,7 @@ export default function SettingsPage() {
   const handleChangePassword = async (e) => {
     e.preventDefault();
 
-    // Validate passwords
+    // Validar senhas
     if (password.new !== password.confirm) {
       toast({
         title: "Erro",
@@ -201,14 +159,32 @@ export default function SettingsPage() {
       return;
     }
 
+    if (password.current.length === 0) {
+      toast({
+        title: "Erro",
+        description: "Digite sua senha atual",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(prev => ({ ...prev, password: true }));
 
     try {
       if (!auth.currentUser) {
         throw new Error("Usuário não autenticado");
       }
-      
-      // Use Firebase Auth to update password
+
+      // Criar credencial para reautenticação
+      const credential = EmailAuthProvider.credential(
+        auth.currentUser.email,
+        password.current
+      );
+
+      // Reautenticar o usuário
+      await reauthenticateWithCredential(auth.currentUser, credential);
+
+      // Agora atualizar a senha
       await updatePassword(auth.currentUser, password.new);
 
       toast({
@@ -216,21 +192,27 @@ export default function SettingsPage() {
         description: "Senha alterada com sucesso",
       });
 
-      // Clear form
+      // Limpar formulário
       setPassword({
         current: "",
         new: "",
         confirm: ""
       });
     } catch (error) {
-      console.error("Error changing password:", error);
+      console.error("Erro ao alterar senha:", error);
       let errorMessage = "Falha ao alterar senha";
       
-      // Provide more specific error messages for Firebase Auth errors
-      if (error.code === 'auth/requires-recent-login') {
+      // Mensagens de erro específicas do Firebase Auth
+      if (error.code === 'auth/wrong-password') {
+        errorMessage = "Senha atual incorreta";
+      } else if (error.code === 'auth/invalid-credential') {
+        errorMessage = "Senha atual incorreta";
+      } else if (error.code === 'auth/requires-recent-login') {
         errorMessage = "Por motivos de segurança, faça login novamente antes de alterar sua senha";
       } else if (error.code === 'auth/weak-password') {
         errorMessage = "A senha é muito fraca. Use uma senha mais forte";
+      } else if (error.code === 'auth/too-many-requests') {
+        errorMessage = "Muitas tentativas. Tente novamente mais tarde";
       }
       
       toast({
@@ -290,51 +272,51 @@ export default function SettingsPage() {
             <CardHeader>
               <CardTitle>Preferências de Notificação</CardTitle>
               <CardDescription>
-                Configure como deseja receber as notificações
+                Configure como deseja receber notificações
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center space-x-2">
                   <Mail className="h-4 w-4" />
-                  <Label>Notificações por E-mail</Label>
+                  <Label>Notificações por Email</Label>
                 </div>
                 <Switch
                   checked={settings.notifications.email}
-                  onCheckedChange={() => updateNotificationSetting("email")}
+                  onCheckedChange={() => handleNotificationChange("email")}
                 />
               </div>
 
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center space-x-2">
+                  <Bell className="h-4 w-4" />
+                  <Label>Notificações Push</Label>
+                </div>
+                <Switch
+                  checked={settings.notifications.push}
+                  onCheckedChange={() => handleNotificationChange("push")}
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
                   <MessageSquare className="h-4 w-4" />
-                  <Label>Notificações de Chat</Label>
+                  <Label>Mensagens de Chat</Label>
                 </div>
                 <Switch
                   checked={settings.notifications.chat}
-                  onCheckedChange={() => updateNotificationSetting("chat")}
+                  onCheckedChange={() => handleNotificationChange("chat")}
                 />
               </div>
 
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center space-x-2">
                   <ClipboardList className="h-4 w-4" />
-                  <Label>Atualizações de Pedidos</Label>
-                </div>
-                <Switch
-                  checked={settings.notifications.orders}
-                  onCheckedChange={() => updateNotificationSetting("orders")}
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Search className="h-4 w-4" />
-                  <Label>Atualizações de Inspeções</Label>
+                  <Label>Inspeções</Label>
                 </div>
                 <Switch
                   checked={settings.notifications.inspections}
-                  onCheckedChange={() => updateNotificationSetting("inspections")}
+                  onCheckedChange={() => handleNotificationChange("inspections")}
                 />
               </div>
             </CardContent>
@@ -346,16 +328,16 @@ export default function SettingsPage() {
             <CardHeader>
               <CardTitle>Configurações da Aplicação</CardTitle>
               <CardDescription>
-                Personalize suas preferências de aplicação
+                Personalize o comportamento da aplicação
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-2">
                 <Label>Formato de Data</Label>
                 <select
-                  className="w-full p-2 border rounded-md bg-background"
+                  className="w-full p-2 border border-gray-300 rounded-md"
                   value={settings.app.dateFormat}
-                  onChange={(e) => updateAppSetting("dateFormat", e.target.value)}
+                  onChange={(e) => handleAppSettingChange("dateFormat", e.target.value)}
                 >
                   <option value="DD/MM/YYYY">DD/MM/YYYY</option>
                   <option value="MM/DD/YYYY">MM/DD/YYYY</option>
@@ -363,24 +345,27 @@ export default function SettingsPage() {
                 </select>
               </div>
 
-              <div className="flex items-center justify-between">
-                <Label>Auto-salvamento</Label>
-                <Switch
-                  checked={settings.app.autoSave}
-                  onCheckedChange={(checked) => updateAppSetting("autoSave", checked)}
-                />
-              </div>
-
               <div className="space-y-2">
                 <Label>Visualização Padrão</Label>
                 <select
-                  className="w-full p-2 border rounded-md bg-background"
+                  className="w-full p-2 border border-gray-300 rounded-md"
                   value={settings.app.defaultView}
-                  onChange={(e) => updateAppSetting("defaultView", e.target.value)}
+                  onChange={(e) => handleAppSettingChange("defaultView", e.target.value)}
                 >
                   <option value="lista">Lista</option>
                   <option value="kanban">Kanban</option>
                 </select>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Search className="h-4 w-4" />
+                  <Label>Auto-salvamento</Label>
+                </div>
+                <Switch
+                  checked={settings.app.autoSave}
+                  onCheckedChange={(checked) => handleAppSettingChange("autoSave", checked)}
+                />
               </div>
             </CardContent>
           </Card>
@@ -389,14 +374,14 @@ export default function SettingsPage() {
         <TabsContent value="appearance">
           <Card>
             <CardHeader>
-              <CardTitle>Configurações de Aparência</CardTitle>
+              <CardTitle>Aparência</CardTitle>
               <CardDescription>
                 Personalize a aparência da aplicação
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent>
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center space-x-2">
                   {theme === "dark" ? (
                     <Moon className="h-4 w-4" />
                   ) : (
@@ -432,6 +417,7 @@ export default function SettingsPage() {
                     onChange={(e) => setPassword({ ...password, current: e.target.value })}
                     required
                     disabled={loading.password}
+                    placeholder="Digite sua senha atual"
                   />
                 </div>
 
@@ -444,11 +430,12 @@ export default function SettingsPage() {
                     onChange={(e) => setPassword({ ...password, new: e.target.value })}
                     required
                     disabled={loading.password}
+                    placeholder="Digite sua nova senha (mín. 8 caracteres)"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="confirm-password">Confirmar Senha</Label>
+                  <Label htmlFor="confirm-password">Confirmar Nova Senha</Label>
                   <Input
                     id="confirm-password"
                     type="password"
@@ -456,6 +443,7 @@ export default function SettingsPage() {
                     onChange={(e) => setPassword({ ...password, confirm: e.target.value })}
                     required
                     disabled={loading.password}
+                    placeholder="Confirme sua nova senha"
                   />
                 </div>
 

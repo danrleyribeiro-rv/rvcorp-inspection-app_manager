@@ -7,7 +7,9 @@ import {
   signOut as firebaseSignOut,
   onAuthStateChanged,
   sendPasswordResetEmail,
-  updatePassword as firebaseUpdatePassword
+  updatePassword as firebaseUpdatePassword,
+  reauthenticateWithCredential,
+  EmailAuthProvider
 } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import { useRouter, usePathname } from "next/navigation";
@@ -86,7 +88,7 @@ export function AuthProvider({ children }) {
     };
 
     setupAuth();
-  }, [router, pathname]); // Adicione pathname às dependências
+  }, [router, pathname]);
 
   const signIn = async (email, password) => {
     setLoading(true);
@@ -158,6 +160,31 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const updateUserPassword = async (currentPassword, newPassword) => {
+    try {
+      if (!auth.currentUser) {
+        throw new Error("Usuário não autenticado");
+      }
+
+      // Criar credencial para reautenticação
+      const credential = EmailAuthProvider.credential(
+        auth.currentUser.email,
+        currentPassword
+      );
+
+      // Reautenticar o usuário
+      await reauthenticateWithCredential(auth.currentUser, credential);
+
+      // Agora atualizar a senha
+      await firebaseUpdatePassword(auth.currentUser, newPassword);
+
+      return { success: true };
+    } catch (error) {
+      console.error("Erro ao atualizar senha:", error);
+      return { success: false, error: error.message };
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -166,6 +193,7 @@ export function AuthProvider({ children }) {
         signIn,
         signOut,
         resetPassword,
+        updateUserPassword,
       }}
     >
       {children}
