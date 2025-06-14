@@ -483,7 +483,7 @@ export default function InspectionDetailsDialog({
                   {inspectorDetails && (
                     <Card>
                       <CardHeader>
-                        <CardTitle className="text-lg">Vistoriador</CardTitle>
+                        <CardTitle className="text-lg">Lincer</CardTitle>
                       </CardHeader>
                       <CardContent className="space-y-4">
                         <div className="flex items-center gap-2">

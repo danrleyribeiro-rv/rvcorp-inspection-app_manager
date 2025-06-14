@@ -100,7 +100,7 @@ export default function InspectorsPage() {
     } catch (error) {
       console.error("Error fetching inspectors:", error);
       toast({
-        title: "Erro ao buscar vistoriadores",
+        title: "Erro ao buscar lincers",
         description: error.message,
         variant: "destructive"
       });
@@ -270,7 +270,7 @@ const handleRateInspector = async (inspector, ratingData) => {
   return (
     <div className="container p-6">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Vistoriadores</h1>
+        <h1 className="text-3xl font-bold">Lincers</h1>
         <Sheet>
           <SheetTrigger asChild>
             <Button variant="outline">
@@ -359,7 +359,7 @@ const handleRateInspector = async (inspector, ratingData) => {
         </div>
         {search && (
           <p className="text-sm text-muted-foreground mt-2">
-            {filteredInspectors.length} vistoriador(es) encontrado(s) para "{search}"
+            {filteredInspectors.length} Lincer(s) encontrado(s) para "{search}"
           </p>
         )}
       </div>
@@ -371,8 +371,8 @@ const handleRateInspector = async (inspector, ratingData) => {
       ) : filteredInspectors.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           {search || filters.state !== "all" || filters.city !== "all" || filters.rating !== "all" 
-            ? "Nenhum vistoriador encontrado com os filtros atuais."
-            : "Nenhum vistoriador cadastrado no sistema."
+            ? "Nenhum lincer encontrado com os filtros atuais."
+            : "Nenhum lincer cadastrado no sistema."
           }
         </div>
       ) : (

@@ -183,13 +183,13 @@ export default function FilterPanel({ filterState, onFilterChange, inspections }
         </div>
 
         <div className="space-y-2">
-          <Label>Vistoriador</Label>
+          <Label>Lincer</Label>
           <Select
             value={filterState.inspector}
             onValueChange={(value) => onFilterChange({ ...filterState, inspector: value })}
           >
             <SelectTrigger>
-              <SelectValue placeholder="Todos os vistoriadores" />
+              <SelectValue placeholder="Todos os lincers" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos</SelectItem>

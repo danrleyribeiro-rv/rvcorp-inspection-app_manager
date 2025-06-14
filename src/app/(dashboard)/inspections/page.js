@@ -385,15 +385,6 @@ export default function InspectionsPage() {
         />
       )}
 
-      {editingInspection && (
-        <EditInspectionDialog
-          inspection={editingInspection}
-          open={!!editingInspection}
-          onClose={() => setEditingInspection(null)}
-          onSuccess={resetAndFetchInspections}
-        />
-      )}
-
       {viewingInspection && (
         <InspectionDetailsDialog
           inspection={viewingInspection}

@@ -272,13 +272,9 @@ export default function InspectionListItem({ inspection, onEdit, onView, onDelet
               <Eye className="h-4 w-4 mr-2" />
               Ver
             </Button>
-            <Button variant="outline" size="sm" onClick={onEditData}>
-              <FileText className="h-4 w-4 mr-2" />
-              Info
-            </Button>
             <Button variant="outline" size="sm" onClick={onEditInspection}>
               <Edit className="h-4 w-4 mr-2" />
-              Vistoria
+              Inspeção
             </Button>
             <Button variant="outline" size="sm" onClick={onDelete}>
               <Trash2 className="h-4 w-4 mr-2 text-destructive" />

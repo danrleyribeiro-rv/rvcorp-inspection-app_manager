@@ -400,7 +400,7 @@ export default function CreateInspectionPage() {
                     checked={sharedData.sameInspector}
                     onCheckedChange={(checked) => setSharedData(prev => ({ ...prev, sameInspector: checked }))}
                   />
-                  <Label htmlFor="same-inspector">Mesmo vistoriador</Label>
+                  <Label htmlFor="same-inspector">Mesmo Lincer</Label>
                 </div>
               </div>
             )}
@@ -449,13 +449,13 @@ export default function CreateInspectionPage() {
               {/* Shared Inspector Select */}
               {(!bulkMode || (bulkMode && sharedData.sameInspector)) && (
                 <div>
-                  <Label htmlFor="shared-inspector">Vistoriador</Label>
+                  <Label htmlFor="shared-inspector">Lincer</Label>
                   <Select
                     value={sharedData.inspector_id || "none"}
                     onValueChange={(value) => setSharedData(prev => ({ ...prev, inspector_id: value === "none" ? null : value }))}
                   >
                     <SelectTrigger id="shared-inspector">
-                        <SelectValue placeholder="Selecione um vistoriador" />
+                        <SelectValue placeholder="Selecione um lincer" />
                     </SelectTrigger>
                     <SelectContent>
                         <SelectItem value="none">Nenhum</SelectItem>
@@ -580,13 +580,13 @@ export default function CreateInspectionPage() {
                     {/* Individual Inspector Select */}
                     {bulkMode && !sharedData.sameInspector && (
                       <div className="md:w-48">
-                        <Label htmlFor={`inspector-${index}`}>Vistoriador</Label>
+                        <Label htmlFor={`inspector-${index}`}>Lincer</Label>
                         <Select
                           value={inspection.inspector_id || "none"}
                           onValueChange={(value) => updateBulkInspection(index, 'inspector_id', value === "none" ? null : value)}
                         >
                           <SelectTrigger id={`inspector-${index}`} className="mt-1">
-                            <SelectValue placeholder="Vistoriador" />
+                            <SelectValue placeholder="Lincer" />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="none">Nenhum</SelectItem>

@@ -9,9 +9,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertTriangle, Trash2, Upload } from "lucide-react";
-import DraggableMedia from "./DraggableMedia";
-import MediaDropzone from "./MediaDropzone";
+import { AlertTriangle, Trash2 } from "lucide-react";
+import UniversalMediaSection from "./UniversalMediaSection";
 
 export default function NonConformityEditor({ 
   nonConformities, 
@@ -152,69 +151,21 @@ export default function NonConformityEditor({
                   </div>
 
                   {/* NC Media Section */}
-                  <div>
-                    <div className="flex items-center justify-between">
-                      <Label className="text-xs font-bold">Mídia da NC ({nc.media?.length || 0})</Label>
-                      <div>
-                        <input
-                          type="file"
-                          accept="image/*,video/*"
-                          onChange={e => {
-                            const file = e.target.files[0];
-                            if (file) {
-                              onUploadMedia(topicIndex, itemIndex, detailIndex, file, true, ncIndex);
-                            }
-                            e.target.value = '';
-                          }}
-                          style={{ display: 'none' }}
-                          id={`nc-media-upload-${topicIndex}-${itemIndex}-${detailIndex}-${ncIndex}`}
-                        />
-                        <Button
-                          size="sm"
-                          className="h-6 text-xs"
-                          onClick={() => document.getElementById(
-                            `nc-media-upload-${topicIndex}-${itemIndex}-${detailIndex}-${ncIndex}`
-                          ).click()}
-                        >
-                          <Upload className="mr-1 h-3 w-3" />
-                          Mídia
-                        </Button>
-                      </div>
-                    </div>
-                    
-                    <MediaDropzone
-                      topicIndex={topicIndex}
-                      itemIndex={itemIndex}
-                      detailIndex={detailIndex}
-                      ncIndex={ncIndex}
-                      onDrop={onMoveMediaDrop}
-                      hasMedia={nc.media && nc.media.length > 0}
-                    >
-                      {nc.media && nc.media.length > 0 ? (
-                        <div className="grid grid-cols-3 md:grid-cols-6 gap-1 mt-1">
-                          {nc.media.map((media, mediaIndex) => (
-                            <DraggableMedia
-                              key={mediaIndex}
-                              media={media}
-                              topicIndex={topicIndex}
-                              itemIndex={itemIndex}
-                              detailIndex={detailIndex}
-                              mediaIndex={mediaIndex}
-                              isNC={true}
-                              ncIndex={ncIndex}
-                              onView={onViewMedia}
-                              onRemove={onRemoveMedia}
-                              onMove={onMoveMedia}
-                            />
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="border-2 border-dashed rounded-md p-2 min-h-[60px] flex items-center justify-center text-xs text-muted-foreground mt-1">
-                          Arraste uma mídia para cá ou clique no botão acima
-                        </div>
-                      )}
-                    </MediaDropzone>
-                  </div>
+                  <UniversalMediaSection
+                    media={nc.media || []}
+                    level="detail"
+                    topicIndex={topicIndex}
+                    itemIndex={itemIndex}
+                    detailIndex={detailIndex}
+                    ncIndex={ncIndex}
+                    isNC={true}
+                    onUpload={onUploadMedia}
+                    onRemove={onRemoveMedia}
+                    onMove={onMoveMedia}
+                    onView={onViewMedia}
+                    onMoveMediaDrop={onMoveMediaDrop}
+                    title={`Mídia da NC ${ncIndex + 1}`}
+                  />
                 </CardContent>
               </Card>
             ))}

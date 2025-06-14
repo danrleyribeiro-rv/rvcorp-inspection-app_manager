@@ -145,7 +145,7 @@ export default function ChatList({ selectedChatId, onSelectChat }) {
                 
                 {/* Nome da inspeção */}
                 <p className="text-xs text-muted-foreground truncate mb-1">
-                  {chat.inspection?.title || 'Inspeção'}
+                  {chat.inspection?.cod || 'Inspeção'}
                 </p>
                 
                 <div className="flex justify-between items-center">

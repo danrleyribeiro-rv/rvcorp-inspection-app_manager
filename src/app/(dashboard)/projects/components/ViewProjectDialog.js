@@ -2,6 +2,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { db } from "@/lib/firebase"
 import { doc, getDoc, collection, query, where, getDocs, orderBy } from "firebase/firestore" // Added orderBy
 import {
@@ -10,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter, // Added for close button
+  DialogDescription,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -36,7 +38,8 @@ import {
   PhoneIcon,        // New
   ClipboardListIcon, // New for inspections title
   BriefcaseIcon,    // New for project type
-  InfoIcon          // For "Sem descrição" etc.
+  InfoIcon,         // For "Sem descrição" etc.
+  ExternalLinkIcon  // For navigation indication
 } from "lucide-react"
 
 // Status mapping similar to KanbanView
@@ -90,6 +93,9 @@ export default function ViewProjectDialog({ project, open, onClose }) {
   const [inspections, setInspections] = useState([]);
   const [loadingClient, setLoadingClient] = useState(true);
   const [loadingInspections, setLoadingInspections] = useState(true);
+  const [selectedInspection, setSelectedInspection] = useState(null);
+  const [showNavigationDialog, setShowNavigationDialog] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     if (open && project) { // Fetch only when dialog is open and project exists
@@ -165,6 +171,25 @@ export default function ViewProjectDialog({ project, open, onClose }) {
 
   const formatCurrency = (value) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
+  };
+
+  const handleInspectionClick = (inspection) => {
+    setSelectedInspection(inspection);
+    setShowNavigationDialog(true);
+  };
+
+  const handleNavigateToInspection = () => {
+    if (selectedInspection) {
+      router.push(`/inspections?highlight=${selectedInspection.id}`);
+    }
+    setShowNavigationDialog(false);
+    setSelectedInspection(null);
+    onClose(); // Close the project dialog as well
+  };
+
+  const handleCancelNavigation = () => {
+    setShowNavigationDialog(false);
+    setSelectedInspection(null);
   };
 
   if (!project) return null; // Don't render if no project
@@ -274,9 +299,16 @@ export default function ViewProjectDialog({ project, open, onClose }) {
                   <ScrollArea className="h-[200px] pr-3"> {/* Max height for scroll */}
                     <div className="space-y-3">
                       {inspections.map((inspection) => (
-                        <div key={inspection.id} className="flex items-center justify-between p-3 border rounded-md bg-background hover:bg-muted/50 transition-colors">
-                          <div>
-                            <p className="font-medium text-sm text-foreground">{inspection.title || "Inspeção Sem Título"}</p>
+                        <div 
+                          key={inspection.id} 
+                          className="flex items-center justify-between p-3 border rounded-md bg-background hover:bg-accent cursor-pointer transition-colors group"
+                          onClick={() => handleInspectionClick(inspection)}
+                        >
+                          <div className="flex-1">
+                            <p className="font-medium text-sm text-foreground group-hover:text-primary flex items-center gap-2">
+                              {inspection.title || "Inspeção Sem Título"}
+                              <ExternalLinkIcon className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </p>
                             <p className="text-xs text-muted-foreground">
                               Agendada para: {formatDateSafe(inspection.scheduled_date, "dd/MM/yy HH:mm")}
                             </p>
@@ -300,6 +332,26 @@ export default function ViewProjectDialog({ project, open, onClose }) {
           <Button variant="outline" onClick={onClose}>Fechar</Button>
         </DialogFooter>
       </DialogContent>
+      
+      {/* Navigation Confirmation Dialog */}
+      <Dialog open={showNavigationDialog} onOpenChange={setShowNavigationDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Navegar para Inspeções</DialogTitle>
+            <DialogDescription>
+              Deseja ir para a tela de inspeções e visualizar a inspeção "{selectedInspection?.title || 'Inspeção Sem Título'}"?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleCancelNavigation}>
+              Cancelar
+            </Button>
+            <Button onClick={handleNavigateToInspection}>
+              Ir para Inspeções
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   )
 }

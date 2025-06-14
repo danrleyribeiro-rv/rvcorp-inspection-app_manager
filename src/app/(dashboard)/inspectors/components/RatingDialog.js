@@ -163,9 +163,9 @@ export default function RatingDialog({ inspector, open, onClose, onRate }) {
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Avaliar Vistoriador</DialogTitle>
+          <DialogTitle>Avaliar Lincer</DialogTitle>
           <DialogDescription>
-            Avalie o desempenho do vistoriador {inspector.name} nas categorias abaixo
+            Avalie o desempenho do lincer {inspector.name} nas categorias abaixo
           </DialogDescription>
         </DialogHeader>
 
@@ -204,7 +204,7 @@ export default function RatingDialog({ inspector, open, onClose, onRate }) {
           <div className="space-y-1">
             <Label>Comentários e Observações</Label>
             <Textarea
-              placeholder="Deixe comentários detalhados sobre o desempenho do vistoriador..."
+              placeholder="Deixe comentários detalhados sobre o desempenho do lincer..."
               value={comment}
               onChange={(e) => setComment(e.target.value)}
               rows={3}

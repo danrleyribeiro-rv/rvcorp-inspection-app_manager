@@ -14,6 +14,17 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
 };
 
+// Verificar se as variáveis essenciais estão presentes
+if (!firebaseConfig.apiKey || !firebaseConfig.projectId || !firebaseConfig.storageBucket) {
+  console.error("Variáveis de ambiente do Firebase não estão configuradas corretamente");
+  console.log("Configuração atual:", {
+    hasApiKey: !!firebaseConfig.apiKey,
+    hasProjectId: !!firebaseConfig.projectId,
+    hasStorageBucket: !!firebaseConfig.storageBucket,
+    hasAuthDomain: !!firebaseConfig.authDomain
+  });
+}
+
 // Inicializar Firebase apenas se ainda não estiver inicializado
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 

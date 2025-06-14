@@ -81,7 +81,7 @@ export default function InspectorProfileDialog({ inspector, open, onClose }) {
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Perfil do Vistoriador</DialogTitle>
+          <DialogTitle>Perfil do Lincer</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6">

@@ -97,14 +97,14 @@ export default function InspectionControlPanel({ inspection, onUpdate }) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Edit3 className="h-5 w-5" />
-          Controle da Vistoria
+          Controle da Inspeção
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Status Atual */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <Label className="text-sm font-medium">Status da Vistoria</Label>
+            <Label className="text-sm font-medium">Status da Inspeção</Label>
             <Badge variant={isCompleted ? "default" : "secondary"}>
               {isCompleted ? "Concluída" : "Em Andamento"}
             </Badge>
@@ -171,8 +171,8 @@ export default function InspectionControlPanel({ inspection, onUpdate }) {
               </Label>
               <p className="text-xs text-muted-foreground">
                 {isEditBlocked 
-                  ? "Vistoriador não pode editar" 
-                  : "Vistoriador pode editar"
+                  ? "Lincer não pode editar" 
+                  : "Lincer pode editar"
                 }
               </p>
             </div>
@@ -191,7 +191,7 @@ export default function InspectionControlPanel({ inspection, onUpdate }) {
                 Criar Release
               </Label>
               <p className="text-xs text-muted-foreground">
-                Salvar estado atual da vistoria
+                Salvar estado atual da inspeção
               </p>
             </div>
             <Dialog open={releaseDialogOpen} onOpenChange={setReleaseDialogOpen}>
@@ -203,7 +203,7 @@ export default function InspectionControlPanel({ inspection, onUpdate }) {
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Criar Release da Vistoria</DialogTitle>
+                  <DialogTitle>Criar Release da Inspeção</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4">
                   <div className="space-y-2">
@@ -220,7 +220,7 @@ export default function InspectionControlPanel({ inspection, onUpdate }) {
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <AlertTriangle className="h-4 w-4" />
                       <span>
-                        O estado atual da vistoria será salvo e o bloqueio de edição será removido.
+                        O estado atual da inspeção será salvo e o bloqueio de edição será removido.
                       </span>
                     </div>
                   </div>

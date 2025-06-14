@@ -20,7 +20,7 @@ import { TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Settings, ListChecks } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
-import { addWatermarkToImage } from "@/utils/ImageWatermark";
+import { addWatermarkToImage, detectImageSource } from "@/utils/ImageWatermark";
 import {
   ArrowLeft,
   Save,
@@ -29,11 +29,15 @@ import {
   X,
   Loader2,
   AlertTriangle,
-  ChevronRight
+  ChevronRight,
+  Video
 } from "lucide-react";
 import DetailEditor from "@/components/inspection/DetailEditor";
 import MediaMoveDialog from "@/components/inspection/MediaMoveDialog";
 import InspectionControlPanel from "@/components/inspection/InspectionControlPanel";
+import UniversalMediaSection from "@/components/inspection/UniversalMediaSection";
+import { UniversalDropZone, DRAG_TYPES } from "@/components/inspection/EnhancedDragDropProvider";
+import { DraggableTopic, DraggableItem, DraggableDetail } from "@/components/inspection/DraggableStructureItem";
 
 export default function InspectionEditorPage({ params }) {
   const inspectionId = use(params).id;
@@ -151,34 +155,84 @@ export default function InspectionEditorPage({ params }) {
     }
   };
 
-  const uploadMedia = async (topicIndex, itemIndex, detailIndex, file, isNC = false, ncIndex = null) => {
+  const uploadMedia = async (topicIndex, itemIndex, detailIndex, file, isNC = false, ncIndex = null, isFromCamera = false) => {
     try {
+      console.log("Iniciando upload de mídia:", { file: file.name, type: file.type, size: file.size });
+      
+      if (!file || !file.name) {
+        throw new Error("Arquivo inválido selecionado");
+      }
+      
       const fileExtension = file.name.split('.').pop();
       const mediaType = file.type.startsWith('image/') ? 'image' : 'video';
       const timestamp = Date.now();
       const fileName = `${mediaType}_${timestamp}.${fileExtension}`;
       
       let storagePath;
-      if (isNC) {
+      if (isNC && ncIndex !== null) {
         storagePath = `inspections/${inspectionId}/topic_${topicIndex}/item_${itemIndex}/detail_${detailIndex}/non_conformities/nc_${ncIndex}/${fileName}`;
-      } else {
+      } else if (detailIndex !== null) {
         storagePath = `inspections/${inspectionId}/topic_${topicIndex}/item_${itemIndex}/detail_${detailIndex}/media/${fileName}`;
+      } else if (itemIndex !== null) {
+        storagePath = `inspections/${inspectionId}/topic_${topicIndex}/item_${itemIndex}/media/${fileName}`;
+      } else {
+        storagePath = `inspections/${inspectionId}/topic_${topicIndex}/media/${fileName}`;
       }
+      
+      console.log("Caminho de storage:", storagePath);
       
       let fileToUpload = file;
       let url;
       
       if (mediaType === 'image') {
-        const fileURL = URL.createObjectURL(file);
-        const watermarkedImageURL = await addWatermarkToImage(fileURL, inspectionId);
-        const response = await fetch(watermarkedImageURL);
-        fileToUpload = await response.blob();
-        URL.revokeObjectURL(fileURL);
+        try {
+          console.log("Processando marca d'água para imagem...");
+          
+          // Verificar se o arquivo é válido antes de tentar a marca d'água
+          if (!file.type.startsWith('image/')) {
+            throw new Error("Tipo de arquivo não é uma imagem válida");
+          }
+          
+          const fileURL = URL.createObjectURL(file);
+          const imageSource = detectImageSource(file, isFromCamera);
+          
+          // Timeout para a marca d'água
+          const watermarkPromise = addWatermarkToImage(fileURL, inspectionId, imageSource);
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error("Timeout na marca d'água")), 8000)
+          );
+          
+          const watermarkedImageURL = await Promise.race([watermarkPromise, timeoutPromise]);
+          const response = await fetch(watermarkedImageURL);
+          
+          if (!response.ok) {
+            throw new Error("Falha ao processar imagem com marca d'água");
+          }
+          
+          fileToUpload = await response.blob();
+          URL.revokeObjectURL(fileURL);
+          console.log("Marca d'água aplicada com sucesso");
+        } catch (watermarkError) {
+          console.warn("Erro ao aplicar marca d'água, continuando sem ela:", watermarkError?.message || "Erro desconhecido");
+          // Se falhar a marca d'água, continua com o arquivo original
+          fileToUpload = file;
+        }
       }
 
+      console.log("Fazendo upload para Firebase Storage...");
+      
+      if (!storage) {
+        throw new Error("Firebase Storage não está configurado");
+      }
+      
       const storageRef = ref(storage, storagePath);
+      console.log("Referência de storage criada:", storageRef);
+      
       const snapshot = await uploadBytes(storageRef, fileToUpload);
+      console.log("Upload bytes concluído, obtendo URL...");
+      
       url = await getDownloadURL(snapshot.ref);
+      console.log("Upload concluído:", url);
 
       const mediaObject = {
         id: `${mediaType}_${timestamp}`,
@@ -191,16 +245,26 @@ export default function InspectionEditorPage({ params }) {
       setInspection(prev => {
         const updated = structuredClone(prev);
         
-        if (isNC) {
+        if (isNC && ncIndex !== null) {
           if (!updated.topics[topicIndex].items[itemIndex].details[detailIndex].non_conformities[ncIndex].media) {
             updated.topics[topicIndex].items[itemIndex].details[detailIndex].non_conformities[ncIndex].media = [];
           }
           updated.topics[topicIndex].items[itemIndex].details[detailIndex].non_conformities[ncIndex].media.push(mediaObject);
-        } else {
+        } else if (detailIndex !== null) {
           if (!updated.topics[topicIndex].items[itemIndex].details[detailIndex].media) {
             updated.topics[topicIndex].items[itemIndex].details[detailIndex].media = [];
           }
           updated.topics[topicIndex].items[itemIndex].details[detailIndex].media.push(mediaObject);
+        } else if (itemIndex !== null) {
+          if (!updated.topics[topicIndex].items[itemIndex].media) {
+            updated.topics[topicIndex].items[itemIndex].media = [];
+          }
+          updated.topics[topicIndex].items[itemIndex].media.push(mediaObject);
+        } else {
+          if (!updated.topics[topicIndex].media) {
+            updated.topics[topicIndex].media = [];
+          }
+          updated.topics[topicIndex].media.push(mediaObject);
         }
         
         return updated;
@@ -210,10 +274,10 @@ export default function InspectionEditorPage({ params }) {
         title: "Mídia enviada com sucesso"
       });
     } catch (error) {
-      console.error("Error uploading media:", error);
+      console.error("Error uploading media:", error?.message || "Erro desconhecido");
       toast({
         title: "Erro ao enviar mídia",
-        description: error.message,
+        description: error?.message || "Erro desconhecido ao fazer upload",
         variant: "destructive"
       });
     }
@@ -375,21 +439,63 @@ export default function InspectionEditorPage({ params }) {
           name: "Novo Tópico",
           description: "",
           observation: "",
-          items: []
+          items: [],
+          media: []
         }
       ]
     }));
   };
 
-  const removeTopic = (topicIndex) => {
+  const duplicateTopic = (topicIndex) => {
+    const topicToDuplicate = inspection.topics[topicIndex];
+    const duplicatedTopic = {
+      ...structuredClone(topicToDuplicate),
+      name: `${topicToDuplicate.name} (Cópia)`,
+    };
+    
     setInspection(prev => ({
       ...prev,
-      topics: prev.topics.filter((_, index) => index !== topicIndex)
+      topics: [
+        ...prev.topics.slice(0, topicIndex + 1),
+        duplicatedTopic,
+        ...prev.topics.slice(topicIndex + 1)
+      ]
     }));
+  };
+
+  const reorderTopic = (topicIndex, direction) => {
+    const newIndex = topicIndex + direction;
+    if (newIndex < 0 || newIndex >= inspection.topics.length) return;
     
-    if (activeTopicIndex >= prev.topics.length - 1) {
-      setActiveTopicIndex(Math.max(0, prev.topics.length - 2));
+    setInspection(prev => {
+      const newTopics = [...prev.topics];
+      [newTopics[topicIndex], newTopics[newIndex]] = [newTopics[newIndex], newTopics[topicIndex]];
+      return { ...prev, topics: newTopics };
+    });
+    
+    // Update active topic index
+    if (activeTopicIndex === topicIndex) {
+      setActiveTopicIndex(newIndex);
+    } else if (activeTopicIndex === newIndex) {
+      setActiveTopicIndex(topicIndex);
     }
+  };
+
+  const removeTopic = (topicIndex) => {
+    setInspection(prev => {
+      const updatedTopics = prev.topics.filter((_, index) => index !== topicIndex);
+      
+      // Adjust active topic index if needed
+      if (activeTopicIndex >= updatedTopics.length - 1) {
+        setActiveTopicIndex(Math.max(0, updatedTopics.length - 2));
+      }
+      
+      return {
+        ...prev,
+        topics: updatedTopics
+      };
+    });
+    
     setActiveItemIndex(null);
   };
 
@@ -406,13 +512,67 @@ export default function InspectionEditorPage({ params }) {
                   name: "Novo Item",
                   description: "",
                   observation: "",
-                  details: []
+                  details: [],
+                  media: []
                 }
               ]
             }
           : topic
       )
     }));
+  };
+
+  const duplicateItem = (topicIndex, itemIndex) => {
+    const itemToDuplicate = inspection.topics[topicIndex].items[itemIndex];
+    const duplicatedItem = {
+      ...structuredClone(itemToDuplicate),
+      name: `${itemToDuplicate.name} (Cópia)`,
+    };
+    
+    setInspection(prev => ({
+      ...prev,
+      topics: prev.topics.map((topic, tIndex) =>
+        tIndex === topicIndex
+          ? {
+              ...topic,
+              items: [
+                ...topic.items.slice(0, itemIndex + 1),
+                duplicatedItem,
+                ...topic.items.slice(itemIndex + 1)
+              ]
+            }
+          : topic
+      )
+    }));
+  };
+
+  const reorderItem = (topicIndex, itemIndex, direction) => {
+    const topic = inspection.topics[topicIndex];
+    const newIndex = itemIndex + direction;
+    if (newIndex < 0 || newIndex >= topic.items.length) return;
+    
+    setInspection(prev => ({
+      ...prev,
+      topics: prev.topics.map((topic, tIndex) =>
+        tIndex === topicIndex
+          ? {
+              ...topic,
+              items: (() => {
+                const newItems = [...topic.items];
+                [newItems[itemIndex], newItems[newIndex]] = [newItems[newIndex], newItems[itemIndex]];
+                return newItems;
+              })()
+            }
+          : topic
+      )
+    }));
+    
+    // Update active item index
+    if (activeItemIndex === itemIndex) {
+      setActiveItemIndex(newIndex);
+    } else if (activeItemIndex === newIndex) {
+      setActiveItemIndex(itemIndex);
+    }
   };
 
   const removeItem = (topicIndex, itemIndex) => {
@@ -468,6 +628,66 @@ export default function InspectionEditorPage({ params }) {
     }));
   };
 
+  const duplicateDetail = (topicIndex, itemIndex, detailIndex) => {
+    const detailToDuplicate = inspection.topics[topicIndex].items[itemIndex].details[detailIndex];
+    const duplicatedDetail = {
+      ...structuredClone(detailToDuplicate),
+      name: `${detailToDuplicate.name} (Cópia)`,
+    };
+    
+    setInspection(prev => ({
+      ...prev,
+      topics: prev.topics.map((topic, tIndex) =>
+        tIndex === topicIndex
+          ? {
+              ...topic,
+              items: topic.items.map((item, iIndex) =>
+                iIndex === itemIndex
+                  ? {
+                      ...item,
+                      details: [
+                        ...item.details.slice(0, detailIndex + 1),
+                        duplicatedDetail,
+                        ...item.details.slice(detailIndex + 1)
+                      ]
+                    }
+                  : item
+              )
+            }
+          : topic
+      )
+    }));
+  };
+
+  const reorderDetail = (topicIndex, itemIndex, detailIndex, direction) => {
+    const item = inspection.topics[topicIndex].items[itemIndex];
+    const newIndex = detailIndex + direction;
+    if (newIndex < 0 || newIndex >= item.details.length) return;
+    
+    setInspection(prev => ({
+      ...prev,
+      topics: prev.topics.map((topic, tIndex) =>
+        tIndex === topicIndex
+          ? {
+              ...topic,
+              items: topic.items.map((item, iIndex) =>
+                iIndex === itemIndex
+                  ? {
+                      ...item,
+                      details: (() => {
+                        const newDetails = [...item.details];
+                        [newDetails[detailIndex], newDetails[newIndex]] = [newDetails[newIndex], newDetails[detailIndex]];
+                        return newDetails;
+                      })()
+                    }
+                  : item
+              )
+            }
+          : topic
+      )
+    }));
+  };
+
   const removeDetail = (topicIndex, itemIndex, detailIndex) => {
     setInspection(prev => ({
       ...prev,
@@ -490,7 +710,7 @@ export default function InspectionEditorPage({ params }) {
   };
 
   const handleMoveMediaDrop = (item, destination) => {
-    const { media, topicIndex: srcTopicIndex, itemIndex: srcItemIndex, 
+    const { topicIndex: srcTopicIndex, itemIndex: srcItemIndex, 
             detailIndex: srcDetailIndex, mediaIndex: srcMediaIndex, 
             isNC: srcIsNC, ncIndex: srcNcIndex } = item;
             
@@ -499,33 +719,143 @@ export default function InspectionEditorPage({ params }) {
     
     const updatedInspection = structuredClone(inspection);
     
+    // Remove media from source
     let mediaToMove;
-    if (srcIsNC) {
+    if (srcIsNC && srcNcIndex !== null) {
       mediaToMove = updatedInspection.topics[srcTopicIndex].items[srcItemIndex].details[srcDetailIndex].non_conformities[srcNcIndex].media[srcMediaIndex];
       updatedInspection.topics[srcTopicIndex].items[srcItemIndex].details[srcDetailIndex].non_conformities[srcNcIndex].media.splice(srcMediaIndex, 1);
-    } else {
+    } else if (srcDetailIndex !== null) {
       mediaToMove = updatedInspection.topics[srcTopicIndex].items[srcItemIndex].details[srcDetailIndex].media[srcMediaIndex];
       updatedInspection.topics[srcTopicIndex].items[srcItemIndex].details[srcDetailIndex].media.splice(srcMediaIndex, 1);
+    } else if (srcItemIndex !== null) {
+      mediaToMove = updatedInspection.topics[srcTopicIndex].items[srcItemIndex].media[srcMediaIndex];
+      updatedInspection.topics[srcTopicIndex].items[srcItemIndex].media.splice(srcMediaIndex, 1);
+    } else {
+      mediaToMove = updatedInspection.topics[srcTopicIndex].media[srcMediaIndex];
+      updatedInspection.topics[srcTopicIndex].media.splice(srcMediaIndex, 1);
     }
     
+    // Add media to destination
     if (destNcIndex !== undefined && destNcIndex !== null) {
       if (!updatedInspection.topics[destTopicIndex].items[destItemIndex].details[destDetailIndex].non_conformities[destNcIndex].media) {
         updatedInspection.topics[destTopicIndex].items[destItemIndex].details[destDetailIndex].non_conformities[destNcIndex].media = [];
       }
-      
       updatedInspection.topics[destTopicIndex].items[destItemIndex].details[destDetailIndex].non_conformities[destNcIndex].media.push(mediaToMove);
-    } else {
+    } else if (destDetailIndex !== null) {
       if (!updatedInspection.topics[destTopicIndex].items[destItemIndex].details[destDetailIndex].media) {
         updatedInspection.topics[destTopicIndex].items[destItemIndex].details[destDetailIndex].media = [];
       }
-      
       updatedInspection.topics[destTopicIndex].items[destItemIndex].details[destDetailIndex].media.push(mediaToMove);
+    } else if (destItemIndex !== null) {
+      if (!updatedInspection.topics[destTopicIndex].items[destItemIndex].media) {
+        updatedInspection.topics[destTopicIndex].items[destItemIndex].media = [];
+      }
+      updatedInspection.topics[destTopicIndex].items[destItemIndex].media.push(mediaToMove);
+    } else {
+      if (!updatedInspection.topics[destTopicIndex].media) {
+        updatedInspection.topics[destTopicIndex].media = [];
+      }
+      updatedInspection.topics[destTopicIndex].media.push(mediaToMove);
     }
     
     setInspection(updatedInspection);
     
     toast({
       title: "Mídia movida com sucesso"
+    });
+  };
+
+  const handleMoveStructure = (item, destination) => {
+    const updatedInspection = structuredClone(inspection);
+    
+    // Helper function to create new structure based on destination level
+    const convertToDestinationLevel = (sourceData, destinationLevel) => {
+      if (destinationLevel === 'topic') {
+        return {
+          name: sourceData.name || "Novo Tópico",
+          description: sourceData.description || "",
+          observation: sourceData.observation || "",
+          items: [],
+          media: sourceData.media || []
+        };
+      } else if (destinationLevel === 'item') {
+        return {
+          name: sourceData.name || "Novo Item",
+          description: sourceData.description || "",
+          observation: sourceData.observation || "",
+          details: sourceData.details || [],
+          media: sourceData.media || []
+        };
+      } else if (destinationLevel === 'detail') {
+        return {
+          name: sourceData.name || "Novo Detalhe",
+          description: sourceData.description || "",
+          observation: sourceData.observation || "",
+          type: sourceData.type || "text",
+          value: sourceData.value || "",
+          unit: sourceData.unit || "",
+          options: sourceData.options || [],
+          required: sourceData.required || false,
+          media: sourceData.media || [],
+          non_conformities: sourceData.non_conformities || []
+        };
+      }
+    };
+
+    // Remove item from source
+    let sourceData;
+    if (item.type === DRAG_TYPES.TOPIC) {
+      [sourceData] = updatedInspection.topics.splice(item.topicIndex, 1);
+    } else if (item.type === DRAG_TYPES.ITEM) {
+      [sourceData] = updatedInspection.topics[item.topicIndex].items.splice(item.itemIndex, 1);
+    } else if (item.type === DRAG_TYPES.DETAIL) {
+      [sourceData] = updatedInspection.topics[item.topicIndex].items[item.itemIndex].details.splice(item.detailIndex, 1);
+    }
+
+    // Convert and insert at destination
+    if (destination.level === 'topic') {
+      const convertedData = item.type === DRAG_TYPES.TOPIC ? sourceData : convertToDestinationLevel(sourceData, 'topic');
+      const insertIndex = destination.topicIndex !== undefined ? destination.topicIndex : updatedInspection.topics.length;
+      updatedInspection.topics.splice(insertIndex, 0, convertedData);
+      
+      // Update active topic if needed
+      if (item.type === DRAG_TYPES.TOPIC && activeTopicIndex === item.topicIndex) {
+        setActiveTopicIndex(insertIndex);
+      }
+      
+    } else if (destination.level === 'item') {
+      const convertedData = item.type === DRAG_TYPES.ITEM ? sourceData : convertToDestinationLevel(sourceData, 'item');
+      
+      if (!updatedInspection.topics[destination.topicIndex].items) {
+        updatedInspection.topics[destination.topicIndex].items = [];
+      }
+      
+      const insertIndex = destination.itemIndex !== undefined ? destination.itemIndex : 
+                         updatedInspection.topics[destination.topicIndex].items.length;
+      updatedInspection.topics[destination.topicIndex].items.splice(insertIndex, 0, convertedData);
+      
+      // Update active item if needed
+      if (item.type === DRAG_TYPES.ITEM && activeItemIndex === item.itemIndex && activeTopicIndex === item.topicIndex) {
+        setActiveItemIndex(insertIndex);
+        setActiveTopicIndex(destination.topicIndex);
+      }
+      
+    } else if (destination.level === 'detail') {
+      const convertedData = item.type === DRAG_TYPES.DETAIL ? sourceData : convertToDestinationLevel(sourceData, 'detail');
+      
+      if (!updatedInspection.topics[destination.topicIndex].items[destination.itemIndex].details) {
+        updatedInspection.topics[destination.topicIndex].items[destination.itemIndex].details = [];
+      }
+      
+      const insertIndex = destination.detailIndex !== undefined ? destination.detailIndex : 
+                         updatedInspection.topics[destination.topicIndex].items[destination.itemIndex].details.length;
+      updatedInspection.topics[destination.topicIndex].items[destination.itemIndex].details.splice(insertIndex, 0, convertedData);
+    }
+    
+    setInspection(updatedInspection);
+    
+    toast({
+      title: "Estrutura movida com sucesso"
     });
   };
 
@@ -544,60 +874,21 @@ export default function InspectionEditorPage({ params }) {
 
   const removeMedia = async (topicIndex, itemIndex, detailIndex, mediaIndex, isNC = false, ncIndex = null) => {
     try {
-      if (isNC) {
-        setInspection(prev => ({
-          ...prev,
-          topics: prev.topics.map((topic, tIndex) =>
-            tIndex === topicIndex
-              ? {
-                  ...topic,
-                  items: topic.items.map((item, iIndex) =>
-                    iIndex === itemIndex
-                      ? {
-                          ...item,
-                          details: item.details.map((detail, dIndex) =>
-                            dIndex === detailIndex
-                              ? {
-                                  ...detail,
-                                  non_conformities: detail.non_conformities.map((nc, ncIdx) =>
-                                    ncIdx === ncIndex
-                                      ? { ...nc, media: nc.media.filter((_, mIndex) => mIndex !== mediaIndex) }
-                                      : nc
-                                  )
-                                }
-                              : detail
-                          )
-                        }
-                      : item
-                  )
-                }
-              : topic
-          )
-        }));
-      } else {
-        setInspection(prev => ({
-          ...prev,
-          topics: prev.topics.map((topic, tIndex) =>
-            tIndex === topicIndex
-              ? {
-                  ...topic,
-                  items: topic.items.map((item, iIndex) =>
-                    iIndex === itemIndex
-                      ? {
-                          ...item,
-                          details: item.details.map((detail, dIndex) =>
-                            dIndex === detailIndex
-                              ? { ...detail, media: detail.media.filter((_, mIndex) => mIndex !== mediaIndex) }
-                              : detail
-                          )
-                        }
-                      : item
-                  )
-                }
-              : topic
-          )
-        }));
-      }
+      setInspection(prev => {
+        const updated = structuredClone(prev);
+        
+        if (isNC && ncIndex !== null) {
+          updated.topics[topicIndex].items[itemIndex].details[detailIndex].non_conformities[ncIndex].media.splice(mediaIndex, 1);
+        } else if (detailIndex !== null) {
+          updated.topics[topicIndex].items[itemIndex].details[detailIndex].media.splice(mediaIndex, 1);
+        } else if (itemIndex !== null) {
+          updated.topics[topicIndex].items[itemIndex].media.splice(mediaIndex, 1);
+        } else {
+          updated.topics[topicIndex].media.splice(mediaIndex, 1);
+        }
+        
+        return updated;
+      });
 
       toast({
         title: "Mídia removida com sucesso"
@@ -872,8 +1163,8 @@ export default function InspectionEditorPage({ params }) {
             </TabsContent>
 
             <TabsContent value="topics" className="space-y-4">
-              <div className="grid grid-cols-12 gap-4 h-[calc(100vh-200px)]">
-                {/* Topics Column */}
+              <div className="grid grid-cols-10 gap-4 h-[calc(100vh-200px)]">
+                {/* Topics Column - 30% */}
                 <div className="col-span-3 border rounded-lg">
                   <div className="p-3 border-b flex justify-between items-center">
                     <h3 className="font-medium">Tópicos ({inspection.topics?.length || 0})</h3>
@@ -884,46 +1175,124 @@ export default function InspectionEditorPage({ params }) {
                   <ScrollArea className="h-[calc(100vh-280px)]">
                     <div className="p-2 space-y-1">
                       {inspection.topics?.map((topic, topicIndex) => (
-                        <div
+                        <UniversalDropZone
                           key={topicIndex}
-                          className={`p-2 rounded cursor-pointer border ${
-                            activeTopicIndex === topicIndex 
-                              ? 'bg-primary text-primary-foreground' 
-                              : 'hover:bg-accent'
-                          }`}
-                          onClick={() => {
-                            setActiveTopicIndex(topicIndex);
-                            setActiveItemIndex(null);
-                          }}
+                          topicIndex={topicIndex}
+                          onDropMedia={handleMoveMediaDrop}
+                          onDropTopic={handleMoveStructure}
+                          onDropItem={handleMoveStructure}
+                          onDropDetail={handleMoveStructure}
+                          acceptTypes={[DRAG_TYPES.MEDIA, DRAG_TYPES.TOPIC, DRAG_TYPES.ITEM, DRAG_TYPES.DETAIL]}
+                          hasContent={topic.media?.length > 0 || topic.items?.length > 0}
                         >
-                          <div className="flex justify-between items-center">
-                            <span className="text-sm font-medium truncate">
-                              {topic.name || `Tópico ${topicIndex + 1}`}
-                            </span>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-6 w-6 p-0"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                removeTopic(topicIndex);
+                          <DraggableTopic
+                            topic={topic}
+                            topicIndex={topicIndex}
+                            isActive={activeTopicIndex === topicIndex}
+                            onReorder={reorderTopic}
+                            onDuplicate={duplicateTopic}
+                            onRemove={removeTopic}
+                          >
+                            <div
+                              className={`p-2 rounded cursor-pointer border space-y-2 ${
+                                activeTopicIndex === topicIndex 
+                                  ? 'bg-primary text-primary-foreground' 
+                                  : 'hover:bg-accent'
+                              }`}
+                              onClick={() => {
+                                setActiveTopicIndex(topicIndex);
+                                setActiveItemIndex(null);
                               }}
                             >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          </div>
-                          {topic.items?.length > 0 && (
-                            <span className="text-xs opacity-70">
-                              {topic.items.length} ite{topic.items.length !== 1 ? 'ns' : 'm'}
-                            </span>
-                          )}
-                        </div>
+                              <div className="flex justify-between items-center">
+                                <span className="text-sm font-medium truncate">
+                                  {topic.name || `Tópico ${topicIndex + 1}`}
+                                </span>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-6 w-6 p-0"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    removeTopic(topicIndex);
+                                  }}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                              
+                              <div className="flex items-center justify-between text-xs opacity-70">
+                                {topic.items?.length > 0 && (
+                                  <span>
+                                    {topic.items.length} ite{topic.items.length !== 1 ? 'ns' : 'm'}
+                                  </span>
+                                )}
+                                {topic.media?.length > 0 && (
+                                  <span>
+                                    {topic.media.length} mídia{topic.media.length !== 1 ? 's' : ''}
+                                  </span>
+                                )}
+                              </div>
+                              
+                              {/* Topic Media Grid */}
+                              {topic.media?.length > 0 && (
+                                <div className="grid grid-cols-4 gap-1" onClick={(e) => e.stopPropagation()}>
+                                  {topic.media.map((mediaItem, mediaIndex) => (
+                                    <div
+                                      key={mediaIndex}
+                                      className="aspect-square border rounded overflow-hidden bg-gray-50 cursor-pointer hover:opacity-80"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        openMediaViewer(mediaItem, topicIndex, null, null, mediaIndex);
+                                      }}
+                                    >
+                                      {mediaItem.type === 'image' ? (
+                                        <img
+                                          src={mediaItem.url}
+                                          alt="Topic Media"
+                                          className="w-full h-full object-cover"
+                                        />
+                                      ) : (
+                                        <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                                          <Video className="h-4 w-4 text-gray-400" />
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              
+                              {/* Topic Observation */}
+                              {topic.observation && (
+                                <div className="text-xs text-muted-foreground bg-accent/20 p-2 rounded border-l-2 border-primary/20" onClick={(e) => e.stopPropagation()}>
+                                  <div className="font-medium mb-1">Observação:</div>
+                                  <div className="line-clamp-2">{topic.observation}</div>
+                                </div>
+                              )}
+                            </div>
+                          </DraggableTopic>
+                        </UniversalDropZone>
                       ))}
+                      
+                      {/* Drop zone for adding at the end */}
+                      <UniversalDropZone
+                        topicIndex={inspection.topics?.length || 0}
+                        onDropMedia={handleMoveMediaDrop}
+                        onDropTopic={handleMoveStructure}
+                        onDropItem={handleMoveStructure}
+                        onDropDetail={handleMoveStructure}
+                        acceptTypes={[DRAG_TYPES.MEDIA, DRAG_TYPES.TOPIC, DRAG_TYPES.ITEM, DRAG_TYPES.DETAIL]}
+                        className="min-h-8 border-2 border-dashed border-muted-foreground/20 rounded-md mx-2 my-1"
+                      >
+                        <div className="h-8 flex items-center justify-center text-xs text-muted-foreground">
+                          Solte aqui para adicionar no final
+                        </div>
+                      </UniversalDropZone>
                     </div>
                   </ScrollArea>
                 </div>
 
-                {/* Items Column */}
+                {/* Items Column - 30% */}
                 <div className="col-span-3 border rounded-lg">
                   <div className="p-3 border-b flex justify-between items-center">
                     <div className="flex items-center gap-2">
@@ -955,8 +1324,8 @@ export default function InspectionEditorPage({ params }) {
                             <Input
                               value={currentTopic.description || ''}
                               onChange={e => updateTopicField(activeTopicIndex, 'description', e.target.value)}
-className="h-7 text-sm mt-1"
-                           />
+                              className="h-7 text-sm mt-1"
+                            />
                          </div>
                          <div>
                            <Label className="text-xs">Observação do Tópico</Label>
@@ -967,43 +1336,151 @@ className="h-7 text-sm mt-1"
                              className="text-sm mt-1"
                            />
                          </div>
+                         
+                         {/* Topic Media Upload Section */}
+                         <div>
+                           <UniversalMediaSection
+                             media={[]}
+                             level="topic"
+                             topicIndex={activeTopicIndex}
+                             onUpload={uploadMedia}
+                             onRemove={removeMedia}
+                             onMove={openMoveDialog}
+                             onView={openMediaViewer}
+                             onMoveMediaDrop={handleMoveMediaDrop}
+                             title="Adicionar Mídia ao Tópico"
+                           />
+                         </div>
                        </div>
                        
                        {/* Items list */}
                        <div className="space-y-1">
                          {currentTopic.items?.map((item, itemIndex) => (
-                           <div
+                           <UniversalDropZone
                              key={itemIndex}
-                             className={`p-2 rounded cursor-pointer border ${
-                               activeItemIndex === itemIndex 
-                                 ? 'bg-primary text-primary-foreground' 
-                                 : 'hover:bg-accent'
-                             }`}
-                             onClick={() => setActiveItemIndex(itemIndex)}
+                             topicIndex={activeTopicIndex}
+                             itemIndex={itemIndex}
+                             onDropMedia={handleMoveMediaDrop}
+                             onDropTopic={handleMoveStructure}
+                             onDropItem={handleMoveStructure}
+                             onDropDetail={handleMoveStructure}
+                             acceptTypes={[DRAG_TYPES.MEDIA, DRAG_TYPES.TOPIC, DRAG_TYPES.ITEM, DRAG_TYPES.DETAIL]}
+                             hasContent={item.media?.length > 0 || item.details?.length > 0}
                            >
-                             <div className="flex justify-between items-center">
-                               <span className="text-sm font-medium truncate">
-                                 {item.name || `Item ${itemIndex + 1}`}
-                               </span>
-                               <Button
-                                 size="sm"
-                                 variant="ghost"
-                                 className="h-6 w-6 p-0"
-                                 onClick={(e) => {
-                                   e.stopPropagation();
-                                   removeItem(activeTopicIndex, itemIndex);
-                                 }}
-                               >
-                                 <Trash2 className="h-3 w-3" />
-                               </Button>
-                             </div>
-                             {item.details?.length > 0 && (
-                               <span className="text-xs opacity-70">
-                                 {item.details.length} detalhe{item.details.length !== 1 ? 's' : ''}
-                               </span>
-                             )}
-                           </div>
+                             <DraggableItem
+                               item={item}
+                               topicIndex={activeTopicIndex}
+                               itemIndex={itemIndex}
+                               isActive={activeItemIndex === itemIndex}
+                               onReorder={reorderItem}
+                               onDuplicate={duplicateItem}
+                               onRemove={removeItem}
+                             >
+                               <div className="space-y-2">
+                                 <div
+                                   className={`p-2 rounded cursor-pointer border space-y-2 ${
+                                     activeItemIndex === itemIndex 
+                                       ? 'bg-primary text-primary-foreground' 
+                                       : 'hover:bg-accent'
+                                   }`}
+                                   onClick={() => setActiveItemIndex(itemIndex)}
+                                 >
+                                   <div className="flex justify-between items-center">
+                                     <span className="text-sm font-medium truncate">
+                                       {item.name || `Item ${itemIndex + 1}`}
+                                     </span>
+                                     <Button
+                                       size="sm"
+                                       variant="ghost"
+                                       className="h-6 w-6 p-0"
+                                       onClick={(e) => {
+                                         e.stopPropagation();
+                                         removeItem(activeTopicIndex, itemIndex);
+                                       }}
+                                     >
+                                       <Trash2 className="h-3 w-3" />
+                                     </Button>
+                                   </div>
+                                 
+                                 <div className="flex items-center justify-between text-xs opacity-70">
+                                   {item.details?.length > 0 && (
+                                     <span>
+                                       {item.details.length} detalhe{item.details.length !== 1 ? 's' : ''}
+                                     </span>
+                                   )}
+                                   {item.media?.length > 0 && (
+                                     <span>
+                                       {item.media.length} mídia{item.media.length !== 1 ? 's' : ''}
+                                     </span>
+                                   )}
+                                 </div>
+                                 
+                                 {/* Item Media Grid */}
+                                 {item.media?.length > 0 && (
+                                   <div className="grid grid-cols-3 gap-1" onClick={(e) => e.stopPropagation()}>
+                                     {item.media.map((mediaItem, mediaIndex) => (
+                                       <div
+                                         key={mediaIndex}
+                                         className="aspect-square border rounded overflow-hidden bg-gray-50 cursor-pointer hover:opacity-80"
+                                         onClick={(e) => {
+                                           e.stopPropagation();
+                                           openMediaViewer(mediaItem, activeTopicIndex, itemIndex, null, mediaIndex);
+                                         }}
+                                       >
+                                         {mediaItem.type === 'image' ? (
+                                           <img
+                                             src={mediaItem.url}
+                                             alt="Item Media"
+                                             className="w-full h-full object-cover"
+                                           />
+                                         ) : (
+                                           <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                                             <Video className="h-4 w-4 text-gray-400" />
+                                           </div>
+                                         )}
+                                       </div>
+                                     ))}
+                                   </div>
+                                 )}
+                               </div>
+                               
+                               {/* Item Media Upload Section - show when item is selected */}
+                               {activeItemIndex === itemIndex && (
+                                 <div className="px-2">
+                                   <UniversalMediaSection
+                                     media={[]}
+                                     level="item"
+                                     topicIndex={activeTopicIndex}
+                                     itemIndex={itemIndex}
+                                     onUpload={uploadMedia}
+                                     onRemove={removeMedia}
+                                     onMove={openMoveDialog}
+                                     onView={openMediaViewer}
+                                     onMoveMediaDrop={handleMoveMediaDrop}
+                                     title="Adicionar Mídia ao Item"
+                                   />
+                                 </div>
+                               )}
+                               </div>
+                             </DraggableItem>
+                           </UniversalDropZone>
                          ))}
+                         
+                         {/* Drop zone for adding items at the end */}
+                         <UniversalDropZone
+                           topicIndex={activeTopicIndex}
+                           itemIndex={currentTopic?.items?.length || 0}
+                           onDropMedia={handleMoveMediaDrop}
+                           onDropTopic={handleMoveStructure}
+                           onDropItem={handleMoveStructure}
+                           onDropDetail={handleMoveStructure}
+                           acceptTypes={[DRAG_TYPES.MEDIA, DRAG_TYPES.TOPIC, DRAG_TYPES.ITEM, DRAG_TYPES.DETAIL]}
+                           className="min-h-8 border-2 border-dashed border-muted-foreground/20 rounded-md mx-2 my-1"
+                         >
+                           <div className="h-8 flex items-center justify-center text-xs text-muted-foreground">
+                             Solte aqui para adicionar no final
+                           </div>
+                         </UniversalDropZone>
                        </div>
                      </div>
                    ) : (
@@ -1014,8 +1491,8 @@ className="h-7 text-sm mt-1"
                  </ScrollArea>
                </div>
 
-               {/* Details Column */}
-               <div className="col-span-6 border rounded-lg">
+               {/* Details Column - 40% */}
+               <div className="col-span-4 border rounded-lg">
                  <div className="p-3 border-b flex justify-between items-center">
                    <div className="flex items-center gap-2">
                      {currentItem && (
@@ -1087,6 +1564,9 @@ className="h-7 text-sm mt-1"
                              onMoveMedia={openMoveDialog}
                              onViewMedia={openMediaViewer}
                              onMoveMediaDrop={handleMoveMediaDrop}
+                             onReorderDetail={reorderDetail}
+                             onDuplicateDetail={duplicateDetail}
+                             onMoveStructureDrop={handleMoveStructure}
                            />
                          ))}
                        </div>

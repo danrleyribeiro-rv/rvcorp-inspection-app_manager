@@ -8,8 +8,8 @@ import { X, Move, Video } from "lucide-react";
 export default function DraggableMedia({ 
   media, 
   topicIndex, 
-  itemIndex, 
-  detailIndex, 
+  itemIndex = null, 
+  detailIndex = null, 
   mediaIndex, 
   isNC = false, 
   ncIndex = null, 
@@ -26,7 +26,8 @@ export default function DraggableMedia({
       detailIndex, 
       mediaIndex,
       isNC,
-      ncIndex
+      ncIndex,
+      sourceLevel: detailIndex !== null ? 'detail' : (itemIndex !== null ? 'item' : 'topic')
     },
     collect: (monitor) => ({
       isDragging: !!monitor.isDragging(),

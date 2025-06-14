@@ -2,10 +2,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs, orderBy, limit } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -17,7 +20,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { 
   Building, Calendar, Users, DollarSign, File, Flag, FileText,
   Home, Layers, User, CheckSquare, AlertCircle, ArrowUp, ArrowDown,
-  ClipboardList, BarChart2 
+  ClipboardList, BarChart2, ExternalLink 
 } from "lucide-react";
 
 export default function DashboardPage() {
@@ -36,8 +39,11 @@ export default function DashboardPage() {
   const [projectsData, setProjectsData] = useState([]);
   const [inspectionsByStatus, setInspectionsByStatus] = useState([]);
   const [monthlyInspections, setMonthlyInspections] = useState([]);
+  const [selectedProject, setSelectedProject] = useState(null);
+  const [showNavigationDialog, setShowNavigationDialog] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
+  const router = useRouter();
 
   useEffect(() => {
     if (user) {
@@ -218,6 +224,24 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleProjectClick = (project) => {
+    setSelectedProject(project);
+    setShowNavigationDialog(true);
+  };
+
+  const handleNavigateToProject = () => {
+    if (selectedProject) {
+      router.push(`/projects?highlight=${selectedProject.id}`);
+    }
+    setShowNavigationDialog(false);
+    setSelectedProject(null);
+  };
+
+  const handleCancelNavigation = () => {
+    setShowNavigationDialog(false);
+    setSelectedProject(null);
   };
 
   const monthlyInspectionConfig = {
@@ -421,9 +445,16 @@ export default function DashboardPage() {
               {recentProjects.length > 0 ? (
                 <div className="space-y-4">
                   {recentProjects.map((project) => (
-                    <div key={project.id} className="flex justify-between items-center p-3 border rounded-md">
-                      <div>
-                        <div className="font-medium">{project.title}</div>
+                    <div 
+                      key={project.id} 
+                      className="flex justify-between items-center p-3 border rounded-md hover:bg-accent cursor-pointer transition-colors group"
+                      onClick={() => handleProjectClick(project)}
+                    >
+                      <div className="flex-1">
+                        <div className="font-medium group-hover:text-primary flex items-center gap-2">
+                          {project.title}
+                          <ExternalLink className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
                         <div className="text-sm text-muted-foreground">
                           {project.type || "Não categorizado"}
                         </div>
@@ -485,20 +516,20 @@ export default function DashboardPage() {
             
             <Card>
               <CardHeader>
-                <CardTitle>Distribuição de Vistoriadores</CardTitle>
-                <CardDescription>Estatísticas de vistoriadores ativos</CardDescription>
+                <CardTitle>Distribuição de Lincers</CardTitle>
+                <CardDescription>Estatísticas de lincers ativos</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <div className="text-sm text-muted-foreground">Vistoriadores Ativos</div>
+                      <div className="text-sm text-muted-foreground">Lincers Ativos</div>
                       <div className="text-2xl font-bold">
                         {stats.totalInspectors}
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <div className="text-sm text-muted-foreground">Inspeções por Vistoriador</div>
+                      <div className="text-sm text-muted-foreground">Inspeções por Lincers</div>
                       <div className="text-2xl font-bold">
                         {stats.totalInspectors > 0 
                           ? (stats.totalInspections / stats.totalInspectors).toFixed(1)
@@ -522,6 +553,26 @@ export default function DashboardPage() {
           </Alert>
         </TabsContent>
       </Tabs>
+
+      {/* Navigation Confirmation Dialog */}
+      <Dialog open={showNavigationDialog} onOpenChange={setShowNavigationDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Navegar para Projetos</DialogTitle>
+            <DialogDescription>
+              Deseja ir para a tela de projetos e visualizar o projeto "{selectedProject?.title}"?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleCancelNavigation}>
+              Cancelar
+            </Button>
+            <Button onClick={handleNavigateToProject}>
+              Ir para Projetos
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

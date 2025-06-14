@@ -5,8 +5,8 @@ import { useDrop } from 'react-dnd';
 
 export default function MediaDropzone({ 
   topicIndex, 
-  itemIndex, 
-  detailIndex, 
+  itemIndex = null, 
+  detailIndex = null, 
   ncIndex = null, 
   onDrop,
   hasMedia = false,
@@ -15,12 +15,23 @@ export default function MediaDropzone({
   const [{ isOver }, drop] = useDrop({
     accept: 'MEDIA_ITEM',
     drop: (item) => {
-      onDrop(item, { 
+      const destination = { 
         topicIndex, 
         itemIndex, 
         detailIndex, 
-        ncIndex 
-      });
+        ncIndex,
+        targetLevel: detailIndex !== null ? 'detail' : (itemIndex !== null ? 'item' : 'topic')
+      };
+      
+      // Prevent dropping on the same location
+      if (item.topicIndex === topicIndex && 
+          item.itemIndex === itemIndex && 
+          item.detailIndex === detailIndex &&
+          item.ncIndex === ncIndex) {
+        return;
+      }
+      
+      onDrop(item, destination);
     },
     collect: (monitor) => ({
       isOver: !!monitor.isOver(),

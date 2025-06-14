@@ -1,27 +1,55 @@
-// src/components/inspection/MediaSection.jsx
+// src/components/inspection/UniversalMediaSection.jsx
 "use client";
 
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Upload, Camera } from "lucide-react";
+import { Upload, Image as ImageIcon, Video } from "lucide-react";
 import DraggableMedia from "./DraggableMedia";
 import MediaDropzone from "./MediaDropzone";
 
-export default function MediaSection({
+export default function UniversalMediaSection({
   media = [],
+  level, // 'topic', 'item', or 'detail'
   topicIndex,
-  itemIndex,
-  detailIndex,
+  itemIndex = null,
+  detailIndex = null,
+  ncIndex = null,
+  isNC = false,
   onUpload,
   onRemove,
   onMove,
   onView,
-  onMoveMediaDrop
+  onMoveMediaDrop,
+  title = "Mídia"
 }) {
+  const getId = () => {
+    let id = `media-upload-${topicIndex}`;
+    if (itemIndex !== null) id += `-${itemIndex}`;
+    if (detailIndex !== null) id += `-${detailIndex}`;
+    if (isNC && ncIndex !== null) id += `-nc-${ncIndex}`;
+    return id;
+  };
+
+
+  const handleFileUpload = (file, isFromCamera = false) => {
+    if (level === 'topic') {
+      onUpload(topicIndex, null, null, file, false, null, isFromCamera);
+    } else if (level === 'item') {
+      onUpload(topicIndex, itemIndex, null, file, false, null, isFromCamera);
+    } else if (level === 'detail') {
+      onUpload(topicIndex, itemIndex, detailIndex, file, isNC, ncIndex, isFromCamera);
+    }
+  };
+
+  const mediaCount = media?.length || 0;
+
   return (
     <div className="pt-1">
       <div className="flex items-center justify-between mb-1">
-        <Label className="text-xs">Mídia ({media?.length || 0})</Label>
+        <Label className="text-xs flex items-center gap-1">
+          <ImageIcon className="h-3 w-3" />
+          {title} ({mediaCount})
+        </Label>
         <div className="flex gap-1">
           {/* Input para arquivos */}
           <input
@@ -30,47 +58,21 @@ export default function MediaSection({
             onChange={e => {
               const file = e.target.files[0];
               if (file) {
-                onUpload(topicIndex, itemIndex, detailIndex, file);
+                handleFileUpload(file, false);
               }
               e.target.value = '';
             }}
             style={{ display: 'none' }}
-            id={`media-upload-${topicIndex}-${itemIndex}-${detailIndex}`}
-          />
-          
-          {/* Input para câmera */}
-          <input
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={e => {
-              const file = e.target.files[0];
-              if (file) {
-                onUpload(topicIndex, itemIndex, detailIndex, file);
-              }
-              e.target.value = '';
-            }}
-            style={{ display: 'none' }}
-            id={`camera-upload-${topicIndex}-${itemIndex}-${detailIndex}`}
+            id={getId()}
           />
           
           <Button
             size="sm"
             className="h-6 text-xs"
-            onClick={() => document.getElementById(`media-upload-${topicIndex}-${itemIndex}-${detailIndex}`).click()}
+            onClick={() => document.getElementById(getId()).click()}
           >
             <Upload className="mr-1 h-3 w-3" />
             Arquivo
-          </Button>
-          
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-6 text-xs"
-            onClick={() => document.getElementById(`camera-upload-${topicIndex}-${itemIndex}-${detailIndex}`).click()}
-          >
-            <Camera className="mr-1 h-3 w-3" />
-            Câmera
           </Button>
         </div>
       </div>
@@ -80,10 +82,11 @@ export default function MediaSection({
         topicIndex={topicIndex}
         itemIndex={itemIndex}
         detailIndex={detailIndex}
+        ncIndex={ncIndex}
         onDrop={onMoveMediaDrop}
-        hasMedia={media && media.length > 0}
+        hasMedia={mediaCount > 0}
       >
-        {media && media.length > 0 ? (
+        {mediaCount > 0 ? (
           <div className="grid grid-cols-3 md:grid-cols-6 gap-1">
             {media.map((mediaItem, mediaIndex) => (
               <DraggableMedia
@@ -93,6 +96,8 @@ export default function MediaSection({
                 itemIndex={itemIndex}
                 detailIndex={detailIndex}
                 mediaIndex={mediaIndex}
+                isNC={isNC}
+                ncIndex={ncIndex}
                 onView={onView}
                 onRemove={onRemove}
                 onMove={onMove}
@@ -101,7 +106,7 @@ export default function MediaSection({
           </div>
         ) : (
           <div className="border-2 border-dashed rounded-md p-2 min-h-[60px] flex items-center justify-center text-xs text-muted-foreground">
-            Arraste uma mídia para cá ou clique no botão acima
+            Arraste uma mídia para cá ou clique nos botões acima
           </div>
         )}
       </MediaDropzone>

@@ -26,7 +26,8 @@ import {
   FileText,
   FolderKanban,
   Plus,
-  MessageSquare
+  MessageSquare,
+  Building2
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useUnreadCounts } from '@/hooks/use-unread-counts';
@@ -38,8 +39,8 @@ const menuItems = [
   { href: "/inspections", label: "Inspeções", icon: Search },
   { href: "/reports", label: "Relatórios", icon: FileText }, // Nova entrada
   { href: "/templates", label: "Templates", icon: CircleDot },
-  { href: "/inspectors", label: "Vistoriadores", icon: Users },
-  { href: "/clients", label: "Clientes", icon: Users },
+  { href: "/inspectors", label: "Lincers", icon: Users },
+  { href: "/clients", label: "Clientes", icon: Building2 },
   { href: "/chats", label: "Chats", icon: MessageSquare },
   { href: "/settings", label: "Configurações", icon: Settings },
 ];
@@ -118,7 +119,7 @@ export function Sidebar({ onToggle, isCollapsed }) {
   return (
     <aside
       className={`hidden md:flex h-screen fixed left-0 top-0 z-40 flex-col bg-background border-r transition-all duration-300 ${
-        isCollapsed ? "w-16" : "w-64"
+        isCollapsed ? "w-20" : "w-64"
       }`}
     >
       <div className="flex items-center justify-between p-4 border-b">
@@ -145,9 +146,9 @@ export function Sidebar({ onToggle, isCollapsed }) {
           className="ml-2"
         >
           {isCollapsed ? (
-            <ChevronRight className="h-5 w-5" />
+            <ChevronRight className="h-6 w-6" />
           ) : (
-            <ChevronLeft className="h-5 w-5" />
+            <ChevronLeft className="h-6 w-6" />
           )}
         </Button>
       </div>
@@ -165,7 +166,7 @@ export function Sidebar({ onToggle, isCollapsed }) {
                         : "hover:bg-accent hover:text-accent-foreground"
                     } ${isCollapsed ? "justify-center" : ""}`}
                   >
-                    <MessageSquare className="h-5 w-5 flex-shrink-0" />
+                    <MessageSquare className="h-6 w-6 flex-shrink-0" />
                     {!isCollapsed && (
                       <div className="flex items-center justify-between w-full">
                         <span className="truncate">Chats</span>
@@ -190,7 +191,7 @@ export function Sidebar({ onToggle, isCollapsed }) {
                       : "hover:bg-accent hover:text-accent-foreground"
                   } ${isCollapsed ? "justify-center" : ""}`}
                 >
-                  <item.icon className="h-5 w-5 flex-shrink-0" />
+                  <item.icon className="h-6 w-6 flex-shrink-0" />
                   {!isCollapsed && <span className="truncate">{item.label}</span>}
                 </Link>
               </li>
@@ -208,7 +209,7 @@ export function Sidebar({ onToggle, isCollapsed }) {
             onClick={handleNewInspection}
             title="Nova Inspeção"
           >
-            <Plus className={`h-4 w-4 ${!isCollapsed && "mr-2"}`} />
+            <Plus className={`h-5 w-5 ${!isCollapsed && "mr-2"}`} />
             {!isCollapsed && <span className="truncate">Nova Inspeção</span>}
           </Button>
           
@@ -219,7 +220,7 @@ export function Sidebar({ onToggle, isCollapsed }) {
             onClick={handleNewTemplate}
             title="Novo Template"
           >
-            <CircleDot className={`h-4 w-4 ${!isCollapsed && "mr-2"}`} />
+            <CircleDot className={`h-5 w-5 ${!isCollapsed && "mr-2"}`} />
             {!isCollapsed && <span className="truncate">Novo Template</span>}
           </Button>
           
@@ -230,7 +231,7 @@ export function Sidebar({ onToggle, isCollapsed }) {
             onClick={handleNewProject}
             title="Novo Projeto"
           >
-            <FolderKanban className={`h-4 w-4 ${!isCollapsed && "mr-2"}`} />
+            <FolderKanban className={`h-5 w-5 ${!isCollapsed && "mr-2"}`} />
             {!isCollapsed && <span className="truncate">Novo Projeto</span>}
           </Button>
         </div>
@@ -243,9 +244,9 @@ export function Sidebar({ onToggle, isCollapsed }) {
           onClick={toggleTheme}
         >
           {theme === "dark" ? (
-            <Moon className={`h-4 w-4 ${!isCollapsed && "mr-2"}`} />
+            <Moon className={`h-5 w-5 ${!isCollapsed && "mr-2"}`} />
           ) : (
-            <Sun className={`h-4 w-4 ${!isCollapsed && "mr-2"}`} />
+            <Sun className={`h-5 w-5 ${!isCollapsed && "mr-2"}`} />
           )}
           {!isCollapsed && <span className="truncate">Trocar tema</span>}
         </Button>
@@ -255,7 +256,7 @@ export function Sidebar({ onToggle, isCollapsed }) {
           className={`${isCollapsed ? "justify-center w-9 px-0" : "w-full justify-start"}`}
           onClick={handleLogout}
         >
-          <LogOut className={`h-4 w-4 ${!isCollapsed && "mr-2"}`} />
+          <LogOut className={`h-5 w-5 ${!isCollapsed && "mr-2"}`} />
           {!isCollapsed && <span className="truncate">Sair</span>}
         </Button>
       </div>
@@ -336,7 +337,7 @@ export function MobileNav() {
       <Sheet>
         <SheetTrigger asChild>
           <Button variant="outline" size="icon" className="md:hidden">
-            <Menu className="h-5 w-5" />
+            <Menu className="h-6 w-6" />
             <span className="sr-only">Toggle Menu</span>
           </Button>
         </SheetTrigger>
@@ -369,7 +370,7 @@ export function MobileNav() {
                         : "hover:bg-accent hover:text-accent-foreground"
                     }`}
                   >
-                    <item.icon className="h-5 w-5 flex-shrink-0" />
+                    <item.icon className="h-6 w-6 flex-shrink-0" />
                     <span className="truncate">{item.label}</span>
                   </Link>
                 </li>
@@ -385,7 +386,7 @@ export function MobileNav() {
                 className="w-full justify-start"
                 onClick={handleNewInspection}
               >
-                <Plus className="mr-2 h-4 w-4" />
+                <Plus className="mr-2 h-5 w-5" />
                 <span className="truncate">Nova Inspeção</span>
               </Button>
               
@@ -395,7 +396,7 @@ export function MobileNav() {
                 className="w-full justify-start"
                 onClick={handleNewTemplate}
               >
-                <CircleDot className="mr-2 h-4 w-4" />
+                <CircleDot className="mr-2 h-5 w-5" />
                 <span className="truncate">Novo Template</span>
               </Button>
               
@@ -405,7 +406,7 @@ export function MobileNav() {
                 className="w-full justify-start"
                 onClick={handleNewProject}
               >
-                <FolderKanban className="mr-2 h-4 w-4" />
+                <FolderKanban className="mr-2 h-5 w-5" />
                 <span className="truncate">Novo Projeto</span>
               </Button>
             </div>
@@ -418,9 +419,9 @@ export function MobileNav() {
                 onClick={toggleTheme}
               >
                 {theme === "dark" ? (
-                  <Moon className="mr-2 h-4 w-4" />
+                  <Moon className="mr-2 h-5 w-5" />
                 ) : (
-                  <Sun className="mr-2 h-4 w-4" />
+                  <Sun className="mr-2 h-5 w-5" />
                 )}
                 <span>Trocar tema</span>
               </Button>
@@ -430,7 +431,7 @@ export function MobileNav() {
                 className="w-full justify-start"
                 onClick={handleLogout}
               >
-                <LogOut className="mr-2 h-4 w-4" />
+                <LogOut className="mr-2 h-5 w-5" />
                 <span>Sair</span>
               </Button>
             </div>

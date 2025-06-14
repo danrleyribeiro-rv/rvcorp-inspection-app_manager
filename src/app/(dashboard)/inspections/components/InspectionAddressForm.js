@@ -53,7 +53,7 @@ export default function InspectionAddressForm({ address, onAddressChange }) {
 
   return (
     <div className="space-y-4">
-      <h3 className="font-medium text-lg">Endereço da Vistoria</h3>
+      <h3 className="font-medium text-lg">Endereço da Inspeção</h3>
       
       <div className="space-y-2">
         <Label htmlFor="cep">CEP</Label>
