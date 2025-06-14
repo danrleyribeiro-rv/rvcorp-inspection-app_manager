@@ -37,7 +37,7 @@ import MediaMoveDialog from "@/components/inspection/MediaMoveDialog";
 import InspectionControlPanel from "@/components/inspection/InspectionControlPanel";
 import UniversalMediaSection from "@/components/inspection/UniversalMediaSection";
 import { UniversalDropZone, DRAG_TYPES } from "@/components/inspection/EnhancedDragDropProvider";
-import { DraggableTopic, DraggableItem, DraggableDetail } from "@/components/inspection/DraggableStructureItem";
+import { DraggableTopic, DraggableItem } from "@/components/inspection/DraggableStructureItem";
 
 export default function InspectionEditorPage({ params }) {
   const inspectionId = use(params).id;
@@ -157,12 +157,6 @@ export default function InspectionEditorPage({ params }) {
 
   const uploadMedia = async (topicIndex, itemIndex, detailIndex, file, isNC = false, ncIndex = null, isFromCamera = false) => {
     try {
-      console.log("Iniciando upload de mídia:", { file: file.name, type: file.type, size: file.size });
-      
-      if (!file || !file.name) {
-        throw new Error("Arquivo inválido selecionado");
-      }
-      
       const fileExtension = file.name.split('.').pop();
       const mediaType = file.type.startsWith('image/') ? 'image' : 'video';
       const timestamp = Date.now();
@@ -179,60 +173,21 @@ export default function InspectionEditorPage({ params }) {
         storagePath = `inspections/${inspectionId}/topic_${topicIndex}/media/${fileName}`;
       }
       
-      console.log("Caminho de storage:", storagePath);
-      
       let fileToUpload = file;
       let url;
       
       if (mediaType === 'image') {
-        try {
-          console.log("Processando marca d'água para imagem...");
-          
-          // Verificar se o arquivo é válido antes de tentar a marca d'água
-          if (!file.type.startsWith('image/')) {
-            throw new Error("Tipo de arquivo não é uma imagem válida");
-          }
-          
-          const fileURL = URL.createObjectURL(file);
-          const imageSource = detectImageSource(file, isFromCamera);
-          
-          // Timeout para a marca d'água
-          const watermarkPromise = addWatermarkToImage(fileURL, inspectionId, imageSource);
-          const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error("Timeout na marca d'água")), 8000)
-          );
-          
-          const watermarkedImageURL = await Promise.race([watermarkPromise, timeoutPromise]);
-          const response = await fetch(watermarkedImageURL);
-          
-          if (!response.ok) {
-            throw new Error("Falha ao processar imagem com marca d'água");
-          }
-          
-          fileToUpload = await response.blob();
-          URL.revokeObjectURL(fileURL);
-          console.log("Marca d'água aplicada com sucesso");
-        } catch (watermarkError) {
-          console.warn("Erro ao aplicar marca d'água, continuando sem ela:", watermarkError?.message || "Erro desconhecido");
-          // Se falhar a marca d'água, continua com o arquivo original
-          fileToUpload = file;
-        }
+        const fileURL = URL.createObjectURL(file);
+        const imageSource = detectImageSource(file, isFromCamera);
+        const watermarkedImageURL = await addWatermarkToImage(fileURL, inspectionId, imageSource);
+        const response = await fetch(watermarkedImageURL);
+        fileToUpload = await response.blob();
+        URL.revokeObjectURL(fileURL);
       }
 
-      console.log("Fazendo upload para Firebase Storage...");
-      
-      if (!storage) {
-        throw new Error("Firebase Storage não está configurado");
-      }
-      
       const storageRef = ref(storage, storagePath);
-      console.log("Referência de storage criada:", storageRef);
-      
       const snapshot = await uploadBytes(storageRef, fileToUpload);
-      console.log("Upload bytes concluído, obtendo URL...");
-      
       url = await getDownloadURL(snapshot.ref);
-      console.log("Upload concluído:", url);
 
       const mediaObject = {
         id: `${mediaType}_${timestamp}`,
@@ -274,10 +229,10 @@ export default function InspectionEditorPage({ params }) {
         title: "Mídia enviada com sucesso"
       });
     } catch (error) {
-      console.error("Error uploading media:", error?.message || "Erro desconhecido");
+      console.error("Error uploading media:", error);
       toast({
         title: "Erro ao enviar mídia",
-        description: error?.message || "Erro desconhecido ao fazer upload",
+        description: error.message,
         variant: "destructive"
       });
     }
@@ -1163,8 +1118,8 @@ export default function InspectionEditorPage({ params }) {
             </TabsContent>
 
             <TabsContent value="topics" className="space-y-4">
-              <div className="grid grid-cols-10 gap-4 h-[calc(100vh-200px)]">
-                {/* Topics Column - 30% */}
+              <div className="grid grid-cols-12 gap-4 h-[calc(100vh-200px)]">
+                {/* Topics Column */}
                 <div className="col-span-3 border rounded-lg">
                   <div className="p-3 border-b flex justify-between items-center">
                     <h3 className="font-medium">Tópicos ({inspection.topics?.length || 0})</h3>
@@ -1273,26 +1228,11 @@ export default function InspectionEditorPage({ params }) {
                           </DraggableTopic>
                         </UniversalDropZone>
                       ))}
-                      
-                      {/* Drop zone for adding at the end */}
-                      <UniversalDropZone
-                        topicIndex={inspection.topics?.length || 0}
-                        onDropMedia={handleMoveMediaDrop}
-                        onDropTopic={handleMoveStructure}
-                        onDropItem={handleMoveStructure}
-                        onDropDetail={handleMoveStructure}
-                        acceptTypes={[DRAG_TYPES.MEDIA, DRAG_TYPES.TOPIC, DRAG_TYPES.ITEM, DRAG_TYPES.DETAIL]}
-                        className="min-h-8 border-2 border-dashed border-muted-foreground/20 rounded-md mx-2 my-1"
-                      >
-                        <div className="h-8 flex items-center justify-center text-xs text-muted-foreground">
-                          Solte aqui para adicionar no final
-                        </div>
-                      </UniversalDropZone>
                     </div>
                   </ScrollArea>
                 </div>
 
-                {/* Items Column - 30% */}
+                {/* Items Column */}
                 <div className="col-span-3 border rounded-lg">
                   <div className="p-3 border-b flex justify-between items-center">
                     <div className="flex items-center gap-2">
@@ -1465,22 +1405,6 @@ export default function InspectionEditorPage({ params }) {
                              </DraggableItem>
                            </UniversalDropZone>
                          ))}
-                         
-                         {/* Drop zone for adding items at the end */}
-                         <UniversalDropZone
-                           topicIndex={activeTopicIndex}
-                           itemIndex={currentTopic?.items?.length || 0}
-                           onDropMedia={handleMoveMediaDrop}
-                           onDropTopic={handleMoveStructure}
-                           onDropItem={handleMoveStructure}
-                           onDropDetail={handleMoveStructure}
-                           acceptTypes={[DRAG_TYPES.MEDIA, DRAG_TYPES.TOPIC, DRAG_TYPES.ITEM, DRAG_TYPES.DETAIL]}
-                           className="min-h-8 border-2 border-dashed border-muted-foreground/20 rounded-md mx-2 my-1"
-                         >
-                           <div className="h-8 flex items-center justify-center text-xs text-muted-foreground">
-                             Solte aqui para adicionar no final
-                           </div>
-                         </UniversalDropZone>
                        </div>
                      </div>
                    ) : (
@@ -1491,8 +1415,8 @@ export default function InspectionEditorPage({ params }) {
                  </ScrollArea>
                </div>
 
-               {/* Details Column - 40% */}
-               <div className="col-span-4 border rounded-lg">
+               {/* Details Column */}
+               <div className="col-span-6 border rounded-lg">
                  <div className="p-3 border-b flex justify-between items-center">
                    <div className="flex items-center gap-2">
                      {currentItem && (

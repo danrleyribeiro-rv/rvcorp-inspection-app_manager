@@ -516,20 +516,20 @@ export default function DashboardPage() {
             
             <Card>
               <CardHeader>
-                <CardTitle>Distribuição de Lincers</CardTitle>
-                <CardDescription>Estatísticas de lincers ativos</CardDescription>
+                <CardTitle>Distribuição de Vistoriadores</CardTitle>
+                <CardDescription>Estatísticas de vistoriadores ativos</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <div className="text-sm text-muted-foreground">Lincers Ativos</div>
+                      <div className="text-sm text-muted-foreground">Vistoriadores Ativos</div>
                       <div className="text-2xl font-bold">
                         {stats.totalInspectors}
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <div className="text-sm text-muted-foreground">Inspeções por Lincers</div>
+                      <div className="text-sm text-muted-foreground">Inspeções por Vistoriador</div>
                       <div className="text-2xl font-bold">
                         {stats.totalInspectors > 0 
                           ? (stats.totalInspections / stats.totalInspectors).toFixed(1)
