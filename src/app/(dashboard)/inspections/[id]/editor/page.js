@@ -36,9 +36,9 @@ import {
 import DetailEditor from "@/components/inspection/DetailEditor";
 import MediaMoveDialog from "@/components/inspection/MediaMoveDialog";
 import InspectionControlPanel from "@/components/inspection/InspectionControlPanel";
-import UniversalMediaSection from "@/components/inspection/UniversalMediaSection";
 import MediaManagementTab from "@/components/inspection/MediaManagementTab";
 import { UniversalDropZone, DRAG_TYPES } from "@/components/inspection/EnhancedDragDropProvider";
+import UniversalMediaSection from "@/components/inspection/UniversalMediaSection";
 import { DraggableTopic, DraggableItem } from "@/components/inspection/DraggableStructureItem";
 
 export default function InspectionEditorPage({ params }) {
@@ -666,61 +666,112 @@ export default function InspectionEditorPage({ params }) {
     }));
   };
 
-  const handleMoveMediaDrop = (item, destination) => {
-    const { topicIndex: srcTopicIndex, itemIndex: srcItemIndex, 
-            detailIndex: srcDetailIndex, mediaIndex: srcMediaIndex, 
-            isNC: srcIsNC, ncIndex: srcNcIndex } = item;
-            
-    const { topicIndex: destTopicIndex, itemIndex: destItemIndex, 
-            detailIndex: destDetailIndex, ncIndex: destNcIndex } = destination;
-    
-    const updatedInspection = structuredClone(inspection);
-    
-    // Remove media from source
-    let mediaToMove;
+const handleMoveMediaDrop = (item, destination) => {
+  const { topicIndex: srcTopicIndex, itemIndex: srcItemIndex, 
+          detailIndex: srcDetailIndex, mediaIndex: srcMediaIndex, 
+          isNC: srcIsNC, ncIndex: srcNcIndex } = item;
+          
+  const { topicIndex: destTopicIndex, itemIndex: destItemIndex, 
+          detailIndex: destDetailIndex, ncIndex: destNcIndex } = destination;
+  
+  const updatedInspection = structuredClone(inspection);
+  
+  // Verificar se todos os índices são válidos antes de acessar
+  if (!updatedInspection.topics?.[srcTopicIndex]) return;
+  
+  // Remove media from source
+  let mediaToMove;
+  
+  try {
     if (srcIsNC && srcNcIndex !== null) {
-      mediaToMove = updatedInspection.topics[srcTopicIndex].items[srcItemIndex].details[srcDetailIndex].non_conformities[srcNcIndex].media[srcMediaIndex];
-      updatedInspection.topics[srcTopicIndex].items[srcItemIndex].details[srcDetailIndex].non_conformities[srcNcIndex].media.splice(srcMediaIndex, 1);
+      const srcTopic = updatedInspection.topics[srcTopicIndex];
+      const srcItem = srcTopic.items?.[srcItemIndex];
+      const srcDetail = srcItem?.details?.[srcDetailIndex];
+      const srcNc = srcDetail?.non_conformities?.[srcNcIndex];
+      
+      if (!srcNc?.media?.[srcMediaIndex]) return;
+      
+      mediaToMove = srcNc.media[srcMediaIndex];
+      srcNc.media.splice(srcMediaIndex, 1);
     } else if (srcDetailIndex !== null) {
-      mediaToMove = updatedInspection.topics[srcTopicIndex].items[srcItemIndex].details[srcDetailIndex].media[srcMediaIndex];
-      updatedInspection.topics[srcTopicIndex].items[srcItemIndex].details[srcDetailIndex].media.splice(srcMediaIndex, 1);
+      const srcTopic = updatedInspection.topics[srcTopicIndex];
+      const srcItem = srcTopic.items?.[srcItemIndex];
+      const srcDetail = srcItem?.details?.[srcDetailIndex];
+      
+      if (!srcDetail?.media?.[srcMediaIndex]) return;
+      
+      mediaToMove = srcDetail.media[srcMediaIndex];
+      srcDetail.media.splice(srcMediaIndex, 1);
     } else if (srcItemIndex !== null) {
-      mediaToMove = updatedInspection.topics[srcTopicIndex].items[srcItemIndex].media[srcMediaIndex];
-      updatedInspection.topics[srcTopicIndex].items[srcItemIndex].media.splice(srcMediaIndex, 1);
+      const srcTopic = updatedInspection.topics[srcTopicIndex];
+      const srcItem = srcTopic.items?.[srcItemIndex];
+      
+      if (!srcItem?.media?.[srcMediaIndex]) return;
+      
+      mediaToMove = srcItem.media[srcMediaIndex];
+      srcItem.media.splice(srcMediaIndex, 1);
     } else {
-      mediaToMove = updatedInspection.topics[srcTopicIndex].media[srcMediaIndex];
-      updatedInspection.topics[srcTopicIndex].media.splice(srcMediaIndex, 1);
+      const srcTopic = updatedInspection.topics[srcTopicIndex];
+      
+      if (!srcTopic?.media?.[srcMediaIndex]) return;
+      
+      mediaToMove = srcTopic.media[srcMediaIndex];
+      srcTopic.media.splice(srcMediaIndex, 1);
     }
     
+    if (!mediaToMove) return;
+    
     // Add media to destination
-    if (destNcIndex !== undefined && destNcIndex !== null) {
-      if (!updatedInspection.topics[destTopicIndex].items[destItemIndex].details[destDetailIndex].non_conformities[destNcIndex].media) {
-        updatedInspection.topics[destTopicIndex].items[destItemIndex].details[destDetailIndex].non_conformities[destNcIndex].media = [];
-      }
-      updatedInspection.topics[destTopicIndex].items[destItemIndex].details[destDetailIndex].non_conformities[destNcIndex].media.push(mediaToMove);
+    if (destNcIndex !== null) {
+      const destTopic = updatedInspection.topics[destTopicIndex];
+      const destItem = destTopic.items?.[destItemIndex];
+      const destDetail = destItem?.details?.[destDetailIndex];
+      const destNc = destDetail?.non_conformities?.[destNcIndex];
+      
+      if (!destNc) return;
+      if (!destNc.media) destNc.media = [];
+      
+      destNc.media.push(mediaToMove);
     } else if (destDetailIndex !== null) {
-      if (!updatedInspection.topics[destTopicIndex].items[destItemIndex].details[destDetailIndex].media) {
-        updatedInspection.topics[destTopicIndex].items[destItemIndex].details[destDetailIndex].media = [];
-      }
-      updatedInspection.topics[destTopicIndex].items[destItemIndex].details[destDetailIndex].media.push(mediaToMove);
+      const destTopic = updatedInspection.topics[destTopicIndex];
+      const destItem = destTopic.items?.[destItemIndex];
+      const destDetail = destItem?.details?.[destDetailIndex];
+      
+      if (!destDetail) return;
+      if (!destDetail.media) destDetail.media = [];
+      
+      destDetail.media.push(mediaToMove);
     } else if (destItemIndex !== null) {
-      if (!updatedInspection.topics[destTopicIndex].items[destItemIndex].media) {
-        updatedInspection.topics[destTopicIndex].items[destItemIndex].media = [];
-      }
-      updatedInspection.topics[destTopicIndex].items[destItemIndex].media.push(mediaToMove);
+      const destTopic = updatedInspection.topics[destTopicIndex];
+      const destItem = destTopic.items?.[destItemIndex];
+      
+      if (!destItem) return;
+      if (!destItem.media) destItem.media = [];
+      
+      destItem.media.push(mediaToMove);
     } else {
-      if (!updatedInspection.topics[destTopicIndex].media) {
-        updatedInspection.topics[destTopicIndex].media = [];
-      }
-      updatedInspection.topics[destTopicIndex].media.push(mediaToMove);
+      const destTopic = updatedInspection.topics[destTopicIndex];
+      
+      if (!destTopic) return;
+      if (!destTopic.media) destTopic.media = [];
+      
+      destTopic.media.push(mediaToMove);
     }
     
     setInspection(updatedInspection);
-    
     toast({
-      title: "Mídia movida com sucesso"
+      title: "Mídia movida",
+      description: "A mídia foi movida com sucesso.",
     });
-  };
+  } catch (error) {
+    console.error("Erro ao mover mídia:", error);
+    toast({
+      title: "Erro",
+      description: "Não foi possível mover a mídia.",
+      variant: "destructive",
+    });
+  }
+};
 
   const handleMoveStructure = (item, destination) => {
     const updatedInspection = structuredClone(inspection);
