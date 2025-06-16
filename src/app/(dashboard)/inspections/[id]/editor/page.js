@@ -30,12 +30,14 @@ import {
   Loader2,
   AlertTriangle,
   ChevronRight,
-  Video
+  Video,
+  Images
 } from "lucide-react";
 import DetailEditor from "@/components/inspection/DetailEditor";
 import MediaMoveDialog from "@/components/inspection/MediaMoveDialog";
 import InspectionControlPanel from "@/components/inspection/InspectionControlPanel";
 import UniversalMediaSection from "@/components/inspection/UniversalMediaSection";
+import MediaManagementTab from "@/components/inspection/MediaManagementTab";
 import { UniversalDropZone, DRAG_TYPES } from "@/components/inspection/EnhancedDragDropProvider";
 import { DraggableTopic, DraggableItem } from "@/components/inspection/DraggableStructureItem";
 
@@ -1051,7 +1053,10 @@ export default function InspectionEditorPage({ params }) {
                 <ListChecks className="h-4 w-4" />
                 Estrutura da Inspeção
               </TabsTrigger>
-              {/* Nova aba Controle */}
+              <TabsTrigger value="media" className="flex items-center gap-2">
+                <Images className="h-4 w-4" />
+                Mídias
+              </TabsTrigger>
               <TabsTrigger value="control" className="flex items-center gap-2">
                 <Settings className="h-4 w-4" />
                 Controle
@@ -1507,6 +1512,19 @@ export default function InspectionEditorPage({ params }) {
                </div>
              </div>
            </TabsContent>
+
+           <TabsContent value="media" className="space-y-4">
+             <MediaManagementTab
+               inspection={inspection}
+               onUploadMedia={uploadMedia}
+               onRemoveMedia={removeMedia}
+               onMoveMedia={handleMoveMediaDrop}
+               onViewMedia={openMediaViewer}
+               onMoveDialog={openMoveDialog}
+               onUpdateInspection={setInspection}
+             />
+           </TabsContent>
+
            {/* Novo conteúdo da aba Controle */}
            <TabsContent value="control" className="space-y-4">
               {inspectionControlData && (

@@ -33,7 +33,7 @@ function detectImageSource(file, isFromCamera = false) {
 export { detectImageSource };
 
 export async function addWatermarkToImage(imageUrl, inspectionId, source = 'files') {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
     try {
       // Verificar se está em ambiente browser
       if (typeof document === 'undefined') {
@@ -41,9 +41,194 @@ export async function addWatermarkToImage(imageUrl, inspectionId, source = 'file
         return;
       }
 
+      let imageBlob;
+
       // Verificar se a URL já é um dataURL
       if (imageUrl.startsWith('data:')) {
-        // Se já for um dataURL, carregamos diretamente
+        // Converter dataURL para blob
+        try {
+          const response = await fetch(imageUrl);
+          imageBlob = await response.blob();
+        } catch (fetchError) {
+          reject(new Error("Erro ao converter dataURL para blob: " + fetchError.message));
+          return;
+        }
+      } else {
+        // Se for URL do Firebase Storage, tentar API proxy diretamente primeiro
+        if (imageUrl.includes('firebasestorage.googleapis.com')) {
+          try {
+            console.log("URL do Firebase detectada, tentando API proxy direto...");
+            
+            const proxyResponse = await fetch('/api/watermark', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                imageUrl: imageUrl,
+                inspectionId: inspectionId,
+                source: source,
+                processWatermark: true
+              })
+            });
+            
+            if (proxyResponse.ok) {
+              const proxyData = await proxyResponse.json();
+              
+              if (proxyData.success && proxyData.dataURL) {
+                if (proxyData.watermarkApplied) {
+                  console.log("Firebase + API proxy: marca d'água aplicada no servidor!");
+                  resolve(proxyData.dataURL);
+                  return;
+                } else {
+                  console.log("Firebase + API proxy: usando imagem do servidor para processamento no cliente...");
+                  const proxyDataResponse = await fetch(proxyData.dataURL);
+                  imageBlob = await proxyDataResponse.blob();
+                  
+                  if (imageBlob && imageBlob.size > 0) {
+                    // Pular para o processamento do blob
+                    console.log("Firebase proxy funcionou, processando blob...");
+                  } else {
+                    throw new Error("Blob vazio do proxy");
+                  }
+                }
+              } else {
+                throw new Error("Proxy retornou dados inválidos");
+              }
+            } else {
+              throw new Error(`Proxy falhou: ${proxyResponse.status}`);
+            }
+          } catch (firebaseProxyError) {
+            console.log("Proxy direto para Firebase falhou, tentando métodos tradicionais:", firebaseProxyError.message);
+            // Continuar com métodos tradicionais
+          }
+        }
+        
+        // Se chegou até aqui e não tem imageBlob, tentar métodos tradicionais
+        if (!imageBlob) {
+          // Para URLs externas, fazer fetch primeiro para evitar CORS
+          try {
+            let response;
+          
+          // Primeira tentativa: fetch direto
+          try {
+            response = await fetch(imageUrl, {
+              mode: 'cors',
+              credentials: 'omit'
+            });
+          } catch (corsError) {
+            console.log("Erro CORS na primeira tentativa, tentando sem modo cors:", corsError);
+            
+            // Segunda tentativa: fetch sem modo cors especificado
+            try {
+              response = await fetch(imageUrl, {
+                credentials: 'omit'
+              });
+            } catch (secondError) {
+              console.log("Segunda tentativa falhou, tentando como same-origin:", secondError);
+              
+              // Terceira tentativa: same-origin
+              response = await fetch(imageUrl, {
+                mode: 'same-origin'
+              });
+            }
+          }
+          
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+          
+          imageBlob = await response.blob();
+          
+          // Verificar se conseguiu fazer o fetch mas o blob está vazio
+          if (!imageBlob || imageBlob.size === 0) {
+            throw new Error("Imagem está vazia ou corrompida");
+          }
+          
+        } catch (fetchError) {
+          console.error("Erro ao fazer fetch da imagem:", fetchError);
+          
+          // Fallback: tentar carregar a imagem usando Image() e converter para canvas
+          try {
+            console.log("Tentando fallback com Image()...");
+            
+            const fallbackDataURL = await loadImageAsFallback(imageUrl);
+            const fallbackResponse = await fetch(fallbackDataURL);
+            imageBlob = await fallbackResponse.blob();
+            
+            if (!imageBlob || imageBlob.size === 0) {
+              throw new Error("Fallback também falhou - blob vazio");
+            }
+            
+            console.log("Fallback foi bem sucedido!");
+            
+          } catch (fallbackError) {
+            console.error("Fallback também falhou:", fallbackError);
+            
+            // Último recurso: usar API proxy com processamento no servidor
+            try {
+              console.log("Tentando via API proxy com processamento no servidor...");
+              
+              const proxyResponse = await fetch('/api/watermark', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  imageUrl: imageUrl,
+                  inspectionId: inspectionId,
+                  source: source,
+                  processWatermark: true // Processar marca d'água no servidor
+                })
+              });
+              
+              if (!proxyResponse.ok) {
+                throw new Error(`Proxy API failed: ${proxyResponse.status}`);
+              }
+              
+              const proxyData = await proxyResponse.json();
+              
+              if (!proxyData.success || !proxyData.dataURL) {
+                throw new Error("Proxy API didn't return valid data");
+              }
+              
+              if (proxyData.watermarkApplied) {
+                console.log("Marca d'água aplicada no servidor com sucesso!");
+                // Se a marca d'água foi aplicada no servidor, retornamos o dataURL diretamente
+                resolve(proxyData.dataURL);
+                return;
+              } else {
+                console.log("Servidor retornou imagem sem marca d'água, aplicando no cliente...");
+                // Se o servidor não conseguiu aplicar a marca d'água, fazemos no cliente
+                const proxyDataResponse = await fetch(proxyData.dataURL);
+                imageBlob = await proxyDataResponse.blob();
+              }
+              
+              console.log("API proxy foi bem sucedido!");
+              
+            } catch (proxyError) {
+              console.error("API proxy também falhou:", proxyError);
+              reject(new Error("Falha ao carregar imagem para aplicar marca d'água. Todos os métodos falharam."));
+              return;
+            }
+          }
+        }
+        } // Fechar bloco if (!imageBlob)
+      }
+
+      // Verificar se o blob é válido
+      if (!imageBlob || imageBlob.size === 0) {
+        reject(new Error("Blob da imagem está vazio ou inválido"));
+        return;
+      }
+
+      // Converter blob para dataURL
+      const reader = new FileReader();
+      
+      reader.onload = (event) => {
+        const dataURL = event.target.result;
+        
+        // Carregar imagem a partir do dataURL
         const img = new Image();
         
         // Timeout para evitar travamento
@@ -74,11 +259,11 @@ export async function addWatermarkToImage(imageUrl, inspectionId, source = 'file
             
             // Retornar o dataURL
             try {
-              const dataURL = canvas.toDataURL('image/jpeg', 0.95);
-              if (!dataURL || dataURL === 'data:,') {
+              const finalDataURL = canvas.toDataURL('image/jpeg', 0.95);
+              if (!finalDataURL || finalDataURL === 'data:,') {
                 throw new Error("Canvas produziu dataURL inválido");
               }
-              resolve(dataURL);
+              resolve(finalDataURL);
             } catch (toDataURLError) {
               reject(new Error("Erro ao converter canvas para dataURL: " + toDataURLError.message));
             }
@@ -89,67 +274,20 @@ export async function addWatermarkToImage(imageUrl, inspectionId, source = 'file
         
         img.onerror = () => {
           clearTimeout(timeoutId);
-          console.error("Erro ao carregar imagem dataURL para marca d'água");
+          console.error("Erro ao carregar imagem do blob para marca d'água");
           reject(new Error("Falha ao processar imagem para marca d'água"));
         };
         
-        img.src = imageUrl;
-      } else {
-        // Para URLs regulares, primeiro desenhamos em um canvas
-        const img = new Image();
-        img.crossOrigin = "Anonymous"; // Para lidar com CORS
-        
-        // Timeout para evitar travamento
-        const timeoutId = setTimeout(() => {
-          reject(new Error("Timeout ao carregar imagem externa para marca d'água"));
-        }, 15000);
-        
-        img.onload = () => {
-          clearTimeout(timeoutId);
-          try {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            
-            if (!ctx) {
-              reject(new Error("Não foi possível criar contexto de canvas"));
-              return;
-            }
-            
-            canvas.width = img.width;
-            canvas.height = img.height;
-            
-            // Desenhar a imagem original
-            ctx.drawImage(img, 0, 0);
-            
-            // Adicionar a marca d'água
-            addWatermarkToCanvas(ctx, canvas.width, canvas.height, inspectionId, source);
-            
-            // Retornar o dataURL
-            try {
-              const dataURL = canvas.toDataURL('image/jpeg', 0.95);
-              if (!dataURL || dataURL === 'data:,') {
-                throw new Error("Canvas produziu dataURL inválido");
-              }
-              resolve(dataURL);
-            } catch (toDataURLError) {
-              reject(new Error("Erro ao converter canvas para dataURL: " + toDataURLError.message));
-            }
-          } catch (canvasError) {
-            reject(new Error("Erro ao processar canvas: " + canvasError.message));
-          }
-        };
-        
-        img.onerror = () => {
-          clearTimeout(timeoutId);
-          console.error("Erro ao carregar imagem externa para marca d'água");
-          // Em caso de erro, rejeitar com uma mensagem mais específica
-          reject(new Error("Falha ao carregar imagem para aplicar marca d'água"));
-        };
-        
-        // Adicionar cache buster
-        const cacheBuster = `?t=${Date.now()}`;
-        img.src = imageUrl + cacheBuster;
-      }
+        img.src = dataURL;
+      };
+
+      reader.onerror = () => {
+        reject(new Error("Erro ao ler blob da imagem"));
+      };
+
+      // Iniciar a leitura do blob
+      reader.readAsDataURL(imageBlob);
+      
     } catch (error) {
       reject(new Error("Erro geral na função de marca d'água: " + error.message));
     }
@@ -274,4 +412,47 @@ function drawCustomEmoji(ctx, x, y, size, source) {
     ctx.lineTo(x + 4 * scale, y + 1 * scale);
     ctx.stroke();
   }
+}
+
+// Função de fallback para carregar imagens com problemas de CORS
+function loadImageAsFallback(imageUrl) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    // Timeout para evitar travamento
+    const timeoutId = setTimeout(() => {
+      reject(new Error("Timeout no fallback de carregamento de imagem"));
+    }, 15000);
+    
+    img.onload = () => {
+      clearTimeout(timeoutId);
+      try {
+        canvas.width = img.width;
+        canvas.height = img.height;
+        
+        // Desenhar a imagem no canvas
+        ctx.drawImage(img, 0, 0);
+        
+        // Converter para dataURL
+        const dataURL = canvas.toDataURL('image/jpeg', 0.95);
+        if (!dataURL || dataURL === 'data:,') {
+          throw new Error("Canvas de fallback produziu dataURL inválido");
+        }
+        
+        resolve(dataURL);
+      } catch (canvasError) {
+        reject(new Error("Erro no canvas de fallback: " + canvasError.message));
+      }
+    };
+    
+    img.onerror = () => {
+      clearTimeout(timeoutId);
+      reject(new Error("Fallback: falha ao carregar imagem"));
+    };
+    
+    // Tentar carregar sem crossOrigin para contornar CORS
+    img.src = imageUrl;
+  });
 }
