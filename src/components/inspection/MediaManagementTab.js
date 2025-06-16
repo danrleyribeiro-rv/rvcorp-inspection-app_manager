@@ -1,311 +1,164 @@
-// src/components/inspection/MediaManagementTab.js
-"use client";
-
-import { useState, useCallback, useMemo, useRef } from "react";
-import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
-import { DndProvider, useDrag, useDrop } from 'react-dnd';
-import { HTML5Backend } from 'react-dnd-html5-backend';
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { storage } from "@/lib/firebase";
+import React, { useState, useCallback, useMemo } from "react";
+import { DndProvider } from "react-dnd";
+import { HTML5Backend } from "react-dnd-html5-backend";
 import { 
   Images, 
+  FileImage, 
   Video, 
-  Move, 
-  Trash2, 
-  Eye, 
+  AlertTriangle, 
   Droplets,
-  ChevronRight,
-  Plus,
-  AlertTriangle,
   CheckCircle,
-  FolderOpen,
-  FileImage
+  Clock,
+  Loader2
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { addWatermarkToImage, detectImageSource } from "@/utils/ImageWatermark";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogFooter 
+} from "@/components/ui/dialog";
+import { Progress } from "@/components/ui/progress";
+import DraggableMediaItem from "@/components/inspection/DraggableMedia";
 import { UniversalDropZone, DRAG_TYPES } from "@/components/inspection/EnhancedDragDropProvider";
+import { 
+  addWatermarkToImage, 
+  detectImageSource, 
+  dataURLtoFile, 
+  hasWatermark 
+} from "@/utils/ImageWatermark";
+import { storage } from "@/lib/firebase";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
-// Componente para mídia arrastável
-const DraggableMediaItem = ({ media, context, onView, onMove, onRemove, onWatermark }) => {
-  const [{ isDragging }, drag] = useDrag({
-    type: DRAG_TYPES.MEDIA,
-    item: { 
-      ...context,
-      type: DRAG_TYPES.MEDIA
-    },
-    collect: (monitor) => ({
-      isDragging: monitor.isDragging()
-    })
-  });
-
-  const hasWatermark = media.url && (
-    media.url.includes('watermark') || 
-    media.url.includes('watermarked') ||
-    media.id?.includes('watermark')
-  );
-  const canWatermark = media.type === 'image' && !hasWatermark;
-
-  return (
-    <div
-      ref={drag}
-      className={`group relative border rounded-lg overflow-hidden bg-white hover:shadow-sm transition-all duration-200 ${
-        isDragging ? 'opacity-50' : ''
-      }`}
-    >
-      {/* Media Preview */}
-      <div className="aspect-square relative cursor-pointer" onClick={() => onView(media, context)}>
-        {media.type === 'image' ? (
-          <img
-            src={media.url}
-            alt="Media"
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="w-full h-full bg-gray-100 flex items-center justify-center">
-            <Video className="h-6 w-6 text-gray-400" />
-          </div>
-        )}
-        
-        {/* Watermark indicator */}
-        {media.type === 'image' && (
-          <div className="absolute top-1 right-1">
-            {hasWatermark ? (
-              <CheckCircle className="h-4 w-4 text-green-500 bg-white rounded-full" />
-            ) : (
-              <AlertTriangle className="h-4 w-4 text-amber-500 bg-white rounded-full" />
-            )}
-          </div>
-        )}
-
-        {/* Action buttons overlay */}
-        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={(e) => {
-              e.stopPropagation();
-              onView(media, context);
-            }}
-            className="h-6 w-6 p-0"
-          >
-            <Eye className="h-3 w-3" />
-          </Button>
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={(e) => {
-              e.stopPropagation();
-              onMove(media, context);
-            }}
-            className="h-6 w-6 p-0"
-          >
-            <Move className="h-3 w-3" />
-          </Button>
-          {canWatermark && (
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={(e) => {
-                e.stopPropagation();
-                onWatermark(media, context);
-              }}
-              className="h-6 w-6 p-0"
-            >
-              <Droplets className="h-3 w-3" />
-            </Button>
-          )}
-          <Button
-            size="sm"
-            variant="destructive"
-            onClick={(e) => {
-              e.stopPropagation();
-              onRemove(media, context);
-            }}
-            className="h-6 w-6 p-0"
-          >
-            <Trash2 className="h-3 w-3" />
-          </Button>
-        </div>
-      </div>
-
-      {/* Media info */}
-      <div className="p-1 border-t bg-gray-50">
-        <div className="text-xs text-center capitalize font-medium">
-          {media.type}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default function MediaManagementTab({ 
-  inspection, 
-  onUploadMedia, 
-  onRemoveMedia, 
-  onMoveMedia, 
-  onViewMedia, 
+export default function MediaManagementTab({
+  inspection,
+  onUploadMedia,
+  onRemoveMedia,
+  onMoveMedia,
+  onViewMedia,
   onMoveDialog,
-  onUpdateInspection 
+  onUpdateInspection
 }) {
+  const { toast } = useToast();
+  
+  // Estados
   const [activeTopicIndex, setActiveTopicIndex] = useState(0);
   const [activeItemIndex, setActiveItemIndex] = useState(null);
   const [isWatermarkDialog, setIsWatermarkDialog] = useState(false);
   const [selectedMediaForWatermark, setSelectedMediaForWatermark] = useState(null);
   const [isApplyingWatermark, setIsApplyingWatermark] = useState(false);
-  const { toast } = useToast();
+  const [isBulkWatermark, setIsBulkWatermark] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState({ current: 0, total: 0 });
 
-  // Estatísticas de mídia
+  // Calcular estatísticas de mídia
   const mediaStats = useMemo(() => {
     let totalImages = 0;
     let totalVideos = 0;
     let imagesWithoutWatermark = 0;
 
-    inspection?.topics?.forEach((topic) => {
-      // Topic media
-      topic.media?.forEach((media) => {
+    const processMedia = (mediaArray) => {
+      mediaArray?.forEach(media => {
         if (media.type === 'image') {
           totalImages++;
-          const hasWatermark = media.url && (
-            media.url.includes('watermark') || 
-            media.url.includes('watermarked') ||
-            media.id?.includes('watermark')
-          );
-          if (!hasWatermark) {
+          if (!hasWatermark(media)) {
             imagesWithoutWatermark++;
           }
         } else if (media.type === 'video') {
           totalVideos++;
         }
       });
+    };
 
-      // Item media
-      topic.items?.forEach((item) => {
-        item.media?.forEach((media) => {
-          if (media.type === 'image') {
-            totalImages++;
-            const hasWatermark = media.url && (
-              media.url.includes('watermark') || 
-              media.url.includes('watermarked') ||
-              media.id?.includes('watermark')
-            );
-            if (!hasWatermark) {
-              imagesWithoutWatermark++;
-            }
-          } else if (media.type === 'video') {
-            totalVideos++;
-          }
-        });
-
-        // Detail media
-        item.details?.forEach((detail) => {
-          detail.media?.forEach((media) => {
-            if (media.type === 'image') {
-              totalImages++;
-              const hasWatermark = media.url && (
-                media.url.includes('watermark') || 
-                media.url.includes('watermarked') ||
-                media.id?.includes('watermark')
-              );
-              if (!hasWatermark) {
-                imagesWithoutWatermark++;
-              }
-            } else if (media.type === 'video') {
-              totalVideos++;
-            }
-          });
-
-          // Non-conformity media
-          detail.non_conformities?.forEach((nc) => {
-            nc.media?.forEach((media) => {
-              if (media.type === 'image') {
-                totalImages++;
-                const hasWatermark = media.url && (
-                  media.url.includes('watermark') || 
-                  media.url.includes('watermarked') ||
-                  media.id?.includes('watermark')
-                );
-                if (!hasWatermark) {
-                  imagesWithoutWatermark++;
-                }
-              } else if (media.type === 'video') {
-                totalVideos++;
-              }
-            });
+    inspection?.topics?.forEach(topic => {
+      // Mídia do tópico
+      processMedia(topic.media);
+      
+      // Mídia dos itens
+      topic.items?.forEach(item => {
+        processMedia(item.media);
+        
+        // Mídia dos detalhes
+        item.details?.forEach(detail => {
+          processMedia(detail.media);
+          
+          // Mídia das não conformidades
+          detail.non_conformities?.forEach(nc => {
+            processMedia(nc.media);
           });
         });
       });
     });
 
     return {
+      total: totalImages + totalVideos,
       totalImages,
       totalVideos,
-      total: totalImages + totalVideos,
       imagesWithoutWatermark
     };
   }, [inspection]);
 
-  // Handle media view
+  // Tópico e item atuais
+  const currentTopic = inspection?.topics?.[activeTopicIndex];
+  const currentItem = currentTopic?.items?.[activeItemIndex];
+
+  // Manipuladores de eventos
   const handleViewMedia = useCallback((media, context) => {
-    onViewMedia(
-      media, 
-      context.topicIndex, 
-      context.itemIndex, 
-      context.detailIndex, 
-      context.mediaIndex,
-      context.isNC || false,
-      context.ncIndex
-    );
+    onViewMedia(media, context);
   }, [onViewMedia]);
 
-  // Handle media move
   const handleMoveMedia = useCallback((media, context) => {
-    onMoveDialog(
-      media,
-      context.topicIndex,
-      context.itemIndex,
-      context.detailIndex,
-      context.mediaIndex,
-      context.isNC || false,
-      context.ncIndex
-    );
+    onMoveDialog(media, context);
   }, [onMoveDialog]);
 
-  // Handle media remove
   const handleRemoveMedia = useCallback((media, context) => {
-    onRemoveMedia(
-      context.topicIndex,
-      context.itemIndex,
-      context.detailIndex,
-      context.mediaIndex,
-      context.isNC || false,
-      context.ncIndex
-    );
+    onRemoveMedia(media, context);
   }, [onRemoveMedia]);
 
-  // Handle watermark application
   const handleWatermark = useCallback((media, context) => {
+    if (hasWatermark(media)) {
+      toast({
+        title: "Aviso",
+        description: "Esta imagem já possui marca d'água",
+        variant: "default"
+      });
+      return;
+    }
+
     setSelectedMediaForWatermark({ media, context });
     setIsWatermarkDialog(true);
-  }, []);
+  }, [toast]);
 
-  // Apply watermark to image
+  // Aplicar marca d'água em uma imagem
   const applyWatermark = useCallback(async () => {
     if (!selectedMediaForWatermark) return;
 
     setIsApplyingWatermark(true);
-    
+
     try {
       const { media, context } = selectedMediaForWatermark;
       
       console.log("Aplicando marca d'água para:", media.url);
       
-      // Create new file name and storage path
+      // Detectar origem da imagem
+      const imageSource = detectImageSource(null, false);
+      
+      // Aplicar marca d'água
+      const watermarkedDataURL = await addWatermarkToImage(
+        media.url, 
+        inspection.id, 
+        imageSource
+      );
+      
+      // Criar arquivo da imagem com marca d'água
       const timestamp = Date.now();
       const fileName = `image_watermarked_${timestamp}.jpg`;
+      const watermarkedFile = dataURLtoFile(watermarkedDataURL, fileName);
       
+      // Definir caminho de armazenamento
       let storagePath;
       if (context.isNC && context.ncIndex !== null) {
         storagePath = `inspections/${inspection.id}/topic_${context.topicIndex}/item_${context.itemIndex}/detail_${context.detailIndex}/non_conformities/nc_${context.ncIndex}/${fileName}`;
@@ -317,138 +170,76 @@ export default function MediaManagementTab({
         storagePath = `inspections/${inspection.id}/topic_${context.topicIndex}/media/${fileName}`;
       }
 
-      // Use API to process watermark and upload directly
-      const imageSource = detectImageSource(null, false);
-      let downloadURL;
+      // Upload para Firebase
+      const storageRef = ref(storage, storagePath);
+      const uploadResult = await uploadBytes(storageRef, watermarkedFile);
+      const downloadURL = await getDownloadURL(uploadResult.ref);
       
-      try {
-        console.log("Processando marca d'água via API com upload direto...");
-        
-        const apiResponse = await fetch('/api/watermark', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            imageUrl: media.url,
-            inspectionId: inspection.id,
-            source: imageSource,
-            processWatermark: true,
-            uploadToFirebase: true,
-            storagePath: storagePath
-          })
-        });
-        
-        if (!apiResponse.ok) {
-          throw new Error(`API failed: ${apiResponse.status}`);
-        }
-        
-        const apiData = await apiResponse.json();
-        
-        if (!apiData.success) {
-          throw new Error("API retornou erro");
-        }
-        
-        if (apiData.uploaded && apiData.downloadURL) {
-          downloadURL = apiData.downloadURL;
-          console.log("Upload via API bem sucedido!");
-        } else if (apiData.watermarkApplied && apiData.dataURL) {
-          // Fallback: API aplicou marca d'água mas não fez upload
-          console.log("API aplicou marca d'água, fazendo upload manual...");
-          
-          const response = await fetch(apiData.dataURL);
-          const blob = await response.blob();
-          
-          const storageRef = ref(storage, storagePath);
-          const snapshot = await uploadBytes(storageRef, blob);
-          downloadURL = await getDownloadURL(snapshot.ref);
-        } else {
-          throw new Error("API não conseguiu processar a imagem");
-        }
-        
-      } catch (apiError) {
-        console.error("Erro na API, tentando método tradicional:", apiError);
-        
-        // Fallback para método tradicional
-        try {
-          const watermarkedImageURL = await addWatermarkToImage(media.url, inspection.id, imageSource);
-          const response = await fetch(watermarkedImageURL);
-          const blob = await response.blob();
-          
-          const storageRef = ref(storage, storagePath);
-          const snapshot = await uploadBytes(storageRef, blob);
-          downloadURL = await getDownloadURL(snapshot.ref);
-        } catch (fallbackError) {
-          console.error("Método tradicional também falhou:", fallbackError);
-          throw new Error(`Todos os métodos falharam: ${fallbackError.message}`);
-        }
+      // Atualizar dados da inspeção
+      const updatedInspection = { ...inspection };
+      
+      if (context.isNC && context.ncIndex !== null) {
+        updatedInspection.topics[context.topicIndex].items[context.itemIndex]
+          .details[context.detailIndex].non_conformities[context.ncIndex]
+          .media[context.mediaIndex] = {
+            ...media,
+            url: downloadURL,
+            id: `watermarked_${media.id}`,
+            updated_at: new Date().toISOString()
+          };
+      } else if (context.detailIndex !== null) {
+        updatedInspection.topics[context.topicIndex].items[context.itemIndex]
+          .details[context.detailIndex].media[context.mediaIndex] = {
+            ...media,
+            url: downloadURL,
+            id: `watermarked_${media.id}`,
+            updated_at: new Date().toISOString()
+          };
+      } else if (context.itemIndex !== null) {
+        updatedInspection.topics[context.topicIndex].items[context.itemIndex]
+          .media[context.mediaIndex] = {
+            ...media,
+            url: downloadURL,
+            id: `watermarked_${media.id}`,
+            updated_at: new Date().toISOString()
+          };
+      } else {
+        updatedInspection.topics[context.topicIndex].media[context.mediaIndex] = {
+          ...media,
+          url: downloadURL,
+          id: `watermarked_${media.id}`,
+          updated_at: new Date().toISOString()
+        };
       }
 
-      // Update inspection data
-      const updatedInspection = structuredClone(inspection);
+      onUpdateInspection(updatedInspection);
       
-      try {
-        if (context.isNC && context.ncIndex !== null) {
-          updatedInspection.topics[context.topicIndex].items[context.itemIndex].details[context.detailIndex].non_conformities[context.ncIndex].media[context.mediaIndex] = {
-            ...media,
-            url: downloadURL,
-            updated_at: new Date().toISOString()
-          };
-        } else if (context.detailIndex !== null) {
-          updatedInspection.topics[context.topicIndex].items[context.itemIndex].details[context.detailIndex].media[context.mediaIndex] = {
-            ...media,
-            url: downloadURL,
-            updated_at: new Date().toISOString()
-          };
-        } else if (context.itemIndex !== null) {
-          updatedInspection.topics[context.topicIndex].items[context.itemIndex].media[context.mediaIndex] = {
-            ...media,
-            url: downloadURL,
-            updated_at: new Date().toISOString()
-          };
-        } else {
-          updatedInspection.topics[context.topicIndex].media[context.mediaIndex] = {
-            ...media,
-            url: downloadURL,
-            updated_at: new Date().toISOString()
-          };
-        }
-
-        onUpdateInspection(updatedInspection);
-        
-        toast({
-          title: "Marca d'água aplicada com sucesso"
-        });
-        
-        setIsWatermarkDialog(false);
-        setSelectedMediaForWatermark(null);
-      } catch (updateError) {
-        console.error("Erro ao atualizar dados da inspeção:", updateError);
-        throw new Error(`Falha ao atualizar dados: ${updateError.message}`);
-      }
+      toast({
+        title: "Sucesso",
+        description: "Marca d'água aplicada com sucesso!",
+        variant: "default"
+      });
+      
+      setIsWatermarkDialog(false);
+      setSelectedMediaForWatermark(null);
       
     } catch (error) {
-      console.error("Error applying watermark:", error);
+      console.error("Erro ao aplicar marca d'água:", error);
       
-      // Provide more specific error messages
       let errorMessage = "Erro desconhecido ao aplicar marca d'água";
       
-      if (error.message.includes("CORS")) {
-        errorMessage = "Erro de permissão ao acessar a imagem. Tente novamente.";
-      } else if (error.message.includes("Network")) {
-        errorMessage = "Erro de conexão. Verifique sua internet e tente novamente.";
-      } else if (error.message.includes("HTTP")) {
-        errorMessage = "Erro ao carregar a imagem. A imagem pode estar corrompida.";
-      } else if (error.message.includes("Canvas")) {
-        errorMessage = "Erro no processamento da imagem. Tente com uma imagem menor.";
-      } else if (error.message.includes("Firebase") || error.message.includes("upload")) {
-        errorMessage = "Erro ao salvar a imagem. Tente novamente.";
+      if (error.message.includes("Timeout")) {
+        errorMessage = "Timeout - a imagem pode ser muito grande. Tente novamente.";
+      } else if (error.message.includes("CORS") || error.message.includes("carregar")) {
+        errorMessage = "Erro ao carregar a imagem. Tente novamente.";
+      } else if (error.message.includes("Firebase")) {
+        errorMessage = "Erro ao salvar no Firebase. Verifique sua conexão.";
       } else {
         errorMessage = error.message;
       }
       
       toast({
-        title: "Erro ao aplicar marca d'água",
+        title: "Erro",
         description: errorMessage,
         variant: "destructive"
       });
@@ -457,70 +248,78 @@ export default function MediaManagementTab({
     }
   }, [selectedMediaForWatermark, inspection, onUpdateInspection, toast]);
 
-  // Apply watermark to all images without watermark
+  // Aplicar marca d'água em todas as imagens sem marca d'água
   const applyWatermarkToAll = useCallback(async () => {
     const imagesWithoutWatermark = [];
     
     inspection?.topics?.forEach((topic, topicIndex) => {
-      // Topic media
+      // Mídia do tópico
       topic.media?.forEach((media, mediaIndex) => {
-        const hasWatermark = media.url && (
-          media.url.includes('watermark') || 
-          media.url.includes('watermarked') ||
-          media.id?.includes('watermark')
-        );
-        if (media.type === 'image' && !hasWatermark) {
+        if (media.type === 'image' && !hasWatermark(media)) {
           imagesWithoutWatermark.push({
             media,
-            context: { topicIndex, itemIndex: null, detailIndex: null, mediaIndex, isNC: false, ncIndex: null }
+            context: { 
+              topicIndex, 
+              itemIndex: null, 
+              detailIndex: null, 
+              mediaIndex, 
+              isNC: false, 
+              ncIndex: null 
+            }
           });
         }
       });
 
-      // Item media
+      // Mídia dos itens
       topic.items?.forEach((item, itemIndex) => {
         item.media?.forEach((media, mediaIndex) => {
-          const hasWatermark = media.url && (
-            media.url.includes('watermark') || 
-            media.url.includes('watermarked') ||
-            media.id?.includes('watermark')
-          );
-          if (media.type === 'image' && !hasWatermark) {
+          if (media.type === 'image' && !hasWatermark(media)) {
             imagesWithoutWatermark.push({
               media,
-              context: { topicIndex, itemIndex, detailIndex: null, mediaIndex, isNC: false, ncIndex: null }
+              context: { 
+                topicIndex, 
+                itemIndex, 
+                detailIndex: null, 
+                mediaIndex, 
+                isNC: false, 
+                ncIndex: null 
+              }
             });
           }
         });
 
-        // Detail media
+        // Mídia dos detalhes
         item.details?.forEach((detail, detailIndex) => {
           detail.media?.forEach((media, mediaIndex) => {
-            const hasWatermark = media.url && (
-              media.url.includes('watermark') || 
-              media.url.includes('watermarked') ||
-              media.id?.includes('watermark')
-            );
-            if (media.type === 'image' && !hasWatermark) {
+            if (media.type === 'image' && !hasWatermark(media)) {
               imagesWithoutWatermark.push({
                 media,
-                context: { topicIndex, itemIndex, detailIndex, mediaIndex, isNC: false, ncIndex: null }
+                context: { 
+                  topicIndex, 
+                  itemIndex, 
+                  detailIndex, 
+                  mediaIndex, 
+                  isNC: false, 
+                  ncIndex: null 
+                }
               });
             }
           });
 
-          // Non-conformity media
+          // Mídia das não conformidades
           detail.non_conformities?.forEach((nc, ncIndex) => {
             nc.media?.forEach((media, mediaIndex) => {
-              const hasWatermark = media.url && (
-                media.url.includes('watermark') || 
-                media.url.includes('watermarked') ||
-                media.id?.includes('watermark')
-              );
-              if (media.type === 'image' && !hasWatermark) {
+              if (media.type === 'image' && !hasWatermark(media)) {
                 imagesWithoutWatermark.push({
                   media,
-                  context: { topicIndex, itemIndex, detailIndex, mediaIndex, isNC: true, ncIndex }
+                  context: { 
+                    topicIndex, 
+                    itemIndex, 
+                    detailIndex, 
+                    mediaIndex, 
+                    isNC: true, 
+                    ncIndex 
+                  }
                 });
               }
             });
@@ -529,31 +328,129 @@ export default function MediaManagementTab({
       });
     });
 
-    for (let i = 0; i < imagesWithoutWatermark.length; i++) {
-      const { media, context } = imagesWithoutWatermark[i];
-      setSelectedMediaForWatermark({ media, context });
-      await applyWatermark();
+    if (imagesWithoutWatermark.length === 0) {
+      toast({
+        title: "Informação",
+        description: "Todas as imagens já possuem marca d'água!",
+      });
+      return;
     }
-  }, [inspection, applyWatermark]);
 
-  if (!inspection || !inspection.topics || inspection.topics.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-64 text-muted-foreground">
-        <div className="text-center">
-          <Images className="h-12 w-12 mx-auto mb-4 opacity-50" />
-          <p>Nenhuma estrutura encontrada para gerenciar mídias</p>
-        </div>
-      </div>
-    );
-  }
+    setIsBulkWatermark(true);
+    setBulkProgress({ current: 0, total: imagesWithoutWatermark.length });
 
-  const currentTopic = inspection.topics[activeTopicIndex];
-  const currentItem = activeItemIndex !== null ? currentTopic?.items?.[activeItemIndex] : null;
+    let updatedInspection = { ...inspection };
+    let processedCount = 0;
+
+    try {
+      for (const { media, context } of imagesWithoutWatermark) {
+        try {
+          console.log(`Processando ${processedCount + 1}/${imagesWithoutWatermark.length}:`, media.url);
+          
+          // Aplicar marca d'água
+          const imageSource = detectImageSource(null, false);
+          const watermarkedDataURL = await addWatermarkToImage(
+            media.url, 
+            inspection.id, 
+            imageSource
+          );
+          
+          // Criar arquivo
+          const timestamp = Date.now();
+          const fileName = `image_watermarked_${timestamp}_${processedCount}.jpg`;
+          const watermarkedFile = dataURLtoFile(watermarkedDataURL, fileName);
+          
+          // Definir caminho
+          let storagePath;
+          if (context.isNC && context.ncIndex !== null) {
+            storagePath = `inspections/${inspection.id}/topic_${context.topicIndex}/item_${context.itemIndex}/detail_${context.detailIndex}/non_conformities/nc_${context.ncIndex}/${fileName}`;
+          } else if (context.detailIndex !== null) {
+            storagePath = `inspections/${inspection.id}/topic_${context.topicIndex}/item_${context.itemIndex}/detail_${context.detailIndex}/media/${fileName}`;
+          } else if (context.itemIndex !== null) {
+            storagePath = `inspections/${inspection.id}/topic_${context.topicIndex}/item_${context.itemIndex}/media/${fileName}`;
+          } else {
+            storagePath = `inspections/${inspection.id}/topic_${context.topicIndex}/media/${fileName}`;
+          }
+
+          // Upload
+          const storageRef = ref(storage, storagePath);
+          const uploadResult = await uploadBytes(storageRef, watermarkedFile);
+          const downloadURL = await getDownloadURL(uploadResult.ref);
+          
+          // Atualizar dados
+          if (context.isNC && context.ncIndex !== null) {
+            updatedInspection.topics[context.topicIndex].items[context.itemIndex]
+              .details[context.detailIndex].non_conformities[context.ncIndex]
+              .media[context.mediaIndex] = {
+                ...media,
+                url: downloadURL,
+                id: `watermarked_${media.id}`,
+                updated_at: new Date().toISOString()
+              };
+          } else if (context.detailIndex !== null) {
+            updatedInspection.topics[context.topicIndex].items[context.itemIndex]
+              .details[context.detailIndex].media[context.mediaIndex] = {
+                ...media,
+                url: downloadURL,
+                id: `watermarked_${media.id}`,
+                updated_at: new Date().toISOString()
+              };
+          } else if (context.itemIndex !== null) {
+            updatedInspection.topics[context.topicIndex].items[context.itemIndex]
+              .media[context.mediaIndex] = {
+                ...media,
+                url: downloadURL,
+                id: `watermarked_${media.id}`,
+                updated_at: new Date().toISOString()
+              };
+          } else {
+            updatedInspection.topics[context.topicIndex].media[context.mediaIndex] = {
+              ...media,
+              url: downloadURL,
+              id: `watermarked_${media.id}`,
+              updated_at: new Date().toISOString()
+            };
+          }
+
+          processedCount++;
+          setBulkProgress({ current: processedCount, total: imagesWithoutWatermark.length });
+          
+          // Pequena pausa para não sobrecarregar
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
+        } catch (error) {
+          console.error(`Erro ao processar imagem ${processedCount + 1}:`, error);
+          // Continuar processando as outras imagens
+          processedCount++;
+          setBulkProgress({ current: processedCount, total: imagesWithoutWatermark.length });
+        }
+      }
+
+      // Atualizar inspeção
+      onUpdateInspection(updatedInspection);
+      
+      toast({
+        title: "Processamento Concluído",
+        description: `${processedCount} imagens processadas com sucesso!`,
+      });
+      
+    } catch (error) {
+      console.error("Erro no processamento em lote:", error);
+      toast({
+        title: "Erro no Processamento",
+        description: `Erro após processar ${processedCount} imagens.`,
+        variant: "destructive"
+      });
+    } finally {
+      setIsBulkWatermark(false);
+      setBulkProgress({ current: 0, total: 0 });
+    }
+  }, [inspection, onUpdateInspection, toast]);
 
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="space-y-4">
-        {/* Statistics Header */}
+        {/* Header de Estatísticas */}
         <div className="bg-card border rounded-lg p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-6">
@@ -581,18 +478,37 @@ export default function MediaManagementTab({
               <Button
                 variant="outline"
                 onClick={applyWatermarkToAll}
+                disabled={isBulkWatermark}
                 className="flex items-center gap-2"
               >
-                <Droplets className="h-4 w-4" />
-                Aplicar Marca d'Água em Todas
+                {isBulkWatermark ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Droplets className="h-4 w-4" />
+                )}
+                {isBulkWatermark ? "Processando..." : "Aplicar Marca d'Água em Todas"}
               </Button>
             )}
           </div>
+          
+          {/* Barra de progresso do processamento em lote */}
+          {isBulkWatermark && (
+            <div className="mt-4 space-y-2">
+              <div className="flex justify-between text-sm text-muted-foreground">
+                <span>Processando imagens...</span>
+                <span>{bulkProgress.current}/{bulkProgress.total}</span>
+              </div>
+              <Progress 
+                value={(bulkProgress.current / bulkProgress.total) * 100} 
+                className="w-full"
+              />
+            </div>
+          )}
         </div>
 
-        {/* Three Column Layout */}
+        {/* Layout de Três Colunas */}
         <div className="grid grid-cols-12 gap-4 h-[calc(100vh-280px)]">
-          {/* Topics Column */}
+          {/* Coluna de Tópicos */}
           <div className="col-span-3 border rounded-lg">
             <div className="p-3 border-b flex justify-between items-center">
               <h3 className="font-medium">Tópicos ({inspection.topics?.length || 0})</h3>
@@ -627,10 +543,10 @@ export default function MediaManagementTab({
                         </Badge>
                       </div>
                       
-                      {/* Topic Media Grid */}
+                      {/* Grid de mídia do tópico */}
                       {topic.media?.length > 0 && (
-                        <div className="grid grid-cols-4 gap-1" onClick={(e) => e.stopPropagation()}>
-                          {topic.media.slice(0, 4).map((media, mediaIndex) => (
+                        <div className="grid grid-cols-3 gap-1" onClick={(e) => e.stopPropagation()}>
+                          {topic.media.slice(0, 3).map((media, mediaIndex) => (
                             <DraggableMediaItem
                               key={mediaIndex}
                               media={media}
@@ -650,12 +566,6 @@ export default function MediaManagementTab({
                           ))}
                         </div>
                       )}
-                      
-                      <div className="flex items-center justify-between text-xs opacity-70">
-                        {topic.items?.length > 0 && (
-                          <span>{topic.items.length} item{topic.items.length !== 1 ? 's' : ''}</span>
-                        )}
-                      </div>
                     </div>
                   </UniversalDropZone>
                 ))}
@@ -663,19 +573,17 @@ export default function MediaManagementTab({
             </ScrollArea>
           </div>
 
-          {/* Items Column */}
+          {/* Coluna de Itens */}
           <div className="col-span-3 border rounded-lg">
-            <div className="p-3 border-b flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Tópico {activeTopicIndex + 1}</span>
-                <ChevronRight className="h-3 w-3" />
-                <span className="font-medium">Itens ({currentTopic?.items?.length || 0})</span>
-              </div>
+            <div className="p-3 border-b">
+              <h3 className="font-medium">
+                Itens {currentTopic ? `(${currentTopic.items?.length || 0})` : ''}
+              </h3>
             </div>
             <ScrollArea className="h-[calc(100vh-360px)]">
-              {currentTopic ? (
+              {currentTopic?.items?.length > 0 ? (
                 <div className="p-2 space-y-1">
-                  {currentTopic.items?.map((item, itemIndex) => (
+                  {currentTopic.items.map((item, itemIndex) => (
                     <UniversalDropZone
                       key={itemIndex}
                       topicIndex={activeTopicIndex}
@@ -701,7 +609,7 @@ export default function MediaManagementTab({
                           </Badge>
                         </div>
                         
-                        {/* Item Media Grid */}
+                        {/* Grid de mídia do item */}
                         {item.media?.length > 0 && (
                           <div className="grid grid-cols-3 gap-1" onClick={(e) => e.stopPropagation()}>
                             {item.media.slice(0, 3).map((media, mediaIndex) => (
@@ -736,31 +644,26 @@ export default function MediaManagementTab({
                 </div>
               ) : (
                 <div className="p-4 text-center text-muted-foreground">
-                  Selecione um tópico para ver os itens
+                  {currentTopic 
+                    ? "Nenhum item encontrado" 
+                    : "Selecione um tópico"
+                  }
                 </div>
               )}
             </ScrollArea>
           </div>
 
-          {/* Details Column */}
+          {/* Coluna de Detalhes */}
           <div className="col-span-6 border rounded-lg">
-            <div className="p-3 border-b flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                {currentItem && (
-                  <>
-                    <span className="text-sm text-muted-foreground">Tópico {activeTopicIndex + 1}</span>
-                    <ChevronRight className="h-3 w-3" />
-                    <span className="text-sm text-muted-foreground">Item {activeItemIndex + 1}</span>
-                    <ChevronRight className="h-3 w-3" />
-                  </>
-                )}
-                <span className="font-medium">Detalhes ({currentItem?.details?.length || 0})</span>
-              </div>
+            <div className="p-3 border-b">
+              <h3 className="font-medium">
+                Detalhes {currentItem ? `(${currentItem.details?.length || 0})` : ''}
+              </h3>
             </div>
             <ScrollArea className="h-[calc(100vh-360px)]">
-              {currentItem ? (
+              {currentItem?.details?.length > 0 ? (
                 <div className="p-4 space-y-4">
-                  {currentItem.details?.map((detail, detailIndex) => (
+                  {currentItem.details.map((detail, detailIndex) => (
                     <UniversalDropZone
                       key={detailIndex}
                       topicIndex={activeTopicIndex}
@@ -770,18 +673,31 @@ export default function MediaManagementTab({
                       acceptTypes={[DRAG_TYPES.MEDIA]}
                       hasContent={detail.media?.length > 0 || detail.non_conformities?.some(nc => nc.media?.length > 0)}
                     >
-                      <div className="border rounded-lg p-3 space-y-3">
-                        <div className="flex items-center justify-between">
-                          <h4 className="font-medium">{detail.name || `Detalhe ${detailIndex + 1}`}</h4>
-                          <Badge variant="outline">
-                            {(detail.media?.length || 0) + (detail.non_conformities?.reduce((acc, nc) => acc + (nc.media?.length || 0), 0) || 0)} mídias
-                          </Badge>
+                      <div className="border rounded-lg p-4 space-y-4">
+                        <div className="flex justify-between items-center">
+                          <h4 className="font-medium">{detail.name}</h4>
+                          <div className="flex items-center gap-2">
+                            {detail.is_damaged && (
+                              <Badge variant="destructive" className="text-xs">
+                                <AlertTriangle className="w-3 h-3 mr-1" />
+                                Danos
+                              </Badge>
+                            )}
+                            {hasWatermark({ url: detail.media?.[0]?.url }) && (
+                              <Badge variant="outline" className="text-xs">
+                                <CheckCircle className="w-3 h-3 mr-1" />
+                                Marca d'água
+                              </Badge>
+                            )}
+                          </div>
                         </div>
-                        
-                        {/* Detail Media */}
+
+                        {/* Mídia do detalhe */}
                         {detail.media?.length > 0 && (
                           <div>
-                            <h5 className="text-sm font-medium mb-2">Mídias do Detalhe</h5>
+                            <h5 className="text-sm font-medium mb-2">
+                              Mídia ({detail.media.length})
+                            </h5>
                             <div className="grid grid-cols-4 gap-2">
                               {detail.media.map((media, mediaIndex) => (
                                 <DraggableMediaItem
@@ -804,13 +720,13 @@ export default function MediaManagementTab({
                             </div>
                           </div>
                         )}
-                        
-                        {/* Non-Conformity Media */}
+
+                        {/* Não conformidades */}
                         {detail.non_conformities?.map((nc, ncIndex) => (
                           nc.media?.length > 0 && (
                             <div key={ncIndex}>
                               <h5 className="text-sm font-medium mb-2">
-                                Não Conformidade {ncIndex + 1} ({nc.media.length} mídia{nc.media.length !== 1 ? 's' : ''})
+                                Não Conformidade {ncIndex + 1} - Mídia ({nc.media.length})
                               </h5>
                               <div className="grid grid-cols-4 gap-2">
                                 {nc.media.map((media, mediaIndex) => (
@@ -841,9 +757,11 @@ export default function MediaManagementTab({
                 </div>
               ) : (
                 <div className="p-4 text-center text-muted-foreground">
-                  {currentTopic 
-                    ? "Selecione um item para ver os detalhes" 
-                    : "Selecione um tópico e um item para ver os detalhes"
+                  {currentItem 
+                    ? "Nenhum detalhe encontrado" 
+                    : currentTopic 
+                      ? "Selecione um item para ver os detalhes" 
+                      : "Selecione um tópico e um item para ver os detalhes"
                   }
                 </div>
               )}
@@ -851,14 +769,17 @@ export default function MediaManagementTab({
           </div>
         </div>
 
-        {/* Watermark Confirmation Dialog */}
+        {/* Dialog de Confirmação de Marca d'Água */}
         <Dialog open={isWatermarkDialog} onOpenChange={setIsWatermarkDialog}>
-          <DialogContent>
+          <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle>Aplicar Marca d'Água</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
-              <p>Tem certeza que deseja aplicar a marca d'água nesta imagem?</p>
+              <p className="text-sm text-muted-foreground">
+                Tem certeza que deseja aplicar a marca d'água nesta imagem? 
+                Esta ação não pode ser desfeita.
+              </p>
               {selectedMediaForWatermark && (
                 <div className="border rounded-lg p-4">
                   <img
@@ -870,10 +791,23 @@ export default function MediaManagementTab({
               )}
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsWatermarkDialog(false)}>
+              <Button 
+                variant="outline" 
+                onClick={() => setIsWatermarkDialog(false)}
+                disabled={isApplyingWatermark}
+              >
                 Cancelar
               </Button>
-              <Button onClick={applyWatermark} disabled={isApplyingWatermark}>
+              <Button 
+                onClick={applyWatermark} 
+                disabled={isApplyingWatermark}
+                className="flex items-center gap-2"
+              >
+                {isApplyingWatermark ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Droplets className="h-4 w-4" />
+                )}
                 {isApplyingWatermark ? "Aplicando..." : "Aplicar Marca d'Água"}
               </Button>
             </DialogFooter>
