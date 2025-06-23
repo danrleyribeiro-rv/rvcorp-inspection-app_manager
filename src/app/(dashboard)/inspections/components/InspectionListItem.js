@@ -10,7 +10,6 @@ import { parseCode } from "@/utils/codeGenerator";
 import DeliveryStatus from "@/components/inspection/DeliveryStatus";
 import { 
   Pencil, 
-  Eye, 
   Calendar, 
   User, 
   Trash2, 
@@ -73,7 +72,7 @@ const getStatusText = (status) => {
   return statusMap[status] || status;
 };
 
-export default function InspectionListItem({ inspection, onEdit, onView, onDelete, onEditData, onEditInspection }) {
+export default function InspectionListItem({ inspection, onEdit, onDelete, onEditData, onEditInspection }) {
   const [expanded, setExpanded] = useState(false);
 
   // Count non-conformities
@@ -244,9 +243,16 @@ export default function InspectionListItem({ inspection, onEdit, onView, onDelet
                 </div>
               )}
 
-              {inspection.template_id && (
+              {inspection.template && (
                 <div className="text-sm text-muted-foreground">
-                  <span className="font-medium">Template:</span> {inspection.template_id}
+                  <span className="font-medium">Template:</span> 
+                  {inspection.template.cod ? (
+                    <span className="font-mono text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded ml-2">
+                      {inspection.template.cod}
+                    </span>
+                  ) : (
+                    <span className="ml-1">{inspection.template.title || 'Sem código'}</span>
+                  )}
                 </div>
               )}
             </div>
@@ -268,13 +274,9 @@ export default function InspectionListItem({ inspection, onEdit, onView, onDelet
           </div>
           
           <div className="flex justify-end gap-2 pt-4 mt-2 border-t">
-            <Button variant="outline" size="sm" onClick={onView}>
-              <Eye className="h-4 w-4 mr-2" />
-              Ver
-            </Button>
             <Button variant="outline" size="sm" onClick={onEditInspection}>
               <Edit className="h-4 w-4 mr-2" />
-              Inspeção
+              Editar Vistoria
             </Button>
             <Button variant="outline" size="sm" onClick={onDelete}>
               <Trash2 className="h-4 w-4 mr-2 text-destructive" />

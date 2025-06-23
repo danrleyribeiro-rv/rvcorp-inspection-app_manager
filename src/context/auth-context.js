@@ -14,6 +14,7 @@ import {
 import { auth, db } from "@/lib/firebase";
 import { useRouter, usePathname } from "next/navigation";
 import { doc, getDoc } from "firebase/firestore";
+import { showErrorToast } from "@/utils/toast-utils";
 
 const AuthContext = createContext({});
 
@@ -32,27 +33,24 @@ export function AuthProvider({ children }) {
             const token = await firebaseUser.getIdToken();
             
             // Armazenar o token no cookie (client-side)
-            document.cookie = `authToken=${token}; path=/; max-age=3600; SameSite=Strict; Secure`;
+            const isSecure = window.location.protocol === 'https:';
+            document.cookie = `authToken=${token}; path=/; max-age=3600; SameSite=Strict${isSecure ? '; Secure' : ''}`;
             
             // Verificar se usuário é um gerente
             const managerDocRef = doc(db, "managers", firebaseUser.uid);
             const managerDoc = await getDoc(managerDocRef);
             
-            if (managerDoc.exists() || firebaseUser.email === "danrley@post.com") {
+            if (managerDoc.exists()) {
               const userData = {
                 ...firebaseUser,
                 role: "manager",
-                ...(managerDoc.exists() && { profile: managerDoc.data() }),
-                ...(firebaseUser.email === "danrley@post.com" && { isTestUser: true }),
+                profile: managerDoc.data(),
               };
               setUser(userData);
               
-              // Adicione este trecho para melhorar a navegação
-              if (!loading) {
-                // Se estamos em '/' e autenticados, redirecionar para /dashboard
-                if (pathname === '/') {
-                  router.push('/dashboard');
-                }
+              // Redirecionar após login bem-sucedido
+              if (pathname === '/' || pathname === '/login') {
+                router.push('/dashboard');
               }
             } else {
               // Usuário não é um gerente, deslogar
@@ -62,7 +60,7 @@ export function AuthProvider({ children }) {
               setUser(null);
             }
           } catch (error) {
-            console.error("Erro na verificação de autenticação:", error);
+            showErrorToast("Erro de Autenticação", "Erro na verificação de autenticação. Tente fazer login novamente.");
             await firebaseSignOut(auth);
             document.cookie = "authToken=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
             router.push("/login");
@@ -91,48 +89,29 @@ export function AuthProvider({ children }) {
   }, [router, pathname]);
 
   const signIn = async (email, password) => {
-    setLoading(true);
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       
       // Obter token
       const token = await userCredential.user.getIdToken();
-      document.cookie = `authToken=${token}; path=/; max-age=3600; SameSite=Strict; Secure`;
+      const isSecure = window.location.protocol === 'https:';
+      document.cookie = `authToken=${token}; path=/; max-age=3600; SameSite=Strict${isSecure ? '; Secure' : ''}`;
       
       // Verificar se é gerente
       const managerDocRef = doc(db, "managers", userCredential.user.uid);
       const managerDoc = await getDoc(managerDocRef);
       
-      if (managerDoc.exists() || userCredential.user.email === "danrley@post.com") {
-        // Definir usuário no state
-        const userData = {
-          ...userCredential.user,
-          role: "manager",
-          ...(managerDoc.exists() && { profile: managerDoc.data() }),
-          ...(userCredential.user.email === "danrley@post.com" && { isTestUser: true }),
-        };
-        
-        setUser(userData);
-        
-        // Esperar que o estado seja atualizado antes de redirecionar
-        setTimeout(() => {
-          router.push("/dashboard");
-          setLoading(false);
-        }, 100);
-        
+      if (managerDoc.exists()) {
+        // onAuthStateChanged vai lidar com o redirecionamento
         return { success: true, data: userCredential.user };
       } else {
         // Usuário não é um gerente
         await firebaseSignOut(auth);
         document.cookie = "authToken=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
-        router.push("/login");
-        setUser(null);
-        setLoading(false);
         return { success: false, error: "Usuário não autorizado" };
       }
     } catch (error) {
-      console.error("Erro de login:", error);
-      setLoading(false);
+      showErrorToast("Erro de Login", "Não foi possível fazer login. Verifique suas credenciais.");
       return { success: false, error: error.message };
     }
   };
@@ -143,7 +122,7 @@ export function AuthProvider({ children }) {
       document.cookie = "authToken=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
       router.push("/login");
     } catch (error) {
-      console.error("Erro ao sair:", error);
+      showErrorToast("Erro ao Sair", "Não foi possível sair da conta.");
     }
   };
 
@@ -155,7 +134,7 @@ export function AuthProvider({ children }) {
       });
       return { success: true };
     } catch (error) {
-      console.error("Erro de redefinição de senha:", error);
+      showErrorToast("Erro ao Redefinir Senha", "Não foi possível enviar o email de redefinição de senha.");
       return { success: false, error: error.message };
     }
   };
@@ -180,7 +159,7 @@ export function AuthProvider({ children }) {
 
       return { success: true };
     } catch (error) {
-      console.error("Erro ao atualizar senha:", error);
+      showErrorToast("Erro ao Atualizar Senha", "Não foi possível atualizar a senha. Verifique a senha atual.");
       return { success: false, error: error.message };
     }
   };

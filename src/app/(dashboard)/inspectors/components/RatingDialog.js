@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Star } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
+import { useToast } from "@/hooks/use-toast";
 
 const RATING_CATEGORIES = [
   {
@@ -44,6 +45,7 @@ export default function RatingDialog({ inspector, open, onClose, onRate }) {
   const [hoveredRating, setHoveredRating] = useState(0);
   const [loading, setLoading] = useState(false);
   const { user } = useAuth();
+  const { toast } = useToast();
 
   // Calcula a média geral em tempo real
   const calculateOverallRating = () => {
@@ -86,7 +88,11 @@ export default function RatingDialog({ inspector, open, onClose, onRate }) {
       setComment("");
       onClose();
     } catch (error) {
-      console.error("Error submitting rating:", error);
+      toast({
+        title: "Erro ao enviar avaliação",
+        description: error.message,
+        variant: "destructive"
+      });
     } finally {
       setLoading(false);
     }

@@ -35,8 +35,7 @@ export const releaseService = {
 
       return { success: true, id: docRef.id };
     } catch (error) {
-      console.error('Error creating release:', error);
-      throw error;
+      throw new Error(`Erro ao criar release: ${error.message}`);
     }
   },
 
@@ -55,8 +54,7 @@ export const releaseService = {
         created_at: doc.data().created_at?.toDate?.()?.toISOString() || null
       }));
     } catch (error) {
-      console.error('Error fetching releases:', error);
-      throw error;
+      throw new Error(`Erro ao buscar releases: ${error.message}`);
     }
   }
 };

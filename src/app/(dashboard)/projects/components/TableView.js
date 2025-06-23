@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Edit, Trash2, Eye } from "lucide-react";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import EditProjectDialog from "./EditProjectDialog";
 import DeleteProjectDialog from "./DeleteProjectDialog.js";
 import ViewProjectDialog from "./ViewProjectDialog";
@@ -29,6 +30,7 @@ const getStatusColor = (status) => {
 };
 
 export default function TableView({ projects, isLoading, onRefresh }) {
+  const router = useRouter();
   const [editingProject, setEditingProject] = useState(null);
   const [deletingProject, setDeletingProject] = useState(null);
   const [viewingProject, setViewingProject] = useState(null);
@@ -108,7 +110,7 @@ export default function TableView({ projects, isLoading, onRefresh }) {
                     <Button 
                       variant="ghost" 
                       size="icon" 
-                      onClick={() => setViewingProject(project)}
+                      onClick={() => router.push(`/projects/${project.id}`)}
                     >
                       <Eye className="h-4 w-4" />
                     </Button>

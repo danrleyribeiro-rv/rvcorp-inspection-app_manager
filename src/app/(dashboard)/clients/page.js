@@ -58,10 +58,9 @@ export default function ClientsPage() {
             
             setClients(clientsList);
         } catch (error) {
-            console.error("Error fetching clients:", error);
             toast({
-                title: "Error",
-                description: "Failed to fetch clients.",
+                title: "Erro ao Carregar Clientes",
+                description: "Não foi possível carregar a lista de clientes.",
                 variant: "destructive",
             });
         } finally {
@@ -93,11 +92,12 @@ export default function ClientsPage() {
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead>Name</TableHead>
+                                    <TableHead>Nome</TableHead>
                                     <TableHead>Email</TableHead>
-                                    <TableHead>Phone</TableHead>
-                                    <TableHead>Segment</TableHead>
-                                    <TableHead className="text-right">Actions</TableHead>
+                                    <TableHead>Telefone</TableHead>
+                                    <TableHead>Documento</TableHead>
+                                    <TableHead>Segmento</TableHead>
+                                    <TableHead className="text-right">Ações</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -106,6 +106,7 @@ export default function ClientsPage() {
                                         <TableCell>{client.name}</TableCell>
                                         <TableCell>{client.email}</TableCell>
                                         <TableCell>{client.phonenumber}</TableCell>
+                                        <TableCell>{client.document}</TableCell>
                                         <TableCell>{client.segment}</TableCell>
                                         <TableCell className="text-right">
                                             <div className="flex justify-end gap-2">
@@ -113,6 +114,7 @@ export default function ClientsPage() {
                                                 variant="ghost"
                                                 size="icon"
                                                 onClick={() => setEditClient(client)}
+                                                hint="Editar Cliente"
                                             >
                                                 <Pencil className="h-4 w-4" />
                                             </Button>
@@ -120,6 +122,7 @@ export default function ClientsPage() {
                                                 variant="ghost"
                                                 size="icon"
                                                 onClick={() => setTransferClient(client)}
+                                                hint="Transferir Cliente"
                                             >
                                                 <Users className="h-4 w-4" />
                                             </Button>
@@ -127,6 +130,7 @@ export default function ClientsPage() {
                                                 variant="ghost"
                                                 size="icon"
                                                 onClick={() => setDeleteClient(client)}
+                                                hint="Deletar Cliente"
                                             >
                                                 <Trash2 className="h-4 w-4 text-destructive" />
                                             </Button>

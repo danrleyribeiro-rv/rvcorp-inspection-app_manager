@@ -43,8 +43,8 @@ import {
         const snapshot = await getDocs(templatesQuery);
         return snapshot.docs.map(formatTemplateData);
       } catch (error) {
-        console.error("Error fetching templates:", error);
-        throw error;
+        // Remove console.error - error will be handled by calling component
+        throw new Error(`Erro ao buscar templates: ${error.message}`);
       }
     },
   
@@ -60,8 +60,8 @@ import {
         
         return formatTemplateData(templateDoc);
       } catch (error) {
-        console.error(`Error fetching template ${id}:`, error);
-        throw error;
+        // Remove console.error - error will be handled by calling component
+        throw new Error(`Erro ao buscar template ${id}: ${error.message}`);
       }
     },
   
@@ -78,8 +78,8 @@ import {
         const docRef = await addDoc(collection(db, 'templates'), dataToSave);
         return { id: docRef.id, ...dataToSave };
       } catch (error) {
-        console.error("Error creating template:", error);
-        throw error;
+        // Remove console.error - error will be handled by calling component
+        throw new Error(`Erro ao criar template: ${error.message}`);
       }
     },
   
@@ -96,8 +96,8 @@ import {
         await updateDoc(templateRef, dataToUpdate);
         return { id, ...dataToUpdate };
       } catch (error) {
-        console.error(`Error updating template ${id}:`, error);
-        throw error;
+        // Remove console.error - error will be handled by calling component
+        throw new Error(`Erro ao atualizar template ${id}: ${error.message}`);
       }
     },
   
@@ -113,8 +113,8 @@ import {
         
         return { success: true };
       } catch (error) {
-        console.error(`Error deleting template ${id}:`, error);
-        throw error;
+        // Remove console.error - error will be handled by calling component
+        throw new Error(`Erro ao excluir template ${id}: ${error.message}`);
       }
     }
   };

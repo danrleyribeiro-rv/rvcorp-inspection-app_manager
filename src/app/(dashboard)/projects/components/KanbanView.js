@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CalendarIcon, Edit, Trash2, Eye } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { db } from "@/lib/firebase";
 import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
@@ -24,6 +25,7 @@ const formatCurrency = (value) => {
 };
 
 export default function KanbanView({ projects, isLoading, onRefresh }) {
+  const router = useRouter();
   const [editingProject, setEditingProject] = useState(null);
   const [deletingProject, setDeletingProject] = useState(null);
   const [viewingProject, setViewingProject] = useState(null);
@@ -185,7 +187,7 @@ export default function KanbanView({ projects, isLoading, onRefresh }) {
                                 )}
                                 <div className="flex justify-end gap-1 pt-1">
                                   <button 
-                                    onClick={() => setViewingProject(project)}
+                                    onClick={() => router.push(`/projects/${project.id}`)}
                                     className="text-xs p-1 rounded-sm hover:bg-gray-100"
                                   >
                                     <Eye className="h-3 w-3" />

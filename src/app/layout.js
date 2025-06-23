@@ -4,6 +4,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { NotificationProvider } from '@/context/notification-context';
 import { LoadingProvider } from '@/context/loading-context'; // Import LoadingProvider
 import { TopProgressBar } from '@/components/ui/top-progress-bar'; // Import TopProgressBar
+import { Toaster } from '@/components/ui/toaster'; // Import Toaster
 import { Inter } from 'next/font/google';
 import './globals.css';
 
@@ -29,6 +30,7 @@ export default function RootLayout({ children }) {
               <LoadingProvider> {/* Wrap with LoadingProvider */}
                 <TopProgressBar /> {/* Render the progress bar here, above children */}
                 {children}
+                <Toaster />
               </LoadingProvider>
             </NotificationProvider>
           </AuthProvider>

@@ -16,13 +16,7 @@ const firebaseConfig = {
 
 // Verificar se as variáveis essenciais estão presentes
 if (!firebaseConfig.apiKey || !firebaseConfig.projectId || !firebaseConfig.storageBucket) {
-  console.error("Variáveis de ambiente do Firebase não estão configuradas corretamente");
-  console.log("Configuração atual:", {
-    hasApiKey: !!firebaseConfig.apiKey,
-    hasProjectId: !!firebaseConfig.projectId,
-    hasStorageBucket: !!firebaseConfig.storageBucket,
-    hasAuthDomain: !!firebaseConfig.authDomain
-  });
+  throw new Error("Variáveis de ambiente do Firebase não estão configuradas corretamente");
 }
 
 // Inicializar Firebase apenas se ainda não estiver inicializado

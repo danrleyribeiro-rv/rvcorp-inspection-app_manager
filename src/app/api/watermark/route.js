@@ -12,7 +12,7 @@ export async function POST(request) {
       );
     }
 
-    console.log('Baixando imagem:', imageUrl);
+    // Baixando imagem do Firebase
 
     // Baixar a imagem com headers apropriados
     const imageResponse = await fetch(imageUrl, {
@@ -27,7 +27,6 @@ export async function POST(request) {
     }
 
     const contentType = imageResponse.headers.get('content-type');
-    console.log('Content-Type:', contentType);
 
     // Verificar se é realmente uma imagem
     if (!contentType || !contentType.startsWith('image/')) {
@@ -40,7 +39,7 @@ export async function POST(request) {
       throw new Error('Imagem está vazia');
     }
 
-    console.log('Imagem baixada, tamanho:', imageBuffer.byteLength, 'bytes');
+    // Imagem baixada com sucesso
 
     const imageBase64 = Buffer.from(imageBuffer).toString('base64');
     const dataURL = `data:${contentType};base64,${imageBase64}`;
@@ -53,7 +52,6 @@ export async function POST(request) {
     });
 
   } catch (error) {
-    console.error('Erro na API de watermark:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

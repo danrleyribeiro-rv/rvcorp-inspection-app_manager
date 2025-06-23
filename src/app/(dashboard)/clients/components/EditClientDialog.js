@@ -67,17 +67,16 @@ export default function EditClientDialog({ client, open, onClose, onUpdate }) {
           });
 
           toast({
-              title: "Success",
-              description: "Client updated successfully",
+              title: "Cliente atualizado",
+              description: "Cliente atualizado com sucesso",
           });
           onUpdate(); // Refresh the client list
           onClose();
 
         } catch (error) {
-            console.error("Error updating client:", error);
             toast({
-                title: "Error",
-                description: error.message || "Failed to update client.",
+                title: "Erro ao atualizar cliente",
+                description: error.message || "Erro ao atualizar cliente.",
                 variant: "destructive",
             });
         } finally {
@@ -91,15 +90,15 @@ export default function EditClientDialog({ client, open, onClose, onUpdate }) {
         <Dialog open={open} onOpenChange={onClose}>
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
-                    <DialogTitle>Edit Client</DialogTitle>
+                    <DialogTitle>Editar Cliente</DialogTitle>
                     <DialogDescription>
-                        Modify the client's information.
+                        Modifique as informações do cliente.
                     </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleUpdateClient}  className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <Label htmlFor="name">Name</Label>
+                            <Label htmlFor="name">Nome</Label>
                             <Input
                                 id="name"
                                 name="name"
@@ -122,7 +121,7 @@ export default function EditClientDialog({ client, open, onClose, onUpdate }) {
                         </div>
                     </div>
                     <div>
-                        <Label htmlFor="document">Document</Label>
+                        <Label htmlFor="document">Documento</Label>
                         <Input
                             id="document"
                             name="document"
@@ -132,7 +131,7 @@ export default function EditClientDialog({ client, open, onClose, onUpdate }) {
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <Label htmlFor="responsible_name">Responsible Name</Label>
+                            <Label htmlFor="responsible_name">Nome do Responsável</Label>
                             <Input
                                 id="responsible_name"
                                 name="responsible_name"
@@ -141,7 +140,7 @@ export default function EditClientDialog({ client, open, onClose, onUpdate }) {
                             />
                         </div>
                         <div>
-                            <Label htmlFor="responsible_surname">Responsible Surname</Label>
+                            <Label htmlFor="responsible_surname">Sobrenome do Responsável</Label>
                             <Input
                                 id="responsible_surname"
                                 name="responsible_surname"
@@ -162,7 +161,7 @@ export default function EditClientDialog({ client, open, onClose, onUpdate }) {
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <Label htmlFor="phonenumber">Phone Number</Label>
+                            <Label htmlFor="phonenumber">Telefone</Label>
                             <Input
                                 id="phonenumber"
                                 name="phonenumber"
@@ -171,7 +170,7 @@ export default function EditClientDialog({ client, open, onClose, onUpdate }) {
                             />
                         </div>
                         <div>
-                            <Label htmlFor="segment">Segment</Label>
+                            <Label htmlFor="segment">Segmento</Label>
                             <Input
                                 id="segment"
                                 name="segment"
@@ -182,11 +181,11 @@ export default function EditClientDialog({ client, open, onClose, onUpdate }) {
                     </div>
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
-                            Cancel
+                            Cancelar
                         </Button>
                         <Button type="submit" disabled={loading}>
                         {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                        {loading ? "Updating..." : "Update Client"}
+                        {loading ? "Updating..." : "Atualizar Cliente"}
                         </Button>
                     </DialogFooter>
                 </form>

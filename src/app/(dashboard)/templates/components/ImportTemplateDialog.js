@@ -4,10 +4,13 @@
 import { useState, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 import { FileJson, Upload, Check } from "lucide-react";
+import Papa from "papaparse";
+import * as XLSX from "xlsx";
+import { generateTemplateCode, codeExists } from "@/utils/codeGenerator";
 
 export default function ImportTemplateDialog({ open, onClose, onSuccess }) {
   const [file, setFile] = useState(null);
@@ -62,23 +65,178 @@ export default function ImportTemplateDialog({ open, onClose, onSuccess }) {
               variant: "default"
             });
           }
+        } else if (file.name.endsWith(".csv")) {
+          // Parse CSV
+          Papa.parse(text, {
+            header: true,
+            skipEmptyLines: true,
+            complete: (results) => {
+              if (!results.data || results.data.length === 0) {
+                toast({
+                  title: "CSV vazio",
+                  description: "O arquivo CSV não contém dados.",
+                  variant: "destructive",
+                });
+                return;
+              }
+              // Agrupar por title para montar estrutura de template
+              const grouped = {};
+              results.data.forEach(row => {
+                if (!grouped[row.title]) grouped[row.title] = {
+                  title: row.title,
+                  description: row.description || '',
+                  template_price: row.template_price ? Number(row.template_price) : 0,
+                  icon: row.icon || null,
+                  icon_color: row.icon_color || null,
+                  topics: []
+                };
+                let template = grouped[row.title];
+                let topic = template.topics.find(t => t.name === row.topic_name);
+                if (!topic) {
+                  topic = { name: row.topic_name, description: row.topic_description, items: [] };
+                  template.topics.push(topic);
+                }
+                let item = topic.items.find(i => i.name === row.item_name);
+                if (!item) {
+                  item = { name: row.item_name, description: row.item_description, details: [] };
+                  topic.items.push(item);
+                }
+                item.details.push({
+                  name: row.detail_name,
+                  type: row.detail_type,
+                  required: row.detail_required === 'true',
+                  options: row.detail_options ? row.detail_options.split('|') : []
+                });
+              });
+              // Pega o primeiro template agrupado
+              const templateData = Object.values(grouped)[0];
+              setPreview(templateData);
+            },
+            error: (err) => {
+              toast({
+                title: "Erro ao processar CSV",
+                description: err.message,
+                variant: "destructive",
+              });
+            }
+          });
+        } else if (file.name.endsWith(".xlsx")) {
+          // Parse XLSX
+          const workbook = XLSX.read(text, { type: "binary" });
+          const sheetName = workbook.SheetNames[0];
+          const sheet = workbook.Sheets[sheetName];
+          const results = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+          if (!results || results.length === 0) {
+            toast({
+              title: "XLSX vazio",
+              description: "O arquivo XLSX não contém dados.",
+              variant: "destructive",
+            });
+            return;
+          }
+          // Agrupar por title para montar estrutura de template (igual ao CSV)
+          const grouped = {};
+          results.forEach(row => {
+            if (!grouped[row.title]) grouped[row.title] = {
+              title: row.title,
+              description: row.description || '',
+              template_price: row.template_price ? Number(row.template_price) : 0,
+              icon: row.icon || null,
+              icon_color: row.icon_color || null,
+              topics: []
+            };
+            let template = grouped[row.title];
+            let topic = template.topics.find(t => t.name === row.topic_name);
+            if (!topic) {
+              topic = { name: row.topic_name, description: row.topic_description, items: [] };
+              template.topics.push(topic);
+            }
+            let item = topic.items.find(i => i.name === row.item_name);
+            if (!item) {
+              item = { name: row.item_name, description: row.item_description, details: [] };
+              topic.items.push(item);
+            }
+            item.details.push({
+              name: row.detail_name,
+              type: row.detail_type,
+              required: row.detail_required === 'true',
+              options: row.detail_options ? row.detail_options.split('|') : []
+            });
+          });
+          const templateData = Object.values(grouped)[0];
+          setPreview(templateData);
         } else {
           toast({
             title: "Formato não suportado",
-            description: "Apenas arquivos JSON são suportados",
+            description: "Apenas arquivos JSON ou CSV são suportados",
             variant: "destructive",
           });
         }
       } catch (error) {
-        console.error("Erro ao processar arquivo:", error);
         toast({
-          title: "Erro",
-          description: error.message || "Erro ao processar arquivo JSON. Verifique o formato.",
+          title: "Erro ao processar arquivo",
+          description: error.message || "Erro ao processar arquivo. Verifique o formato.",
           variant: "destructive",
         });
       }
     };
-    reader.readAsText(file);
+    if (file.name.endsWith(".csv")) {
+      reader.readAsText(file, "utf-8");
+    } else if (file.name.endsWith(".xlsx")) {
+      const fr = new FileReader();
+      fr.onload = (evt) => {
+        const data = evt.target.result;
+        // XLSX precisa de binary string
+        const workbook = XLSX.read(data, { type: "binary" });
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        const results = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+        if (!results || results.length === 0) {
+          toast({
+            title: "XLSX vazio",
+            description: "O arquivo XLSX não contém dados.",
+            variant: "destructive",
+          });
+          return;
+        }
+        // Agrupar por title para montar estrutura de template (igual ao CSV)
+        const grouped = {};
+        results.forEach(row => {
+          if (!grouped[row.title]) grouped[row.title] = {
+            title: row.title,
+            description: row.description || '',
+            template_price: row.template_price ? Number(row.template_price) : 0,
+            icon: row.icon || null,
+            icon_color: row.icon_color || null,
+            topics: []
+          };
+          let template = grouped[row.title];
+          let topic = template.topics.find(t => t.name === row.topic_name);
+          if (!topic) {
+            topic = { name: row.topic_name, description: row.topic_description, items: [] };
+            template.topics.push(topic);
+          }
+          let item = topic.items.find(i => i.name === row.item_name);
+          if (!item) {
+            item = { name: row.item_name, description: row.item_description, details: [] };
+            topic.items.push(item);
+          }
+          item.details.push({
+            name: row.detail_name,
+            type: row.detail_type,
+            required: row.detail_required === 'true',
+            options: row.detail_options ? row.detail_options.split('|') : []
+          });
+        });
+        const templateData = Object.values(grouped)[0];
+        setPreview(templateData);
+      };
+      fr.readAsBinaryString(file);
+      setFile(file);
+      return;
+    } else {
+      reader.readAsText(file);
+    }
     setFile(file);
   };
 
@@ -92,27 +250,42 @@ export default function ImportTemplateDialog({ open, onClose, onSuccess }) {
     if (!preview) return;
     setLoading(true);
     try {
+      // Verifica duplicidade por title e cod
+      let baseTitle = preview.title;
+      let newTitle = baseTitle;
+      let cod = await generateTemplateCode();
+      let count = 1;
+      // Garante título e código únicos
+      while (true) {
+        const q = query(collection(db, 'templates'), where('deleted_at', '==', null), where('title', '==', newTitle));
+        const snapshot = await getDocs(q);
+        if (snapshot.empty) break;
+        count++;
+        newTitle = `${baseTitle} ${count}`;
+      }
+      // Garante código único
+      while (await codeExists(cod, 'templates')) {
+        const num = parseInt(cod.replace('TP', '')) + 1;
+        cod = `TP${num.toString().padStart(4, '0')}`;
+      }
       const dataToSave = {
         ...preview,
+        title: newTitle,
+        cod,
         created_at: serverTimestamp(),
         updated_at: serverTimestamp(),
         deleted_at: null
       };
-
-      // Add document to Firestore
       await addDoc(collection(db, 'templates'), dataToSave);
-
       toast({
         title: "Sucesso",
-        description: "Template importado com sucesso"
+        description: `Template '${newTitle}' importado com sucesso com código ${cod}`
       });
-
       onSuccess();
       onClose();
     } catch (error) {
-      console.error("Erro ao importar template:", error);
       toast({
-        title: "Erro",
+        title: "Erro ao importar template",
         description: error.message || "Erro ao importar template",
         variant: "destructive"
       });
@@ -138,16 +311,16 @@ export default function ImportTemplateDialog({ open, onClose, onSuccess }) {
             ref={fileInputRef}
             type="file"
             hidden
-            accept=".json"
+            accept=".json,.csv,.xlsx"
             onChange={(e) => handleFileSelect(e.target.files?.[0])}
           />
           <Upload className="w-10 h-10 mx-auto mb-2 text-muted-foreground" />
           <p className="text-sm mb-1">
-            Arraste um arquivo JSON ou clique para selecionar
+            Arraste um arquivo JSON, CSV ou XLSX ou clique para selecionar
           </p>
           <div className="flex justify-center items-center gap-2 mt-2">
             <FileJson className="w-4 h-4 text-blue-500" />
-            <span className="text-sm font-medium">JSON</span>
+            <span className="text-sm font-medium">JSON/CSV/XLSX</span>
           </div>
         </div>
 

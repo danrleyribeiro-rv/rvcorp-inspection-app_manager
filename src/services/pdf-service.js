@@ -13,11 +13,7 @@ export const generateInspectionPDF = async (inspectionData, options = {}) => {
       ? `RLT${(releaseIndex + 1).toString().padStart(2, '0')}-${inspectionCode}`
       : `PREVIEW-${inspectionCode || 'TEMP'}`;
 
-    console.log('Gerando PDF:', {
-      reportCode,
-      isPreview,
-      releaseNotes: releaseInfo?.release_notes
-    });
+    // Gerando PDF com código: ${reportCode}
 
     // Simular processo
     return new Promise((resolve) => {

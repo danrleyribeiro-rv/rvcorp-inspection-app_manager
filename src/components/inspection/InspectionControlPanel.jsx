@@ -13,6 +13,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useInspectionReleases } from "@/hooks/use-inspection-releases";
 import { formatDateSafe } from "@/utils/dateFormater";
+import { db } from "@/lib/firebase";
+import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import {
   Lock,
   Unlock,
@@ -91,6 +93,24 @@ export default function InspectionControlPanel({ inspection, onUpdate }) {
   const isEditBlocked = inspection.inspection_edit_blocked;
   const availableReleases = releases.filter(r => !r.is_delivered);
   const deliveredRelease = releases.find(r => r.id === inspection.delivered_release_id);
+
+  const handleToggleCompletion = async () => {
+    const newStatus = isCompleted ? 'in_progress' : 'completed';
+    
+    try {
+      const inspectionRef = doc(db, 'inspections', inspection.id);
+      await updateDoc(inspectionRef, {
+        status: newStatus,
+        updated_at: serverTimestamp(),
+        ...(newStatus === 'completed' && { completed_at: serverTimestamp() }),
+        ...(newStatus === 'in_progress' && { completed_at: null })
+      });
+      
+      onUpdate();
+    } catch (error) {
+      console.error('Erro ao alterar status:', error);
+    }
+  };
 
   return (
     <Card>
@@ -179,6 +199,27 @@ export default function InspectionControlPanel({ inspection, onUpdate }) {
             <Switch
               checked={isEditBlocked}
               onCheckedChange={handleToggleEditBlock}
+              disabled={loading}
+            />
+          </div>
+
+          {/* Controle de Finalização da Inspeção */}
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <Label className="text-sm font-medium flex items-center gap-2">
+                {isCompleted ? <Package className="h-4 w-4" /> : <Edit3 className="h-4 w-4" />}
+                Finalizar Inspeção
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                {isCompleted 
+                  ? "Inspeção concluída - pode reativar para edição" 
+                  : "Finalizar e marcar como concluída"
+                }
+              </p>
+            </div>
+            <Switch
+              checked={isCompleted}
+              onCheckedChange={handleToggleCompletion}
               disabled={loading}
             />
           </div>

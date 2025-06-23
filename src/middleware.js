@@ -17,8 +17,13 @@ export async function middleware(request) {
   const publicPaths = ['/login', '/forgot-password', '/reset-password'];
   const isPublicPath = publicPaths.some(path => pathname.startsWith(path));
 
-  // Autenticação
+  // Autenticação - verificar se há token nos cookies
   const authToken = request.cookies.get('authToken')?.value;
+  
+  // Debug para desenvolvimento
+  if (process.env.NODE_ENV === 'development') {
+    console.log('Middleware - Path:', pathname, 'Token present:', !!authToken);
+  }
 
   // Rota raiz (/) - redirecionar para /dashboard ou /login
   if (pathname === '/') {

@@ -13,6 +13,7 @@ import Image from "next/image";
 import { useAuth } from '@/context/auth-context';
 import { auth } from '@/lib/firebase';
 import { isSignInWithEmailLink, signInWithEmailLink, verifyPasswordResetCode } from 'firebase/auth';
+import { useToast } from '@/hooks/use-toast';
 
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState('');
@@ -23,6 +24,7 @@ export default function ResetPasswordPage() {
   const [tokenValid, setTokenValid] = useState(true);
   const router = useRouter();
   const { resetPasswordWithToken } = useAuth();
+  const { toast } = useToast();
 
   // Check if the reset code in the URL is valid
   useEffect(() => {
@@ -43,11 +45,15 @@ export default function ResetPasswordPage() {
                 window.localStorage.removeItem('emailForSignIn');
                 router.push('/dashboard');
               } catch (error) {
-                console.error('Error signing in with email link:', error);
                 setTokenValid(false);
                 setMessage({
                   text: 'Link de autenticação inválido ou expirado.',
                   success: false
+                });
+                toast({
+                  title: "Erro de autenticação",
+                  description: "Link de autenticação inválido ou expirado",
+                  variant: "destructive"
                 });
               }
             } else {
@@ -75,11 +81,15 @@ export default function ResetPasswordPage() {
         window.sessionStorage.setItem('resetCode', actionCode);
 
       } catch (error) {
-        console.error('Error verifying reset code:', error);
         setTokenValid(false);
         setMessage({
           text: 'Link de redefinição inválido ou expirado. Por favor, solicite um novo link.',
           success: false
+        });
+        toast({
+          title: "Link inválido",
+          description: "Link de redefinição inválido ou expirado",
+          variant: "destructive"
         });
       }
     };
@@ -142,10 +152,14 @@ export default function ResetPasswordPage() {
       setPassword('');
       setConfirmPassword('');
     } catch (error) {
-      console.error("Error resetting password:", error);
       setMessage({
         text: error.message || 'Erro ao redefinir senha. Por favor, tente novamente.',
         success: false
+      });
+      toast({
+        title: "Erro ao redefinir senha",
+        description: error.message || "Erro ao redefinir senha. Por favor, tente novamente.",
+        variant: "destructive"
       });
     } finally {
       setLoading(false);

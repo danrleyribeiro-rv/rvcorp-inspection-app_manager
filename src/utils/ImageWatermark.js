@@ -99,7 +99,7 @@ export async function addWatermarkToImage(imageUrl, inspectionId, source = 'file
       } else {
         // Para URLs do Firebase, usar nossa API
         try {
-          console.log('Baixando imagem via API...');
+          // Baixando imagem via API
           
           const apiResponse = await fetch('/api/watermark', {
             method: 'POST',
@@ -124,10 +124,8 @@ export async function addWatermarkToImage(imageUrl, inspectionId, source = 'file
           }
 
           dataURL = apiData.dataURL;
-          console.log('Imagem baixada com sucesso via API');
 
         } catch (apiError) {
-          console.error('Erro na API:', apiError);
           reject(new Error(`Falha ao baixar imagem: ${apiError.message}`));
           return;
         }
@@ -195,7 +193,6 @@ export async function addWatermarkToImage(imageUrl, inspectionId, source = 'file
               return;
             }
             
-            console.log('Marca d\'água aplicada com sucesso');
             resolve(result);
             
           } catch (toDataURLError) {
@@ -208,7 +205,6 @@ export async function addWatermarkToImage(imageUrl, inspectionId, source = 'file
       
       img.onerror = (error) => {
         clearTimeout(timeoutId);
-        console.error('Erro ao carregar imagem:', error);
         reject(new Error('Falha ao carregar imagem para processamento'));
       };
       

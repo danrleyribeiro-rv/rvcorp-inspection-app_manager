@@ -11,6 +11,7 @@ import { AlertTriangle, Trash2, GripVertical, Copy } from "lucide-react";
 import NonConformityEditor from "./NonConformityEditor";
 import { UniversalDropZone, DRAG_TYPES } from "./EnhancedDragDropProvider";
 import { DraggableDetail } from "./DraggableStructureItem";
+import { Switch } from "@/components/ui/switch";
 
 export default function DetailEditor({
   detail,
@@ -52,20 +53,55 @@ export default function DetailEditor({
       
       case 'boolean':
         return (
-          <div>
+          <div className="flex flex-col gap-1">
             <Label className="text-xs">Valor</Label>
-            <select
-              value={detail.value || ''}
-              onChange={e => onUpdateDetail(topicIndex, itemIndex, detailIndex, 'value', e.target.value)}
-              className="w-full h-7 text-sm mt-1 px-2 border rounded"
-            >
-              <option value="">Selecione...</option>
-              <option value="true">Sim</option>
-              <option value="false">Não</option>
-            </select>
+            <div className="flex items-center gap-2 mt-1">
+              <Switch
+                checked={detail.value === true || detail.value === 'true'}
+                onCheckedChange={checked => onUpdateDetail(topicIndex, itemIndex, detailIndex, 'value', checked)}
+                id={`switch-${topicIndex}-${itemIndex}-${detailIndex}`}
+              />
+              <span className="text-xs">{detail.value === true || detail.value === 'true' ? 'Sim' : 'Não'}</span>
+            </div>
           </div>
         );
       
+      case 'measure':
+        return (
+          <div className="flex flex-col gap-1">
+            <Label className="text-xs">Medidas (Altura, Largura, Profundidade)</Label>
+            <div className="flex gap-2 mt-1">
+              <Input
+                type="number"
+                placeholder="Altura"
+                value={detail.value?.altura || ''}
+                onChange={e => onUpdateDetail(topicIndex, itemIndex, detailIndex, 'value', { ...detail.value, altura: e.target.value })}
+                className="h-7 text-sm w-1/3"
+                min="0"
+                step="any"
+              />
+              <Input
+                type="number"
+                placeholder="Largura"
+                value={detail.value?.largura || ''}
+                onChange={e => onUpdateDetail(topicIndex, itemIndex, detailIndex, 'value', { ...detail.value, largura: e.target.value })}
+                className="h-7 text-sm w-1/3"
+                min="0"
+                step="any"
+              />
+              <Input
+                type="number"
+                placeholder="Profundidade"
+                value={detail.value?.profundidade || ''}
+                onChange={e => onUpdateDetail(topicIndex, itemIndex, detailIndex, 'value', { ...detail.value, profundidade: e.target.value })}
+                className="h-7 text-sm w-1/3"
+                min="0"
+                step="any"
+              />
+            </div>
+            <span className="text-xs text-muted-foreground">Preencha qualquer uma das medidas.</span>
+          </div>
+        );
       case 'text':
       default:
         return (

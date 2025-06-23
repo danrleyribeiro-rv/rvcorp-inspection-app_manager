@@ -27,6 +27,8 @@ import { useAuth } from "@/context/auth-context";
 import { useRouter } from "next/navigation";
 import { codeService } from "@/services/code-service";
 import InspectionAddressForm from "../components/InspectionAddressForm";
+import SearchableTemplateSelect from "@/components/ui/searchable-template-select";
+import SearchableInspectorSelect from "@/components/ui/searchable-inspector-select";
 
 export default function CreateInspectionPage() {
   const [loading, setLoading] = useState(false);
@@ -427,22 +429,12 @@ export default function CreateInspectionPage() {
               {(!bulkMode || (bulkMode && sharedData.sameTemplate)) && (
                 <div>
                   <Label htmlFor="shared-template">Template</Label>
-                  <Select
-                    value={sharedData.template_id || "none"}
-                    onValueChange={(value) => handleTemplateChange(value === "none" ? null : value)}
-                  >
-                    <SelectTrigger id="shared-template">
-                        <SelectValue placeholder="Selecione um template" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="none">Nenhum</SelectItem>
-                        {templates.map((template) => (
-                        <SelectItem key={template.id} value={template.id}>
-                            {template.title}
-                        </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
+                  <SearchableTemplateSelect
+                    templates={templates}
+                    value={sharedData.template_id}
+                    onValueChange={handleTemplateChange}
+                    placeholder="Pesquisar template..."
+                  />
                 </div>
               )}
 
@@ -450,50 +442,16 @@ export default function CreateInspectionPage() {
               {(!bulkMode || (bulkMode && sharedData.sameInspector)) && (
                 <div>
                   <Label htmlFor="shared-inspector">Lincer</Label>
-                  <Select
-                    value={sharedData.inspector_id || "none"}
-                    onValueChange={(value) => setSharedData(prev => ({ ...prev, inspector_id: value === "none" ? null : value }))}
-                  >
-                    <SelectTrigger id="shared-inspector">
-                        <SelectValue placeholder="Selecione um lincer" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="none">Nenhum</SelectItem>
-                        {inspectors.map((inspector) => (
-                        <SelectItem key={inspector.id} value={inspector.id}>
-                            {`${inspector.name} ${inspector.last_name || ''}`.trim()}
-                        </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
+                  <SearchableInspectorSelect
+                    inspectors={inspectors}
+                    value={sharedData.inspector_id}
+                    onValueChange={(value) => setSharedData(prev => ({ ...prev, inspector_id: value }))}
+                    placeholder="Pesquisar inspetor..."
+                  />
                 </div>
               )}
             </div>
 
-            {/* Display selected shared template info */}
-            {selectedTemplate && (!bulkMode || sharedData.sameTemplate) && (
-              <div className="mt-4 p-3 bg-blue-50 rounded-md border border-blue-200">
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="font-medium text-blue-900">Template Selecionado</h4>
-                  {selectedTemplate.cod && (
-                    <span className="text-xs font-mono bg-blue-100 px-2 py-1 rounded">
-                      {selectedTemplate.cod}
-                    </span>
-                  )}
-                </div>
-                {selectedTemplate.description && (
-                  <p className="text-sm text-blue-700 mb-2">{selectedTemplate.description}</p>
-                )}
-                <div className="text-xs text-blue-600">
-                  <span className="font-medium">Tópicos:</span> {selectedTemplate.topics?.length || 0} | 
-                  <span className="font-medium ml-2">Itens:</span> {
-                    selectedTemplate.topics?.reduce((total, topic) => 
-                      total + (topic.items?.length || 0), 0
-                    ) || 0
-                  }
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Address Section */}
@@ -556,47 +514,31 @@ export default function CreateInspectionPage() {
 
                     {/* Individual Template Select */}
                     {bulkMode && !sharedData.sameTemplate && (
-                       <div className="md:w-48">
+                       <div className="md:w-64">
                         <Label htmlFor={`template-${index}`}>Template</Label>
-                        <Select
-                          value={inspection.template_id || "none"}
-                          onValueChange={(value) => updateBulkInspection(index, 'template_id', value === "none" ? null : value)}
-                        >
-                          <SelectTrigger id={`template-${index}`} className="mt-1">
-                            <SelectValue placeholder="Template" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">Nenhum</SelectItem>
-                            {templates.map((template) => (
-                              <SelectItem key={template.id} value={template.id}>
-                                {template.title}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <div className="mt-1">
+                          <SearchableTemplateSelect
+                            templates={templates}
+                            value={inspection.template_id}
+                            onValueChange={(value) => updateBulkInspection(index, 'template_id', value)}
+                            placeholder="Template..."
+                          />
+                        </div>
                       </div>
                     )}
 
                     {/* Individual Inspector Select */}
                     {bulkMode && !sharedData.sameInspector && (
-                      <div className="md:w-48">
+                      <div className="md:w-64">
                         <Label htmlFor={`inspector-${index}`}>Lincer</Label>
-                        <Select
-                          value={inspection.inspector_id || "none"}
-                          onValueChange={(value) => updateBulkInspection(index, 'inspector_id', value === "none" ? null : value)}
-                        >
-                          <SelectTrigger id={`inspector-${index}`} className="mt-1">
-                            <SelectValue placeholder="Lincer" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">Nenhum</SelectItem>
-                            {inspectors.map((inspector) => (
-                              <SelectItem key={inspector.id} value={inspector.id}>
-                                {`${inspector.name} ${inspector.last_name || ''}`.trim()}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <div className="mt-1">
+                          <SearchableInspectorSelect
+                            inspectors={inspectors}
+                            value={inspection.inspector_id}
+                            onValueChange={(value) => updateBulkInspection(index, 'inspector_id', value)}
+                            placeholder="Lincer..."
+                          />
+                        </div>
                       </div>
                     )}
 

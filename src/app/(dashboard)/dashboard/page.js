@@ -39,8 +39,6 @@ export default function DashboardPage() {
   const [projectsData, setProjectsData] = useState([]);
   const [inspectionsByStatus, setInspectionsByStatus] = useState([]);
   const [monthlyInspections, setMonthlyInspections] = useState([]);
-  const [selectedProject, setSelectedProject] = useState(null);
-  const [showNavigationDialog, setShowNavigationDialog] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
@@ -215,7 +213,6 @@ export default function DashboardPage() {
       setMonthlyInspections(monthlyData);
       
     } catch (error) {
-      console.error("Error fetching dashboard data:", error);
       toast({
         title: "Erro ao carregar dados",
         description: error.message,
@@ -227,21 +224,7 @@ export default function DashboardPage() {
   };
 
   const handleProjectClick = (project) => {
-    setSelectedProject(project);
-    setShowNavigationDialog(true);
-  };
-
-  const handleNavigateToProject = () => {
-    if (selectedProject) {
-      router.push(`/projects?highlight=${selectedProject.id}`);
-    }
-    setShowNavigationDialog(false);
-    setSelectedProject(null);
-  };
-
-  const handleCancelNavigation = () => {
-    setShowNavigationDialog(false);
-    setSelectedProject(null);
+    router.push(`/projects/${project.id}`);
   };
 
   const monthlyInspectionConfig = {
@@ -266,7 +249,7 @@ export default function DashboardPage() {
       </div>
       
       {/* Stats Cards */}
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Projetos</CardTitle>
@@ -306,20 +289,6 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
         
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Templates</CardTitle>
-            <User className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {stats.totalTemplates}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Modelos ativos
-            </p>
-          </CardContent>
-        </Card>
       </div>
       
       {/* Charts */}
@@ -554,25 +523,6 @@ export default function DashboardPage() {
         </TabsContent>
       </Tabs>
 
-      {/* Navigation Confirmation Dialog */}
-      <Dialog open={showNavigationDialog} onOpenChange={setShowNavigationDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Navegar para Projetos</DialogTitle>
-            <DialogDescription>
-              Deseja ir para a tela de projetos e visualizar o projeto "{selectedProject?.title}"?
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={handleCancelNavigation}>
-              Cancelar
-            </Button>
-            <Button onClick={handleNavigateToProject}>
-              Ir para Projetos
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

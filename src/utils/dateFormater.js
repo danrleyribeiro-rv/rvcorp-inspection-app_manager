@@ -27,7 +27,6 @@ export const formatDateSafe = (dateValue) => {
     return format(date, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
     
   } catch (error) {
-    console.error("Erro ao formatar data:", error, dateValue);
     return null;
   }
 };
@@ -57,7 +56,6 @@ export const formatDateShort = (dateValue) => {
     return format(date, "dd/MM/yyyy", { locale: ptBR });
     
   } catch (error) {
-    console.error("Erro ao formatar data curta:", error, dateValue);
     return null;
   }
 };

@@ -22,7 +22,6 @@ import { Plus, Search, Filter, Loader2 } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import InspectionListItem from "./components/InspectionListItem";
-import InspectionDetailsDialog from "./components/InspectionDetailsDialog";
 import DeleteInspectionDialog from "./components/DeleteInspectionDialog";
 import FilterPanel from "./components/FilterPanel";
 
@@ -33,7 +32,6 @@ export default function InspectionsPage() {
   const [filteredInspections, setFilteredInspections] = useState([]);
   const [showCreate, setShowCreate] = useState(false);
   const [editingInspection, setEditingInspection] = useState(null);
-  const [viewingInspection, setViewingInspection] = useState(null);
   const [deletingInspection, setDeletingInspection] = useState(null);
   const [filterState, setFilterState] = useState({
     status: "all",
@@ -345,7 +343,6 @@ export default function InspectionsPage() {
                     inspection={inspection}
                     onEditData={() => handleEditData(inspection)}
                     onEditInspection={() => handleEditInspection(inspection)}
-                    onView={() => setViewingInspection(inspection)}
                     onDelete={() => setDeletingInspection(inspection)}
                   />
                 </div>
@@ -357,7 +354,6 @@ export default function InspectionsPage() {
                   inspection={inspection}
                   onEditData={() => handleEditData(inspection)}
                   onEditInspection={() => handleEditInspection(inspection)}
-                  onView={() => setViewingInspection(inspection)}
                   onDelete={() => setDeletingInspection(inspection)}
                 />
               );
@@ -385,17 +381,6 @@ export default function InspectionsPage() {
         />
       )}
 
-      {viewingInspection && (
-        <InspectionDetailsDialog
-          inspection={viewingInspection}
-          open={!!viewingInspection}
-          onClose={() => setViewingInspection(null)}
-          onEdit={(inspectionToEdit) => { // Renamed param for clarity
-            setEditingInspection(inspectionToEdit);
-            setViewingInspection(null); // Close details when opening edit
-          }}
-        />
-      )}
 
       {deletingInspection && (
         <DeleteInspectionDialog

@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent} from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -65,7 +66,17 @@ export default function InspectionEditorPage({ params }) {
     if (inspection && originalInspection) {
       const current = JSON.stringify(inspection);
       const original = JSON.stringify(originalInspection);
-      setHasUnsavedChanges(current !== original);
+      const hasChanges = current !== original;
+      setHasUnsavedChanges(hasChanges);
+      
+      // Lógica automática de status baseada nas alterações
+      if (hasChanges && inspection.status === 'pending') {
+        // Se há alterações e está pendente, muda para em andamento
+        setInspection(prev => ({
+          ...prev,
+          status: 'in_progress'
+        }));
+      }
     }
   }, [inspection, originalInspection]);
 
@@ -111,7 +122,6 @@ export default function InspectionEditorPage({ params }) {
       setInspection(formattedData);
       setOriginalInspection(structuredClone(formattedData));
     } catch (error) {
-      console.error("Error fetching inspection:", error);
       toast({
         title: "Erro ao carregar inspeção",
         description: error.message,
@@ -138,7 +148,6 @@ export default function InspectionEditorPage({ params }) {
         title: "Inspeção salva com sucesso"
       });
     } catch (error) {
-      console.error("Error saving inspection:", error);
       toast({
         title: "Erro ao salvar inspeção",
         description: error.message,
@@ -231,7 +240,6 @@ export default function InspectionEditorPage({ params }) {
         title: "Mídia enviada com sucesso"
       });
     } catch (error) {
-      console.error("Error uploading media:", error);
       toast({
         title: "Erro ao enviar mídia",
         description: error.message,
@@ -292,7 +300,6 @@ export default function InspectionEditorPage({ params }) {
         minute: '2-digit'
       });
     } catch (error) {
-      console.error('Erro ao formatar data:', error, timestamp);
       return "Data inválida";
     }
   };
@@ -764,9 +771,8 @@ const handleMoveMediaDrop = (item, destination) => {
       description: "A mídia foi movida com sucesso.",
     });
   } catch (error) {
-    console.error("Erro ao mover mídia:", error);
     toast({
-      title: "Erro",
+      title: "Erro ao mover mídia",
       description: "Não foi possível mover a mídia.",
       variant: "destructive",
     });
@@ -902,7 +908,6 @@ const handleMoveMediaDrop = (item, destination) => {
         title: "Mídia removida com sucesso"
       });
     } catch (error) {
-      console.error("Error removing media:", error);
       toast({
         title: "Erro ao remover mídia",
         description: error.message,
@@ -1073,17 +1078,18 @@ const handleMoveMediaDrop = (item, destination) => {
                   Alterações não salvas
                 </span>
               )}
-              <Select value={inspection?.status} onValueChange={(value) => setInspection(prev => ({...prev, status: value}))}>
-                <SelectTrigger className="w-36 h-9">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pending">Pendente</SelectItem>
-                  <SelectItem value="in_progress">Em Andamento</SelectItem>
-                  <SelectItem value="completed">Concluída</SelectItem>
-                  <SelectItem value="canceled">Cancelada</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Status:</span>
+                <Badge variant={
+                  inspection?.status === 'completed' ? 'default' :
+                  inspection?.status === 'in_progress' ? 'secondary' :
+                  'outline'
+                }>
+                  {inspection?.status === 'pending' ? 'Pendente' :
+                   inspection?.status === 'in_progress' ? 'Em Andamento' :
+                   inspection?.status === 'completed' ? 'Concluída' : 'Indefinido'}
+                </Badge>
+              </div>
               <Button size="sm" onClick={saveInspection} disabled={saving || !hasUnsavedChanges}>
                 {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                 Salvar
@@ -1174,9 +1180,9 @@ const handleMoveMediaDrop = (item, destination) => {
             </TabsContent>
 
             <TabsContent value="topics" className="space-y-4">
-              <div className="grid grid-cols-12 gap-4 h-[calc(100vh-200px)]">
+              <div className="grid grid-cols-7 gap-1 h-[calc(100vh-200px)]">
                 {/* Topics Column */}
-                <div className="col-span-3 border rounded-lg">
+                <div className="col-span-2 border rounded-lg">
                   <div className="p-3 border-b flex justify-between items-center">
                     <h3 className="font-medium">Tópicos ({inspection.topics?.length || 0})</h3>
                     <Button size="sm" onClick={addTopic}>
@@ -1289,7 +1295,7 @@ const handleMoveMediaDrop = (item, destination) => {
                 </div>
 
                 {/* Items Column */}
-                <div className="col-span-3 border rounded-lg">
+                <div className="col-span-2 border rounded-lg">
                   <div className="p-3 border-b flex justify-between items-center">
                     <div className="flex items-center gap-2">
                       <span className="text-sm text-muted-foreground">Tópico {activeTopicIndex + 1}</span>
@@ -1472,7 +1478,7 @@ const handleMoveMediaDrop = (item, destination) => {
                </div>
 
                {/* Details Column */}
-               <div className="col-span-6 border rounded-lg">
+               <div className="col-span-3 border rounded-lg">
                  <div className="p-3 border-b flex justify-between items-center">
                    <div className="flex items-center gap-2">
                      {currentItem && (

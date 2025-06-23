@@ -8,6 +8,9 @@ import { useToast } from "@/hooks/use-toast";
 import { Check, Download } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Label } from "@/components/ui/label";
+import Papa from "papaparse";
+import * as XLSX from "xlsx";
+import JSZip from "jszip";
 
 export default function ExportTemplateDialog({ open, onClose, templates }) {
   const [selectedTemplates, setSelectedTemplates] = useState([]);
@@ -30,7 +33,7 @@ export default function ExportTemplateDialog({ open, onClose, templates }) {
     }
   };
 
-  const handleExport = () => {
+  const handleExport = async (type = "json") => {
     if (selectedTemplates.length === 0) {
       toast({
         title: "Erro",
@@ -39,40 +42,152 @@ export default function ExportTemplateDialog({ open, onClose, templates }) {
       });
       return;
     }
-
     setLoading(true);
     try {
-      // Filter templates to export and remove Firebase-specific fields
       const templatesData = templates
         .filter(t => selectedTemplates.includes(t.id))
         .map(({ id, created_at, updated_at, deleted_at, ...rest }) => ({
           ...rest,
-          // Keep the ID but make it optional for import purposes
           original_id: id
         }));
-      
-      // Create JSON data
-      const dataStr = JSON.stringify(templatesData, null, 2);
-      
-      // Create download link
-      const dataUri = `data:application/json;charset=utf-8,${encodeURIComponent(dataStr)}`;
-      const exportFileName = `templates_export_${new Date().toISOString().slice(0, 10)}.json`;
-      
-      const linkElement = document.createElement('a');
-      linkElement.setAttribute('href', dataUri);
-      linkElement.setAttribute('download', exportFileName);
-      linkElement.click();
-      
+      if (selectedTemplates.length > 1) {
+        // Exporta múltiplos arquivos em um ZIP
+        const zip = new JSZip();
+        if (type === "csv" || type === "xlsx") {
+          // Um arquivo por template
+          templatesData.forEach(template => {
+            const rows = [];
+            template.topics?.forEach(topic => {
+              topic.items?.forEach(item => {
+                item.details?.forEach(detail => {
+                  rows.push({
+                    title: template.title,
+                    description: template.description,
+                    template_price: template.template_price,
+                    icon: template.icon,
+                    icon_color: template.icon_color,
+                    topic_name: topic.name,
+                    topic_description: topic.description,
+                    item_name: item.name,
+                    item_description: item.description,
+                    detail_name: detail.name,
+                    detail_type: detail.type,
+                    detail_required: detail.required,
+                    detail_options: detail.options?.join("|") || ""
+                  });
+                });
+              });
+            });
+            if (type === "csv") {
+              const csv = Papa.unparse(rows);
+              zip.file(`template_${template.title.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.csv`, csv);
+            } else {
+              const ws = XLSX.utils.json_to_sheet(rows);
+              const wb = XLSX.utils.book_new();
+              XLSX.utils.book_append_sheet(wb, ws, "Templates");
+              const xlsxData = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+              zip.file(`template_${template.title.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.xlsx`, xlsxData);
+            }
+          });
+        } else {
+          // Um arquivo JSON por template
+          templatesData.forEach(template => {
+            const dataStr = JSON.stringify(template, null, 2);
+            zip.file(`${template.title.replace(/\s+/g, '_')}_${template.cod || ''}.json`, dataStr);
+          });
+        }
+        const blob = await zip.generateAsync({ type: "blob" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.setAttribute("download", `templates_export_${new Date().toISOString().slice(0, 10)}.zip`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      } else {
+        // Exportação individual para CSV/XLSX
+        if (type === "csv") {
+          const template = templatesData[0];
+          const rows = [];
+          template.topics?.forEach(topic => {
+            topic.items?.forEach(item => {
+              item.details?.forEach(detail => {
+                rows.push({
+                  title: template.title,
+                  description: template.description,
+                  template_price: template.template_price,
+                  icon: template.icon,
+                  icon_color: template.icon_color,
+                  topic_name: topic.name,
+                  topic_description: topic.description,
+                  item_name: item.name,
+                  item_description: item.description,
+                  detail_name: detail.name,
+                  detail_type: detail.type,
+                  detail_required: detail.required,
+                  detail_options: detail.options?.join("|") || ""
+                });
+              });
+            });
+          });
+          const csv = Papa.unparse(rows);
+          const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.setAttribute("download", `template_${template.title.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.csv`);
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+        } else if (type === "xlsx") {
+          const template = templatesData[0];
+          const rows = [];
+          template.topics?.forEach(topic => {
+            topic.items?.forEach(item => {
+              item.details?.forEach(detail => {
+                rows.push({
+                  title: template.title,
+                  description: template.description,
+                  template_price: template.template_price,
+                  icon: template.icon,
+                  icon_color: template.icon_color,
+                  topic_name: topic.name,
+                  topic_description: topic.description,
+                  item_name: item.name,
+                  item_description: item.description,
+                  detail_name: detail.name,
+                  detail_type: detail.type,
+                  detail_required: detail.required,
+                  detail_options: detail.options?.join("|") || ""
+                });
+              });
+            });
+          });
+          const ws = XLSX.utils.json_to_sheet(rows);
+          const wb = XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(wb, ws, "Templates");
+          XLSX.writeFile(wb, `template_${template.title.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+        } else {
+          // Exporta para JSON individual
+          const dataStr = JSON.stringify(templatesData[0], null, 2);
+          const dataUri = `data:application/json;charset=utf-8,${encodeURIComponent(dataStr)}`;
+          const exportFileName = `template_${templatesData[0].title.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.json`;
+          const linkElement = document.createElement('a');
+          linkElement.setAttribute('href', dataUri);
+          linkElement.setAttribute('download', exportFileName);
+          linkElement.click();
+        }
+      }
       toast({
         title: "Sucesso",
         description: `${selectedTemplates.length} template(s) exportado(s) com sucesso`
       });
-      
       onClose();
     } catch (error) {
-      console.error("Error exporting templates:", error);
       toast({
-        title: "Erro",
+        title: "Erro ao exportar templates",
         description: "Erro ao exportar templates",
         variant: "destructive"
       });
@@ -131,13 +246,29 @@ export default function ExportTemplateDialog({ open, onClose, templates }) {
             )}
           </ScrollArea>
 
-          <div className="flex justify-end pt-4">
+          <div className="flex justify-end pt-4 gap-2">
             <Button
-              onClick={handleExport}
+              onClick={() => handleExport("json")}
               disabled={loading || selectedTemplates.length === 0}
             >
               <Download className="mr-2 h-4 w-4" />
-              {loading ? "Exportando..." : "Exportar Templates"}
+              {loading ? "Exportando..." : "Exportar JSON"}
+            </Button>
+            <Button
+              onClick={() => handleExport("csv")}
+              disabled={loading || selectedTemplates.length === 0}
+              variant="outline"
+            >
+              <Download className="mr-2 h-4 w-4" />
+              CSV
+            </Button>
+            <Button
+              onClick={() => handleExport("xlsx")}
+              disabled={loading || selectedTemplates.length === 0}
+              variant="outline"
+            >
+              <Download className="mr-2 h-4 w-4" />
+              XLSX
             </Button>
           </div>
         </div>
