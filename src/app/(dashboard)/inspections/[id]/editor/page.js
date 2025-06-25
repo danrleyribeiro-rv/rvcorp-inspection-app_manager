@@ -18,7 +18,7 @@ import { Tabs, TabsContent} from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Settings, ListChecks } from "lucide-react";
+import { Settings, ListChecks, Search, Filter } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { addWatermarkToImage, detectImageSource } from "@/utils/ImageWatermark";
@@ -58,6 +58,10 @@ export default function InspectionEditorPage({ params }) {
   const [confirmExitDialog, setConfirmExitDialog] = useState(false);
   const [activeTab, setActiveTab] = useState("general");
   const [inspectionControlData, setInspectionControlData] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterType, setFilterType] = useState("all");
+  const [showOnlyWithMedia, setShowOnlyWithMedia] = useState(false);
+  const [showOnlyWithNC, setShowOnlyWithNC] = useState(false);
   const mediaRef = useRef(null);
   const { toast } = useToast();
   const router = useRouter();
@@ -1030,6 +1034,73 @@ const handleMoveMediaDrop = (item, destination) => {
     await fetchInspection();
   };
 
+  // Funções de filtro e pesquisa
+  const filterTopics = () => {
+    if (!inspection.topics) return [];
+    
+    return inspection.topics.filter((topic, topicIndex) => {
+      const topicMatches = searchTerm === "" || 
+        topic.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        topic.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        topic.observation?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const hasMedia = topic.media?.length > 0;
+      const hasNC = topic.items?.some(item => 
+        item.details?.some(detail => detail.non_conformities?.length > 0)
+      );
+      
+      const mediaFilter = !showOnlyWithMedia || hasMedia;
+      const ncFilter = !showOnlyWithNC || hasNC;
+      
+      return topicMatches && mediaFilter && ncFilter;
+    });
+  };
+
+  const filterItems = (topicItems) => {
+    if (!topicItems) return [];
+    
+    return topicItems.filter((item, itemIndex) => {
+      const itemMatches = searchTerm === "" || 
+        item.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.observation?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const hasMedia = item.media?.length > 0;
+      const hasNC = item.details?.some(detail => detail.non_conformities?.length > 0);
+      
+      const mediaFilter = !showOnlyWithMedia || hasMedia;
+      const ncFilter = !showOnlyWithNC || hasNC;
+      
+      return itemMatches && mediaFilter && ncFilter;
+    });
+  };
+
+  const filterDetails = (itemDetails) => {
+    if (!itemDetails) return [];
+    
+    return itemDetails.filter((detail, detailIndex) => {
+      const detailMatches = searchTerm === "" || 
+        detail.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        detail.observation?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        detail.value?.toString().toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const hasMedia = detail.media?.length > 0;
+      const hasNC = detail.non_conformities?.length > 0;
+      
+      const mediaFilter = !showOnlyWithMedia || hasMedia;
+      const ncFilter = !showOnlyWithNC || hasNC;
+      
+      return detailMatches && mediaFilter && ncFilter;
+    });
+  };
+
+  const resetFilters = () => {
+    setSearchTerm("");
+    setFilterType("all");
+    setShowOnlyWithMedia(false);
+    setShowOnlyWithNC(false);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -1533,7 +1604,7 @@ const handleMoveMediaDrop = (item, destination) => {
 
                        {/* Details */}
                        <div className="space-y-3">
-                         {currentItem.details?.map((detail, detailIndex) => (
+                         {filterDetails(currentItem.details).map((detail, detailIndex) => (
                            <DetailEditor
                              key={detailIndex}
                              detail={detail}

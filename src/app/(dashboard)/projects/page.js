@@ -5,11 +5,12 @@ import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase";
 import { collection, query, where, orderBy, getDocs, doc, getDoc } from "firebase/firestore";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
+import { EnhancedButton } from "@/components/ui/enhanced-button";
 import { Plus } from "lucide-react";
 import TableView from "./components/TableView";
 import KanbanView from "./components/KanbanView";
 import { CreateProjectDialog } from "./components/CreateProjectDialog";
+import { ResponsiveContainer } from "@/components/ui/responsive-container";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/auth-context";
 import { useRouter } from "next/navigation";
@@ -108,26 +109,27 @@ export default function ProjectsPage() {
   };
 
   return (
-    <div className="container p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Projetos</h1>
-        <Button onClick={() => router.push('/projects/create')} className="flex-1 sm:flex-none">
+    <ResponsiveContainer>
+      <div className="container p-6 animate-in fade-in-0 duration-300">
+      <div className="flex justify-between items-center mb-6 animate-in slide-in-from-top-4 duration-500">
+        <h1 className="text-3xl font-bold animate-in slide-in-from-left-4 duration-700">Projetos</h1>
+        <EnhancedButton onClick={() => router.push('/projects/create')} className="flex-1 sm:flex-none">
           <Plus className="mr-2 h-4 w-4" />
           Novo Projeto
-        </Button>
+        </EnhancedButton>
       </div>
 
-      <Tabs value={activeView} onValueChange={setActiveView} className="space-y-4">
+      <Tabs value={activeView} onValueChange={setActiveView} className="space-y-4 animate-in slide-in-from-bottom-4 duration-500 delay-200">
         <TabsList>
           <TabsTrigger value="lista">Lista</TabsTrigger>
           <TabsTrigger value="kanban">Kanban</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="lista">
+        <TabsContent value="lista" className="animate-in fade-in-0 duration-300">
           <TableView projects={projects} isLoading={loading} onRefresh={fetchProjects} />
         </TabsContent>
 
-        <TabsContent value="kanban">
+        <TabsContent value="kanban" className="animate-in fade-in-0 duration-300">
           <KanbanView projects={projects} isLoading={loading} onRefresh={fetchProjects} />
         </TabsContent>
       </Tabs>
@@ -140,6 +142,7 @@ export default function ProjectsPage() {
           managerId={user.uid}
         />
       )}
-    </div>
+      </div>
+    </ResponsiveContainer>
   );
 }

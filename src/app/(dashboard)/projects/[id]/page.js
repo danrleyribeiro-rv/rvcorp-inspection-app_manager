@@ -2,11 +2,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useParams } from "next/navigation";
+import { useNavigation } from "@/hooks/use-navigation";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, collection, query, where, getDocs, orderBy, updateDoc, serverTimestamp } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { EnhancedButton } from "@/components/ui/enhanced-button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,9 +23,11 @@ import { useAuth } from "@/context/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import { format, parseISO, isValid } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import GrantAccessDialog from "../components/GrantAccessDialog";
 import {
   ArrowLeft, Edit, Save, X, CalendarDaysIcon, FileTextIcon, UsersIcon, TagIcon, DollarSignIcon,
-  ClockIcon, MailIcon, PhoneIcon, ClipboardListIcon, BriefcaseIcon, InfoIcon, ExternalLinkIcon
+  ClockIcon, MailIcon, PhoneIcon, ClipboardListIcon, BriefcaseIcon, InfoIcon, ExternalLinkIcon, Shield,
+  Settings, Trash2, AlertTriangle
 } from "lucide-react";
 
 const projectStatusConfig = {
@@ -105,7 +109,7 @@ const calculateCompletion = (inspection) => {
 
 export default function ProjectViewPage() {
   const params = useParams();
-  const router = useRouter();
+  const { navigateTo, goBack } = useNavigation();
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -113,11 +117,16 @@ export default function ProjectViewPage() {
   const [clientDetails, setClientDetails] = useState(null);
   const [inspections, setInspections] = useState([]);
   const [clients, setClients] = useState([]);
+  const [subManagersWithAccess, setSubManagersWithAccess] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingClient, setLoadingClient] = useState(true);
   const [loadingInspections, setLoadingInspections] = useState(true);
+  const [loadingSubManagers, setLoadingSubManagers] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [removingAccess, setRemovingAccess] = useState(null);
+  const [showRemoveDialog, setShowRemoveDialog] = useState(false);
+  const [showGrantAccessDialog, setShowGrantAccessDialog] = useState(false);
 
   const [formData, setFormData] = useState({
     title: "",
@@ -146,7 +155,7 @@ export default function ProjectViewPage() {
           title: "Projeto não encontrado",
           variant: "destructive"
         });
-        router.push('/projects');
+        navigateTo('/projects');
         return;
       }
 
@@ -182,6 +191,11 @@ export default function ProjectViewPage() {
 
       // Fetch all clients for editing
       fetchClients();
+
+      // Fetch sub-managers with access if project has shared_with array
+      if (projectData.shared_with && projectData.shared_with.length > 0) {
+        fetchSubManagersWithAccess(projectData.shared_with);
+      }
 
     } catch (error) {
       console.error("Error fetching project:", error);
@@ -264,6 +278,57 @@ export default function ProjectViewPage() {
     }
   };
 
+  const fetchSubManagersWithAccess = async (userIds) => {
+    if (!userIds || userIds.length === 0) {
+      setSubManagersWithAccess([]);
+      return;
+    }
+
+    setLoadingSubManagers(true);
+    try {
+      const subManagersList = [];
+      
+      // For each user ID, fetch user data and manager data
+      for (const userId of userIds) {
+        try {
+          // Fetch user data
+          const userRef = doc(db, 'users', userId);
+          const userDoc = await getDoc(userRef);
+          
+          if (userDoc.exists() && userDoc.data().role === 'sub_manager') {
+            const userData = userDoc.data();
+            
+            // Fetch manager data
+            const managersQuery = query(
+              collection(db, 'managers'),
+              where('user_id', '==', userId)
+            );
+            const managersSnapshot = await getDocs(managersQuery);
+            
+            if (!managersSnapshot.empty) {
+              const managerData = managersSnapshot.docs[0].data();
+              
+              subManagersList.push({
+                id: userId,
+                email: userData.email,
+                ...managerData,
+                managerId: managersSnapshot.docs[0].id
+              });
+            }
+          }
+        } catch (err) {
+          console.error(`Error fetching data for user ${userId}:`, err);
+        }
+      }
+      
+      setSubManagersWithAccess(subManagersList);
+    } catch (error) {
+      console.error("Error fetching sub-managers with access:", error);
+    } finally {
+      setLoadingSubManagers(false);
+    }
+  };
+
   const handleSave = async () => {
     setIsSaving(true);
     try {
@@ -334,7 +399,57 @@ export default function ProjectViewPage() {
   };
 
   const handleInspectionClick = (inspection) => {
-    router.push(`/inspections/${inspection.id}/editor`);
+    navigateTo(`/inspections/${inspection.id}/editor`);
+  };
+
+  const handleRemoveAccess = async (subManagerId) => {
+    try {
+      const updatedSharedWith = project.shared_with.filter(id => id !== subManagerId);
+      const projectRef = doc(db, 'projects', params.id);
+      
+      await updateDoc(projectRef, {
+        shared_with: updatedSharedWith,
+        access_updated_at: serverTimestamp(),
+        updated_at: serverTimestamp()
+      });
+
+      // Update local state
+      setProject(prev => ({
+        ...prev,
+        shared_with: updatedSharedWith
+      }));
+
+      // Update sub-managers list
+      setSubManagersWithAccess(prev => 
+        prev.filter(sm => sm.id !== subManagerId)
+      );
+
+      const removedSubManager = subManagersWithAccess.find(sm => sm.id === subManagerId);
+      
+      toast({
+        title: "Acesso removido com sucesso",
+        description: `${removedSubManager?.name} ${removedSubManager?.last_name} não tem mais acesso ao projeto`
+      });
+
+      setShowRemoveDialog(false);
+      setRemovingAccess(null);
+    } catch (error) {
+      console.error("Error removing access:", error);
+      toast({
+        title: "Erro ao remover acesso",
+        description: "Não foi possível remover o acesso do subgerente",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const openManageAccess = () => {
+    setShowGrantAccessDialog(true);
+  };
+
+  const handleAccessGranted = () => {
+    // Refresh project data to get updated shared_with array
+    fetchProjectData();
   };
 
 
@@ -366,9 +481,9 @@ export default function ProjectViewPage() {
     return (
       <div className="flex flex-col items-center justify-center h-[50vh] space-y-4">
         <p className="text-lg font-medium">Projeto não encontrado</p>
-        <Button onClick={() => router.push('/projects')}>
+        <EnhancedButton onClick={() => navigateTo('/projects')}>
           Voltar para Projetos
-        </Button>
+        </EnhancedButton>
       </div>
     );
   }
@@ -380,15 +495,15 @@ export default function ProjectViewPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button 
+          <EnhancedButton 
             variant="ghost" 
             size="sm" 
-            onClick={() => router.push('/projects')}
+            onClick={() => navigateTo('/projects')}
             className="flex items-center gap-2"
           >
             <ArrowLeft className="h-4 w-4" />
             Voltar
-          </Button>
+          </EnhancedButton>
           <div>
             <h1 className="text-2xl font-bold">{project.title}</h1>
             <Badge className={`px-2.5 py-1 text-xs ${currentStatusConfig.badgeClass}`}>
@@ -399,27 +514,27 @@ export default function ProjectViewPage() {
         <div className="flex items-center gap-2">
           {isEditing ? (
             <>
-              <Button 
+              <EnhancedButton 
                 variant="outline" 
                 onClick={handleCancel}
                 disabled={isSaving}
               >
                 <X className="h-4 w-4 mr-2" />
                 Cancelar
-              </Button>
-              <Button 
+              </EnhancedButton>
+              <EnhancedButton 
                 onClick={handleSave}
                 disabled={isSaving}
               >
                 <Save className="h-4 w-4 mr-2" />
                 {isSaving ? "Salvando..." : "Salvar"}
-              </Button>
+              </EnhancedButton>
             </>
           ) : (
-            <Button onClick={() => setIsEditing(true)}>
+            <EnhancedButton onClick={() => setIsEditing(true)}>
               <Edit className="h-4 w-4 mr-2" />
               Editar
-            </Button>
+            </EnhancedButton>
           )}
         </div>
       </div>
@@ -429,6 +544,7 @@ export default function ProjectViewPage() {
         <TabsList>
           <TabsTrigger value="details">Detalhes</TabsTrigger>
           <TabsTrigger value="inspections">Inspeções ({inspections.length})</TabsTrigger>
+          <TabsTrigger value="access">Acesso ({project?.shared_with?.length || 0})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="details" className="space-y-6">
@@ -646,7 +762,199 @@ export default function ProjectViewPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="access" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Shield className="h-5 w-5 text-primary" />
+                    Subgerentes com Acesso ({project?.shared_with?.length || 0})
+                  </CardTitle>
+                  <CardDescription>
+                    Lista de subgerentes que têm acesso a este projeto
+                  </CardDescription>
+                </div>
+                <EnhancedButton
+                  size="sm"
+                  onClick={openManageAccess}
+                  className="flex items-center gap-2"
+                >
+                  <Settings className="h-4 w-4" />
+                  Gerenciar Acesso
+                </EnhancedButton>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {loadingSubManagers ? (
+                <div className="space-y-3">
+                  <Skeleton className="h-16 w-full" />
+                  <Skeleton className="h-16 w-full" />
+                  <Skeleton className="h-16 w-full" />
+                </div>
+              ) : !project?.shared_with || project.shared_with.length === 0 ? (
+                <div className="text-center py-8">
+                  <Shield className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Nenhum subgerente tem acesso a este projeto
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Use o botão "Gerenciar Acesso" nas ações do projeto para conceder acesso
+                  </p>
+                </div>
+              ) : subManagersWithAccess.length > 0 ? (
+                <div className="space-y-3">
+                  {subManagersWithAccess.map((subManager) => (
+                    <div 
+                      key={subManager.id}
+                      className="flex items-center gap-4 p-4 border rounded-lg bg-background hover:bg-accent/50 transition-colors"
+                    >
+                      <Avatar className="h-10 w-10">
+                        <AvatarImage src={subManager.profileImageUrl} />
+                        <AvatarFallback className="text-sm">
+                          {subManager.name?.charAt(0)?.toUpperCase()}{subManager.last_name?.charAt(0)?.toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className="font-medium text-sm">
+                            {subManager.name} {subManager.last_name}
+                          </p>
+                          <Badge variant="outline" className="text-xs">
+                            Subgerente
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {subManager.email}
+                        </p>
+                        {subManager.profession && (
+                          <p className="text-xs text-muted-foreground">
+                            {subManager.profession}
+                          </p>
+                        )}
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <div className="text-right">
+                          <p className="text-xs text-muted-foreground">
+                            {subManager.permissions?.length || 0} permissões
+                          </p>
+                          {subManager.permissions?.includes('view_projects') && (
+                            <div className="flex items-center gap-1 mt-1">
+                              <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                              <span className="text-xs text-green-700">Pode visualizar</span>
+                            </div>
+                          )}
+                        </div>
+                        <EnhancedButton
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setRemovingAccess(subManager);
+                            setShowRemoveDialog(true);
+                          }}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          title="Remover acesso"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </EnhancedButton>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {project.access_updated_at && (
+                    <div className="mt-4 pt-4 border-t">
+                      <p className="text-xs text-muted-foreground">
+                        Última atualização de acesso: {formatDateSafe(project.access_updated_at, "dd/MM/yyyy 'às' HH:mm")}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Shield className="h-12 w-12 mx-auto text-orange-400 mb-4" />
+                  <p className="text-sm text-orange-600 mb-2">
+                    Erro ao carregar informações dos subgerentes
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Os subgerentes podem ter sido removidos do sistema
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
+
+      {/* Grant Access Dialog */}
+      {showGrantAccessDialog && (
+        <GrantAccessDialog
+          project={project}
+          open={showGrantAccessDialog}
+          onClose={() => setShowGrantAccessDialog(false)}
+          onAccessGranted={handleAccessGranted}
+        />
+      )}
+
+      {/* Remove Access Confirmation Dialog */}
+      {showRemoveDialog && removingAccess && (
+        <Dialog open={showRemoveDialog} onOpenChange={setShowRemoveDialog}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-red-500" />
+                Remover Acesso
+              </DialogTitle>
+              <DialogDescription>
+                Tem certeza que deseja remover o acesso de <strong>{removingAccess.name} {removingAccess.last_name}</strong> a este projeto?
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="py-4">
+              <div className="flex items-center gap-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={removingAccess.profileImageUrl} />
+                  <AvatarFallback className="text-xs">
+                    {removingAccess.name?.charAt(0)?.toUpperCase()}{removingAccess.last_name?.charAt(0)?.toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="font-medium text-sm text-red-900">
+                    {removingAccess.name} {removingAccess.last_name}
+                  </p>
+                  <p className="text-xs text-red-700">{removingAccess.email}</p>
+                </div>
+              </div>
+              
+              <p className="text-sm text-muted-foreground mt-3">
+                Esta ação não pode ser desfeita. O subgerente perderá acesso imediatamente e precisará ser adicionado novamente se necessário.
+              </p>
+            </div>
+
+            <DialogFooter className="flex gap-2">
+              <EnhancedButton 
+                variant="outline" 
+                onClick={() => {
+                  setShowRemoveDialog(false);
+                  setRemovingAccess(null);
+                }}
+              >
+                Cancelar
+              </EnhancedButton>
+              <EnhancedButton 
+                variant="destructive"
+                onClick={() => handleRemoveAccess(removingAccess.id)}
+                className="flex items-center gap-2"
+              >
+                <Trash2 className="h-4 w-4" />
+                Remover Acesso
+              </EnhancedButton>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
 
     </div>
   );

@@ -10,13 +10,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Edit, Trash2, Eye } from "lucide-react";
+import { EnhancedButton } from "@/components/ui/enhanced-button";
+import { Trash2, Shield } from "lucide-react";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import EditProjectDialog from "./EditProjectDialog";
+import { useNavigation } from "@/hooks/use-navigation";
 import DeleteProjectDialog from "./DeleteProjectDialog.js";
-import ViewProjectDialog from "./ViewProjectDialog";
+import GrantAccessDialog from "./GrantAccessDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const getStatusColor = (status) => {
@@ -30,10 +29,9 @@ const getStatusColor = (status) => {
 };
 
 export default function TableView({ projects, isLoading, onRefresh }) {
-  const router = useRouter();
-  const [editingProject, setEditingProject] = useState(null);
+  const { navigateTo } = useNavigation();
   const [deletingProject, setDeletingProject] = useState(null);
-  const [viewingProject, setViewingProject] = useState(null);
+  const [grantingAccessProject, setGrantingAccessProject] = useState(null);
 
   if (isLoading) {
     return (
@@ -97,7 +95,14 @@ export default function TableView({ projects, isLoading, onRefresh }) {
             ) : (
               projects.map((project) => (
                 <TableRow key={project.id}>
-                  <TableCell className="font-medium">{project.title}</TableCell>
+                  <TableCell className="font-medium">
+                    <button
+                      onClick={() => navigateTo(`/projects/${project.id}`)}
+                      className="text-left hover:text-primary hover:underline transition-colors"
+                    >
+                      {project.title}
+                    </button>
+                  </TableCell>
                   <TableCell>{project.clients?.name || 'N/A'}</TableCell>
                   <TableCell>
                     <Badge variant={getStatusColor(project.status)}>
@@ -107,27 +112,21 @@ export default function TableView({ projects, isLoading, onRefresh }) {
                   <TableCell>{project.type || 'N/A'}</TableCell>
                   <TableCell>{formatCurrency(project.project_price)}</TableCell>
                   <TableCell className="flex gap-2">
-                    <Button 
+                    <EnhancedButton 
                       variant="ghost" 
                       size="icon" 
-                      onClick={() => router.push(`/projects/${project.id}`)}
+                      onClick={() => setGrantingAccessProject(project)}
+                      title="Gerenciar acesso"
                     >
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      onClick={() => setEditingProject(project)}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button 
+                      <Shield className="h-4 w-4 text-blue-600" />
+                    </EnhancedButton>
+                    <EnhancedButton 
                       variant="ghost" 
                       size="icon" 
                       onClick={() => setDeletingProject(project)}
                     >
                       <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
+                    </EnhancedButton>
                   </TableCell>
                 </TableRow>
               ))
@@ -135,15 +134,6 @@ export default function TableView({ projects, isLoading, onRefresh }) {
           </TableBody>
         </Table>
       </div>
-
-      {editingProject && (
-        <EditProjectDialog
-          project={editingProject}
-          open={!!editingProject}
-          onClose={() => setEditingProject(null)}
-          onSuccess={onRefresh}
-        />
-      )}
 
       {deletingProject && (
         <DeleteProjectDialog
@@ -154,11 +144,12 @@ export default function TableView({ projects, isLoading, onRefresh }) {
         />
       )}
 
-      {viewingProject && (
-        <ViewProjectDialog
-          project={viewingProject}
-          open={!!viewingProject}
-          onClose={() => setViewingProject(null)}
+      {grantingAccessProject && (
+        <GrantAccessDialog
+          project={grantingAccessProject}
+          open={!!grantingAccessProject}
+          onClose={() => setGrantingAccessProject(null)}
+          onAccessGranted={onRefresh}
         />
       )}
     </>

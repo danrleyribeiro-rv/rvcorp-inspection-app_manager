@@ -8,7 +8,8 @@ import { collection, query, where, getDocs, orderBy, limit } from "firebase/fire
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { EnhancedButton } from "@/components/ui/enhanced-button";
+import { ResponsiveContainer as ResponsiveWrapper, ResponsiveGrid } from "@/components/ui/responsive-container";
 import { useAuth } from "@/context/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -17,10 +18,11 @@ import { BarChart, LineChart, PieChart } from "recharts";
 import { Bar, Line, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import MapView from "@/components/MapView";
 import { 
   Building, Calendar, Users, DollarSign, File, Flag, FileText,
   Home, Layers, User, CheckSquare, AlertCircle, ArrowUp, ArrowDown,
-  ClipboardList, BarChart2, ExternalLink 
+  ClipboardList, BarChart2, ExternalLink, Map
 } from "lucide-react";
 
 export default function DashboardPage() {
@@ -293,9 +295,13 @@ export default function DashboardPage() {
       
       {/* Charts */}
       <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList>
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="overview">Visão Geral</TabsTrigger>
           <TabsTrigger value="analytics">Análises</TabsTrigger>
+          <TabsTrigger value="map" className="flex items-center gap-2">
+            <Map className="h-4 w-4" />
+            Mapa
+          </TabsTrigger>
         </TabsList>
         
         <TabsContent value="overview" className="space-y-4">
@@ -485,20 +491,20 @@ export default function DashboardPage() {
             
             <Card>
               <CardHeader>
-                <CardTitle>Distribuição de Vistoriadores</CardTitle>
-                <CardDescription>Estatísticas de vistoriadores ativos</CardDescription>
+                <CardTitle>Distribuição de Lincers</CardTitle>
+                <CardDescription>Estatísticas de linceres ativos</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <div className="text-sm text-muted-foreground">Vistoriadores Ativos</div>
+                      <div className="text-sm text-muted-foreground">Lincers Ativos</div>
                       <div className="text-2xl font-bold">
                         {stats.totalInspectors}
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <div className="text-sm text-muted-foreground">Inspeções por Vistoriador</div>
+                      <div className="text-sm text-muted-foreground">Inspeções por Lincer</div>
                       <div className="text-2xl font-bold">
                         {stats.totalInspectors > 0 
                           ? (stats.totalInspections / stats.totalInspectors).toFixed(1)
@@ -520,6 +526,23 @@ export default function DashboardPage() {
                 : "Atenção: Existem mais inspeções pendentes do que concluídas."}
             </AlertDescription>
           </Alert>
+        </TabsContent>
+        
+        <TabsContent value="map" className="space-y-6">
+          <Card className="min-h-[600px]">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Map className="h-5 w-5" />
+                Mapa de Lincers e Inspeções
+              </CardTitle>
+              <CardDescription>
+                Visualização geográfica dos linceres cadastrados e inspeções em andamento
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <MapView />
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 

@@ -4,17 +4,17 @@
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CalendarIcon, Edit, Trash2, Eye } from "lucide-react";
+import { EnhancedButton } from "@/components/ui/enhanced-button";
+import { CalendarIcon, Trash2, Building2, DollarSign, User, Shield } from "lucide-react";
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useNavigation } from "@/hooks/use-navigation";
 import { db } from "@/lib/firebase";
 import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import EditProjectDialog from "./EditProjectDialog";
 import DeleteProjectDialog from "./DeleteProjectDialog";
-import ViewProjectDialog from "./ViewProjectDialog";
+import GrantAccessDialog from "./GrantAccessDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const formatCurrency = (value) => {
@@ -25,10 +25,9 @@ const formatCurrency = (value) => {
 };
 
 export default function KanbanView({ projects, isLoading, onRefresh }) {
-  const router = useRouter();
-  const [editingProject, setEditingProject] = useState(null);
+  const { navigateTo } = useNavigation();
   const [deletingProject, setDeletingProject] = useState(null);
-  const [viewingProject, setViewingProject] = useState(null);
+  const [grantingAccessProject, setGrantingAccessProject] = useState(null);
   const [localProjects, setLocalProjects] = useState(projects);
   const { toast } = useToast();
 
@@ -43,25 +42,25 @@ export default function KanbanView({ projects, isLoading, onRefresh }) {
       id: "Aguardando", 
       title: "Aguardando", 
       projects: localProjects.filter(p => p.status === "Aguardando"),
-      color: "bg-yellow-50 border-yellow-200"
+      color: "bg-amber-50 border-amber-200 shadow-sm"
     },
     "Em Andamento": { 
       id: "Em Andamento", 
       title: "Em Andamento", 
       projects: localProjects.filter(p => p.status === "Em Andamento"),
-      color: "bg-blue-50 border-blue-200"
+      color: "bg-blue-50 border-blue-200 shadow-sm"
     },
     "Em Revisão": { 
       id: "Em Revisão", 
       title: "Em Revisão", 
       projects: localProjects.filter(p => p.status === "Em Revisão"),
-      color: "bg-purple-50 border-purple-200"
+      color: "bg-purple-50 border-purple-200 shadow-sm"
     },
     "Concluído": { 
       id: "Concluído", 
       title: "Concluído", 
       projects: localProjects.filter(p => p.status === "Concluído"),
-      color: "bg-green-50 border-green-200"
+      color: "bg-emerald-50 border-emerald-200 shadow-sm"
     }
   };
 
@@ -145,8 +144,17 @@ export default function KanbanView({ projects, isLoading, onRefresh }) {
                   className={`p-4 rounded-md border ${column.color}`}
                 >
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-medium">{column.title}</h3>
-                    <Badge variant="outline">{column.projects.length}</Badge>
+                    <h3 className="font-semibold text-gray-800">{column.title}</h3>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-xs">
+                        {column.projects.length} projeto{column.projects.length !== 1 ? 's' : ''}
+                      </Badge>
+                      <div className="w-3 h-3 rounded-full opacity-60" style={{
+                        backgroundColor: column.id === 'Aguardando' ? '#f59e0b' :
+                                       column.id === 'Em Andamento' ? '#3b82f6' :
+                                       column.id === 'Em Revisão' ? '#8b5cf6' : '#10b981'
+                      }} />
+                    </div>
                   </div>
                   <div className="space-y-3">
                     {column.projects.length === 0 ? (
@@ -165,45 +173,92 @@ export default function KanbanView({ projects, isLoading, onRefresh }) {
                               ref={provided.innerRef}
                               {...provided.draggableProps}
                               {...provided.dragHandleProps}
-                              className="bg-white"
+                              className="bg-white hover:shadow-md transition-shadow cursor-pointer group"
+                              onClick={(e) => {
+                                // Prevent opening modal when clicking action buttons
+                                if (!e.target.closest('button')) {
+                                  navigateTo(`/projects/${project.id}`);
+                                }
+                              }}
                             >
-                              <CardHeader className="p-3 pb-1">
-                                <CardTitle className="text-sm font-medium">{project.title}</CardTitle>
-                              </CardHeader>
-                              <CardContent className="p-3 pt-0 space-y-2">
-                                <p className="text-xs text-muted-foreground">
-                                  Cliente: {project.clients?.name || 'N/A'}
-                                </p>
-                                <p className="text-xs font-medium">
-                                  {formatCurrency(project.project_price)}
-                                </p>
-                                {project.inspection_date && (
-                                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                    <CalendarIcon className="h-3 w-3" />
-                                    <span>
-                                      {format(new Date(project.inspection_date), "dd/MM/yyyy", { locale: ptBR })}
-                                    </span>
+                              <CardHeader className="p-4 pb-2">
+                                <div className="flex items-start justify-between">
+                                  <CardTitle className="text-sm font-semibold leading-tight line-clamp-2">
+                                    {project.title}
+                                  </CardTitle>
+                                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <EnhancedButton 
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setGrantingAccessProject(project);
+                                      }}
+                                      className="h-7 w-7 text-xs"
+                                      title="Gerenciar acesso"
+                                    >
+                                      <Shield className="h-3 w-3 text-blue-600" />
+                                    </EnhancedButton>
+                                    <EnhancedButton 
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setDeletingProject(project);
+                                      }}
+                                      className="h-7 w-7 text-xs"
+                                      title="Excluir projeto"
+                                    >
+                                      <Trash2 className="h-3 w-3 text-red-600" />
+                                    </EnhancedButton>
                                   </div>
+                                </div>
+                                {project.type && (
+                                  <Badge variant="outline" className="text-xs w-fit">
+                                    {project.type}
+                                  </Badge>
                                 )}
-                                <div className="flex justify-end gap-1 pt-1">
-                                  <button 
-                                    onClick={() => router.push(`/projects/${project.id}`)}
-                                    className="text-xs p-1 rounded-sm hover:bg-gray-100"
-                                  >
-                                    <Eye className="h-3 w-3" />
-                                  </button>
-                                  <button 
-                                    onClick={() => setEditingProject(project)}
-                                    className="text-xs p-1 rounded-sm hover:bg-gray-100"
-                                  >
-                                    <Edit className="h-3 w-3" />
-                                  </button>
-                                  <button 
-                                    onClick={() => setDeletingProject(project)}
-                                    className="text-xs p-1 rounded-sm hover:bg-gray-100"
-                                  >
-                                    <Trash2 className="h-3 w-3 text-destructive" />
-                                  </button>
+                              </CardHeader>
+                              <CardContent className="p-4 pt-0 space-y-3">
+                                <div className="space-y-2">
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <User className="h-3 w-3" />
+                                    <span className="truncate">{project.clients?.name || 'Cliente não informado'}</span>
+                                  </div>
+                                  
+                                  <div className="flex items-center gap-2 text-xs font-medium text-green-700">
+                                    <DollarSign className="h-3 w-3" />
+                                    <span>{formatCurrency(project.project_price)}</span>
+                                  </div>
+                                  
+                                  {project.inspection_date && (
+                                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                      <CalendarIcon className="h-3 w-3" />
+                                      <span>
+                                        {format(new Date(project.inspection_date), "dd/MM/yyyy", { locale: ptBR })}
+                                      </span>
+                                    </div>
+                                  )}
+                                  
+                                  {project.location && (
+                                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                      <Building2 className="h-3 w-3" />
+                                      <span className="truncate">{project.location}</span>
+                                    </div>
+                                  )}
+                                </div>
+                                
+                                {project.description && (
+                                  <p className="text-xs text-muted-foreground line-clamp-2 mt-2">
+                                    {project.description}
+                                  </p>
+                                )}
+                                
+                                <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                                  <span className="text-xs text-muted-foreground">
+                                    Clique para abrir projeto
+                                  </span>
+                                  <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" title="Clique para abrir" />
                                 </div>
                               </CardContent>
                             </Card>
@@ -220,15 +275,6 @@ export default function KanbanView({ projects, isLoading, onRefresh }) {
         </div>
       </DragDropContext>
 
-      {editingProject && (
-        <EditProjectDialog
-          project={editingProject}
-          open={!!editingProject}
-          onClose={() => setEditingProject(null)}
-          onSuccess={onRefresh}
-        />
-      )}
-
       {deletingProject && (
         <DeleteProjectDialog
           project={deletingProject}
@@ -238,11 +284,12 @@ export default function KanbanView({ projects, isLoading, onRefresh }) {
         />
       )}
 
-      {viewingProject && (
-        <ViewProjectDialog
-          project={viewingProject}
-          open={!!viewingProject}
-          onClose={() => setViewingProject(null)}
+      {grantingAccessProject && (
+        <GrantAccessDialog
+          project={grantingAccessProject}
+          open={!!grantingAccessProject}
+          onClose={() => setGrantingAccessProject(null)}
+          onAccessGranted={onRefresh}
         />
       )}
     </>

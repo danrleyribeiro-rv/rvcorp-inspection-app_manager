@@ -1,7 +1,7 @@
 // src/app/(dashboard)/chats/page.js
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, getDoc, doc, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -9,7 +9,7 @@ import { useAuth } from '@/context/auth-context';
 import ChatList from './components/ChatList';
 import ChatDetail from './components/ChatDetail';
 
-export default function ChatsPage() {
+function ChatsPageContent() {
   const [selectedChatId, setSelectedChatId] = useState(null);
   const searchParams = useSearchParams();
   const inspectorId = searchParams.get('inspector');
@@ -94,5 +94,13 @@ export default function ChatsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ChatsPage() {
+  return (
+    <Suspense fallback={<div className="container p-6 text-center">Carregando chats...</div>}>
+      <ChatsPageContent />
+    </Suspense>
   );
 }
