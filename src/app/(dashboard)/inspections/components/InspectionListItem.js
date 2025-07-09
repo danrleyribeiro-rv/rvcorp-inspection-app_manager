@@ -72,7 +72,9 @@ const getStatusText = (status) => {
   return statusMap[status] || status;
 };
 
-export default function InspectionListItem({ inspection, onEdit, onDelete, onEditData, onEditInspection }) {
+import { Eye } from "lucide-react"; // Add Eye icon import
+
+export default function InspectionListItem({ inspection, onEdit, onDelete, onEditData, onEditInspection, onPreviewPDF }) {
   const [expanded, setExpanded] = useState(false);
 
   // Count non-conformities
@@ -193,6 +195,9 @@ export default function InspectionListItem({ inspection, onEdit, onDelete, onEdi
         </div>
         
         <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" className="text-gray-700 hover:bg-gray-100" onClick={(e) => { e.stopPropagation(); onPreviewPDF(inspection); }}>
+            <Eye className="h-5 w-5" />
+          </Button>
           <Badge variant={getStatusColor(inspection.status)}>
             {getStatusText(inspection.status)}
           </Badge>

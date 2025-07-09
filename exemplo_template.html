@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="utf-8" />
+  <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+  <title>Inspeção de Something</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
+  <style>
+        /* Bricolage Grotesque */
+        @font-face {
+            font-family: 'Bricolage Grotesque';
+            src: url('/fonts/BricolageGrotesque_24pt-Regular.ttf') format('truetype');
+            font-weight: 400;
+            font-style: normal;
+        }
+        @font-face {
+            font-family: 'Bricolage Grotesque';
+            src: url('/fonts/BricolageGrotesque_24pt-Medium.ttf') format('truetype');
+            font-weight: 500;
+            font-style: normal;
+        }
+        @font-face {
+            font-family: 'Bricolage Grotesque';
+            src: url('/fonts/BricolageGrotesque_24pt-SemiBold.ttf') format('truetype');
+            font-weight: 600;
+            font-style: normal;
+        }
+        @font-face {
+            font-family: 'Bricolage Grotesque';
+            src: url('/fonts/BricolageGrotesque_24pt-Bold.ttf') format('truetype');
+            font-weight: 700;
+            font-style: normal;
+        }
+
+        /* Inter */
+        @font-face {
+            font-family: 'Inter';
+            src: url('/fonts/Inter-Regular.ttf') format('truetype');
+            font-weight: 400;
+            font-style: normal;
+        }
+        @font-face {
+            font-family: 'Inter';
+            src: url('/fonts/Inter-Medium.ttf') format('truetype');
+            font-weight: 500;
+            font-style: normal;
+        }
+        @font-face {
+            font-family: 'Inter';
+            src: url('/fonts/Inter-Bold.ttf') format('truetype');
+            font-weight: 700;
+            font-style: normal;
+        }
+
+        :root {
+            --font-heading: 'Bricolage Grotesque', sans-serif;
+            --font-body: 'Inter', sans-serif;
+        }
+
+        body {
+            font-family: var(--font-body);
+        }
+
+        h1, h2, h3, h4, h5, h6 {
+            font-family: var(--font-heading);
+        }
+
+    @media print {
+      body {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      .page-break {
+        page-break-before: always;
+      }
+
+      .no-print {
+        display: none;
+      }
+
+      .print-page {
+        width: 210mm;
+        height: 297mm;
+        margin: 0 auto;
+        padding: 15mm;
+        box-shadow: none;
+        page-break-after: always;
+      }
+
+      .print-page:last-child {
+        page-break-after: auto;
+      }
+    }
+  </style>
+</head>
+
+<body class="bg-gray-100 print:bg-white">
+  <div class="min-h-screen flex flex-col">
+    <div class="container mx-auto p-4 md:p-8 print:p-0">
+      <div class="bg-white shadow-lg print:shadow-none print-page">
+        <header style="background-color: #312456;" class="text-white p-6 print:p-4">
+          <div class="flex justify-between items-center">
+            <div class="flex items-center">
+              <img alt="Lince Logo" class="h-10 mr-3 print:h-8" src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik01MCAwQzIyLjM4NTggMCAwIDIyLjM4NTggMCA1MEMwIDc3LjYxNDIgMjIuMzg1OCAxMDAgNTAgMTAwQzc3LjYxNDIgMTAwIDEwMCA3Ny42MTQyIDEwMCA1MEMxMDAgMjIuMzg1OCA3Ny42MTQyIDAgNTAgMFpNNTAgMTBDNzIuMDkxNCAxMCA5MCAyNy45MDg2IDkwIDUwQzkwIDcyLjA5MTQgNzIuMDkxNCA5MCA1MCA5MEMyNy45MDg2IDkwIDEwIDcyLjA5MTQgMTAgNTBDMTAgMjcuOTA4NiAyNy45MDg2IDEwIDUwIDEwWk01MCAyMEMzMy40MzE1IDIwIDIwIDMzLjQzMTUgMjAgNTBDMjAgNjYuNTY4NSAzMy40MzE1IDgwIDUwIDgwQzY2LjU2ODUgODAgODAgNjYuNTY4NSA4MCA1MEM4MCAzMy40MzE1IDY2LjU2ODUgMjAgNTAgMjBaTTUwIDMwQ0Q0LjQ3NzIgMzAgNDAgMzQuNDc3MiA0MCA0MEM0MCA0NS41MjI4IDQ0LjQ3NzIgNTAgNTAgNTVDNTUuNTIyOCA1MCA2MCA0NS41MjI4IDYwIDQwQzYwIDM0LjQ3NzIgNTUuNTIyOCAzMCA1MCAzMFpNNTAgNjBDNDQuNDc3MiA2MCA0MCA2NC40NzcyIDQwIDcwQzQwIDc1LjUyMjggNDQuNDc3MiA4MCA1MCA4MEM1NS41MjI4IDgwIDYwIDc1LjUyMjggNjAgNzBDNjAgNjQuNDc3MiA1NS41MjI4IDYwIDUwIDYwWiIgZmlsbD0iIzRBOTBFMiIvPgo8L3N2Zz4=" />
+              <div>
+                <h1 class="text-xl font-semibold print:text-lg">Lince</h1>
+                <p class="text-sm print:text-xs">Em algum lugar Bacana - 777, Último Andar</p>
+                <p class="text-sm print:text-xs">Edifício HeavenTouch, Magic Island/BR</p>
+              </div>
+            </div>
+            <div class="text-right">
+              <h2 class="text-xl font-semibold print:text-lg">Inspeção de Something <span
+                  class="material-icons align-middle text-3xl print:text-2xl">home_work</span></h2>
+              <p class="text-sm print:text-xs font-bold">REL01-INSP20250610.TP001</p>
+              <p class="text-xs print:text-[10px]"><strong>Realizado em:</strong> 16 de dezembro 2025</p>
+            </div>
+          </div>
+        </header>
+        <main class="p-6 flex-grow print:p-4">
+          <section class="mb-8 print:mb-6">
+            <div class="flex flex-col md:flex-row gap-x-8">
+              <div class="flex-grow md:w-2/3">
+                <h2 class="text-3xl font-semibold text-slate-700 mb-4 print:text-2xl print:mb-3">Sobre a Inspeção</h2>
+                <div class="border-t border-slate-300 pt-4 print:pt-3">
+                  <div
+                    class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 print:grid-cols-2 print:gap-x-6 print:gap-y-3">
+                    <div>
+                      <p class="text-sm text-slate-500 print:text-xs">Título</p>
+                      <p class="text-slate-700 font-medium print:text-sm">Unidade 1302 - Órion Business &amp; Health
+                        Complex</p>
+                    </div>
+                    <div>
+                      <p class="text-sm text-slate-500 print:text-xs">Tipo da Unidade</p>
+                      <p class="text-slate-700 font-medium print:text-sm">Apartamento</p>
+                    </div>
+                    <div class="md:col-span-2 print:col-span-2 border-t border-slate-200 pt-4 print:pt-3">
+                      <p class="text-sm text-slate-500 print:text-xs">Lincer</p>
+                      <p class="text-slate-700 font-medium print:text-sm">Waldemar Pereira Borges Júnior</p>
+                    </div>
+                    <div class="md:col-span-2 print:col-span-2 border-t border-slate-200 pt-4 print:pt-3">
+                      <p class="text-sm text-slate-500 print:text-xs">Endereço</p>
+                      <p class="text-slate-700 font-medium print:text-sm">Rua T 51, 3, St. Marista - Setor Bueno - Goiânia / GO,
+                      74215-210</p>
+                    </div>
+                  </div>
+                  <div class="mt-4 pt-4 border-t border-slate-200">
+                  </div>
+                </div>
+              </div>
+              <div class="md:w-1/3 mt-6 md:mt-0 print:mt-4 relative">
+                <img alt="Mapa da localização da unidade"
+                  class="w-full h-auto max-h-80 object-cover rounded-lg shadow-md print:shadow-sm"
+                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuD45kjnH_3sds8L7zV6JL-R0TNPs67u9XyqjFleES5KFXwjbckKljxSZZ6f8ZwgLKMhA90LwcOqNyfwCc3BMhU-GEgWGIgsrzb_yCbNT42rv5lZHFnxI6OfRcydu02WbfojHuW9DSABWMf_VMzeXPFlRdzsBaOprR8Uig6vX3u2X_hxR0V8xWzqsFTh1P7hamdGvIxCgQPhQuhmBXAWJACLOXjhsSMkoLFX2jT6YDFamklhlqpKBhw7x6TN1DnF4PfUwD435mdKQg" />
+                <div class="absolute inset-0 flex items-center justify-center">
+                  <div class="bg-white p-2 rounded-md shadow-lg text-center">
+                    <span class="material-icons text-red-500 text-4xl">place</span>
+                    <p class="text-xs text-slate-700 font-medium">Unidade 1302 - Órion Business & Health Complex</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+          <section class="mb-8 print:mb-6">
+            <h2
+              class="text-2xl font-semibold text-slate-700 mb-4 border-b border-slate-300 pb-2 print:text-xl print:mb-3 print:pb-1">
+              Detalhes</h2>
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-4 print:grid-cols-3 print:gap-x-6 print:gap-y-3">
+              <div>
+                <p class="text-sm text-slate-500 print:text-xs">Área</p>
+                <p class="text-slate-700 font-medium print:text-sm">40.0 m²</p>
+              </div>
+              <div>
+                <p class="text-sm text-slate-500 print:text-xs">Nº de Tópicos</p>
+                <p class="text-slate-700 font-medium print:text-sm">15</p>
+              </div>
+              <div>
+                <p class="text-sm text-slate-500 print:text-xs">Nº de Itens</p>
+                <p class="text-slate-700 font-medium print:text-sm">45</p>
+              </div>
+              <div>
+                <p class="text-sm text-slate-500 print:text-xs">Nº de Detalhes</p>
+                <p class="text-slate-700 font-medium print:text-sm">120</p>
+              </div>
+              <div>
+                <p class="text-sm text-slate-500 print:text-xs">Versão do Documento</p>
+                <p class="text-slate-700 font-medium print:text-sm">1.0.0</p>
+              </div>
+              <div>
+                <p class="text-sm text-slate-500 print:text-xs">Não Conformidades Encontradas</p>
+                <p class="text-slate-700 font-medium print:text-sm">5</p>
+              </div>
+            </div>
+          </section>
+          <section class="mb-8 print:mb-6">
+            <h2
+              class="text-2xl font-semibold text-slate-700 mb-4 border-b border-slate-300 pb-2 print:text-xl print:mb-3 print:pb-1">
+              Observações Gerais</h2>
+            <p class="text-slate-600 print:text-sm">Nenhuma observação adicional registrada para esta unidade.</p>
+          </section>
+          <section class="mb-8 print:mb-6">
+            <h2
+              class="text-2xl font-semibold text-slate-700 mb-4 border-b border-slate-300 pb-2 print:text-xl print:mb-3 print:pb-1">
+              Fotos da Unidade</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 print:grid-cols-3">
+              <div class="aspect-w-1 aspect-h-1">
+                <img alt="Foto da unidade 1" class="object-cover rounded-lg shadow-md print:shadow-sm w-full h-full"
+                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuBecnGkkMQJeCpAcsvtsazYCrGIGOZFZCjsJhy2z1qxU_2Z0_IcClRKyrHIVJk-6gC-BuEbhfva-9z6BkdVW--3rXSuOz5FKI8-01Z213pQfG2rlxnUcvlOXfU0hpc6v1KHf_N9JFfW-P7kVY4l2YwElYo7i6ns9wTU-7hDYNTx1HVC03gXP7z8hJl6efBM_wxdJ29LOQkJlk1mqWO4Hv6R2dz2xC8TR4sPKb3E2AQb58VKHgEsnHbJqj1cFIMGA-0SxCLcodo03A" />
+              </div>
+              <div class="aspect-w-1 aspect-h-1">
+                <img alt="Foto da unidade 2" class="object-cover rounded-lg shadow-md print:shadow-sm w-full h-full"
+                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuAhZqUJXtXyxloaiNmcNDT8u-MX4Xk6RIinCwlpc-EN8FXeCihd6JdV2AW-q-THsnKISmbAkZaY_N4Gfqxwk_KR09qwYPgyl4b_qwS9r8m1gQ6BjGL9yI9NiaDgbEACylIX8eH0nhRIgpownvm9X0iLktKSXWSe8mZ1PK1tYz2nuP-0CLBx2ZY1n7yigOHmvsPi-N_9Idem-2h5JJbzwzLux4P2EAWiJpY2lRMqZC-A7SDJf1puHuz8BecIFpeXZ_oM54q55ihNPQ" />
+              </div>
+              <div class="aspect-w-1 aspect-h-1">
+                <img alt="Foto da unidade 3" class="object-cover rounded-lg shadow-md print:shadow-sm w-full h-full"
+                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuA9Wbww7F4wjQyIcj0nQ2buPmX2ZbRsdH7sWJfA6RXURPegm8BOwVKOSsyVOpz0ITwaabD8RZnmLo1nl-K-YV4NfE3rcdmql1o_OGRV9-V0jgx-EcMKNP5rf26KBkBR0DKYUtIRaiTNGzUCgosTfB2dfYuJwF3AlMTkYG4VD66pQT9aMT5QzlLdp3IoSRTTghQadLGJPBkiiNqbJE9UZGYBSDu_dekIZ6W5S4m6k6R0iGuJ32DLnEnSxeSlKWWgxJGbxc2JwDeFyg" />
+              </div>
+            </div>
+          </section>
+        </main>
+        <footer style="background-color: #312456;" class="text-white text-xs p-4 print:p-2 mt-auto">
+          <div class="container mx-auto flex justify-between items-center">
+            <div class="flex items-center">
+              <span class="material-icons text-lg mr-2 print:text-base">home_work</span>
+              <span>Inspeção de Something: Unidade 1302 - Órion Business &amp; Health Complex -
+                REL01-INSP20250610.TP001</span>
+            </div>
+            <span>Página 1 de 1</span>
+          </div>
+        </footer>
+      </div>
+    </div>
+  </div>
+
+</body>
+
+</html>

@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo } from "react";
+import { ChevronUp, ChevronDown } from "lucide-react";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { 
@@ -44,6 +45,14 @@ export default function MediaManagementTab({
   onUpdateInspection
 }) {
   const { toast } = useToast();
+  const [collapsedSections, setCollapsedSections] = useState({});
+
+  const toggleSection = (sectionId) => {
+    setCollapsedSections(prev => ({
+      ...prev,
+      [sectionId]: !prev[sectionId]
+    }));
+  };
   
   // Estados
   const [activeTopicIndex, setActiveTopicIndex] = useState(0);
@@ -538,15 +547,20 @@ export default function MediaManagementTab({
                         <span className="text-sm font-medium truncate">
                           {topic.name || `Tópico ${topicIndex + 1}`}
                         </span>
-                        <Badge variant="secondary" className="text-xs">
-                          {topic.media?.length || 0}
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                            <Badge variant="secondary" className="text-xs">
+                              {topic.media?.length || 0}
+                            </Badge>
+                            <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); toggleSection(`topic-${topicIndex}`); }}>
+                                {collapsedSections[`topic-${topicIndex}`] ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+                            </Button>
+                        </div>
                       </div>
                       
                       {/* Grid de mídia do tópico */}
-                      {topic.media?.length > 0 && (
+                      {!collapsedSections[`topic-${topicIndex}`] && topic.media?.length > 0 && (
                         <div className="grid grid-cols-3 gap-1" onClick={(e) => e.stopPropagation()}>
-                          {topic.media.slice(0, 3).map((media, mediaIndex) => (
+                          {topic.media.map((media, mediaIndex) => (
                             <DraggableMediaItem
                               key={mediaIndex}
                               media={media}
@@ -604,15 +618,20 @@ export default function MediaManagementTab({
                           <span className="text-sm font-medium truncate">
                             {item.name || `Item ${itemIndex + 1}`}
                           </span>
-                          <Badge variant="secondary" className="text-xs">
-                            {item.media?.length || 0}
-                          </Badge>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="secondary" className="text-xs">
+                              {item.media?.length || 0}
+                            </Badge>
+                            <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); toggleSection(`item-${activeTopicIndex}-${itemIndex}`); }}>
+                                {collapsedSections[`item-${activeTopicIndex}-${itemIndex}`] ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+                            </Button>
+                          </div>
                         </div>
                         
                         {/* Grid de mídia do item */}
-                        {item.media?.length > 0 && (
+                        {!collapsedSections[`item-${activeTopicIndex}-${itemIndex}`] && item.media?.length > 0 && (
                           <div className="grid grid-cols-3 gap-1" onClick={(e) => e.stopPropagation()}>
-                            {item.media.slice(0, 3).map((media, mediaIndex) => (
+                            {item.media.map((media, mediaIndex) => (
                               <DraggableMediaItem
                                 key={mediaIndex}
                                 media={media}
@@ -676,6 +695,9 @@ export default function MediaManagementTab({
                       <div className="border rounded-lg p-4 space-y-4">
                         <div className="flex justify-between items-center">
                           <h4 className="font-medium">{detail.name}</h4>
+                          <Button variant="ghost" size="sm" onClick={() => toggleSection(`${activeTopicIndex}-${activeItemIndex}-${detailIndex}`)}>
+                            {collapsedSections[`${activeTopicIndex}-${activeItemIndex}-${detailIndex}`] ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+                          </Button>
                           <div className="flex items-center gap-2">
                             {detail.is_damaged && (
                               <Badge variant="destructive" className="text-xs">
@@ -692,65 +714,69 @@ export default function MediaManagementTab({
                           </div>
                         </div>
 
-                        {/* Mídia do detalhe */}
-                        {detail.media?.length > 0 && (
-                          <div>
-                            <h5 className="text-sm font-medium mb-2">
-                              Mídia ({detail.media.length})
-                            </h5>
-                            <div className="grid grid-cols-4 gap-2">
-                              {detail.media.map((media, mediaIndex) => (
-                                <DraggableMediaItem
-                                  key={mediaIndex}
-                                  media={media}
-                                  context={{
-                                    topicIndex: activeTopicIndex,
-                                    itemIndex: activeItemIndex,
-                                    detailIndex,
-                                    mediaIndex,
-                                    isNC: false,
-                                    ncIndex: null
-                                  }}
-                                  onView={handleViewMedia}
-                                  onMove={handleMoveMedia}
-                                  onRemove={handleRemoveMedia}
-                                  onWatermark={handleWatermark}
-                                />
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Não conformidades */}
-                        {detail.non_conformities?.map((nc, ncIndex) => (
-                          nc.media?.length > 0 && (
-                            <div key={ncIndex}>
-                              <h5 className="text-sm font-medium mb-2">
-                                Não Conformidade {ncIndex + 1} - Mídia ({nc.media.length})
-                              </h5>
-                              <div className="grid grid-cols-4 gap-2">
-                                {nc.media.map((media, mediaIndex) => (
-                                  <DraggableMediaItem
-                                    key={mediaIndex}
-                                    media={media}
-                                    context={{
-                                      topicIndex: activeTopicIndex,
-                                      itemIndex: activeItemIndex,
-                                      detailIndex,
-                                      mediaIndex,
-                                      isNC: true,
-                                      ncIndex
-                                    }}
-                                    onView={handleViewMedia}
-                                    onMove={handleMoveMedia}
-                                    onRemove={handleRemoveMedia}
-                                    onWatermark={handleWatermark}
-                                  />
-                                ))}
+                        {!collapsedSections[`${activeTopicIndex}-${activeItemIndex}-${detailIndex}`] && (
+                          <>
+                            {/* Mídia do detalhe */}
+                            {detail.media?.length > 0 && (
+                              <div>
+                                <h5 className="text-sm font-medium mb-2">
+                                  Mídia ({detail.media.length})
+                                </h5>
+                                <div className="grid grid-cols-4 gap-2">
+                                  {detail.media.map((media, mediaIndex) => (
+                                    <DraggableMediaItem
+                                      key={mediaIndex}
+                                      media={media}
+                                      context={{
+                                        topicIndex: activeTopicIndex,
+                                        itemIndex: activeItemIndex,
+                                        detailIndex,
+                                        mediaIndex,
+                                        isNC: false,
+                                        ncIndex: null
+                                      }}
+                                      onView={handleViewMedia}
+                                      onMove={handleMoveMedia}
+                                      onRemove={handleRemoveMedia}
+                                      onWatermark={handleWatermark}
+                                    />
+                                  ))}
+                                </div>
                               </div>
-                            </div>
-                          )
-                        ))}
+                            )}
+
+                            {/* Não conformidades */}
+                            {detail.non_conformities?.map((nc, ncIndex) => (
+                              nc.media?.length > 0 && (
+                                <div key={ncIndex}>
+                                  <h5 className="text-sm font-medium mb-2">
+                                    Não Conformidade {ncIndex + 1} - Mídia ({nc.media.length})
+                                  </h5>
+                                  <div className="grid grid-cols-4 gap-2">
+                                    {nc.media.map((media, mediaIndex) => (
+                                      <DraggableMediaItem
+                                        key={mediaIndex}
+                                        media={media}
+                                        context={{
+                                          topicIndex: activeTopicIndex,
+                                          itemIndex: activeItemIndex,
+                                          detailIndex,
+                                          mediaIndex,
+                                          isNC: true,
+                                          ncIndex
+                                        }}
+                                        onView={handleViewMedia}
+                                        onMove={handleMoveMedia}
+                                        onRemove={handleRemoveMedia}
+                                        onWatermark={handleWatermark}
+                                      />
+                                    ))}
+                                  </div>
+                                </div>
+                              )
+                            ))}
+                          </>
+                        )}
                       </div>
                     </UniversalDropZone>
                   ))}

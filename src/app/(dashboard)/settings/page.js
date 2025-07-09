@@ -33,7 +33,7 @@ const defaultSettings = {
   notifications: {
     email: true,
     push: true,
-    chat: true,
+    
     orders: true,
     inspections: true,
   },
@@ -298,16 +298,7 @@ export default function SettingsPage() {
                 />
               </div>
 
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <MessageSquare className="h-4 w-4" />
-                  <Label>Mensagens de Chat</Label>
-                </div>
-                <Switch
-                  checked={settings.notifications.chat}
-                  onCheckedChange={() => handleNotificationChange("chat")}
-                />
-              </div>
+              
 
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">

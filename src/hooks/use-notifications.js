@@ -11,23 +11,7 @@ export function registerForNotifications() {
   }
 }
 
-export function showChatNotification(message, chatDetails, onClick) {
-  if ('Notification' in window && Notification.permission === 'granted') {
-    const senderName = chatDetails?.inspector?.name || 'Inspector';
-    const title = `New message from ${senderName}`;
-    
-    const options = {
-      body: message.type === 'text' ? message.content : `Sent a ${message.type}`,
-      icon: chatDetails?.inspector?.profileImageUrl || '/favicon.ico',
-    };
-    
-    const notification = new Notification(title, options);
-    
-    if (onClick) {
-      notification.onclick = onClick;
-    }
-  }
-}
+
 
 // Keep the hook as well
 export function useNotifications() {

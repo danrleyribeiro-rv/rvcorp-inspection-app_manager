@@ -29,6 +29,7 @@ import { useToast } from "@/hooks/use-toast";
 import ReportFilters from "./components/ReportFilters";
 import InspectionReportCard from "./components/InspectionReportCard";
 import ReportViewer from "./components/ReportViewer";
+import { generateInspectionPDF } from "@/services/pdf-service";
 
 export default function ReportsPage() {
   const [inspections, setInspections] = useState([]);
@@ -138,33 +139,7 @@ export default function ReportsPage() {
     }
   };
 
-    const handleGeneratePreview = async (inspection, release = null) => {
-    try {
-        const reportData = release ? release.inspection_snapshot : inspection;
-        const releaseIndex = release ? inspection.releases.indexOf(release) : 0;
-        
-        toast({
-        title: release 
-            ? `Gerando PDF: RLT${(releaseIndex + 1).toString().padStart(2, '0')}-${inspection.cod}` 
-            : "Gerando Preview do PDF",
-        description: release?.release_notes || "Preparando relatório..."
-        });
-
-        await generateInspectionPDF(reportData, {
-        isPreview: !release,
-        releaseInfo: release,
-        inspectionCode: inspection.cod,
-        releaseIndex
-        });
-
-    } catch (error) {
-        toast({
-        title: "Erro ao gerar PDF",
-        description: error.message,
-        variant: "destructive"
-        });
-    }
-    };
+    
 
   const calculateCompletion = (inspection) => {
     if (!inspection.topics || inspection.topics.length === 0) return 0;
@@ -356,7 +331,7 @@ export default function ReportsPage() {
                 setSelectedInspection(inspection);
                 setShowViewer(true);
               }}
-              onGeneratePreview={handleGeneratePreview}
+              
             />
           ))
         )}
@@ -371,6 +346,7 @@ export default function ReportsPage() {
             setShowViewer(false);
             setSelectedInspection(null);
           }}
+          generateInspectionPDF={generateInspectionPDF}
         />
       )}
     </div>

@@ -38,7 +38,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import GoToChatButton from "@/components/ToChatButton";
+
 import DeliveryStatus from "@/components/inspection/DeliveryStatus";
 import { Lock, GitCommit, Package } from "lucide-react";
 
@@ -960,7 +960,7 @@ export default function InspectionDetailsDialog({
               <Pencil className="h-4 w-4" />
               Editar Inspeção
             </Button>
-            <GoToChatButton inspection={inspection} inspector={inspectorDetails} />
+            
           </div>
           <Button onClick={onClose}>Fechar</Button>
         </div>

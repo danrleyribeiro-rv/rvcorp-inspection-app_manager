@@ -1,4 +1,6 @@
 // src/services/pdf-service.js
+import { generateReportHtml } from "@/lib/generateReport";
+
 export const generateInspectionPDF = async (inspectionData, options = {}) => {
   const {
     isPreview = false,
@@ -14,20 +16,21 @@ export const generateInspectionPDF = async (inspectionData, options = {}) => {
       : `PREVIEW-${inspectionCode || 'TEMP'}`;
 
     // Gerando PDF com código: ${reportCode}
+    const htmlContent = generateReportHtml(inspectionData);
 
-    // Simular processo
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({
-          success: true,
-          filename: `${reportCode}.pdf`,
-          url: `#preview-${reportCode}`
-        });
-      }, 2000);
-    });
+    // For now, we return the HTML content directly or simulate a download.
+    // console.log("Generated HTML Content:", htmlContent);
+    // console.log("Generated URL:", URL.createObjectURL(new Blob([htmlContent], { type: 'text/html' })));
+    return {
+      success: true,
+      filename: `${reportCode}.html`,
+      content: htmlContent, // Return the HTML content
+      url: URL.createObjectURL(new Blob([htmlContent], { type: 'text/html' })) // Create a blob URL for preview/download
+    };
 
   } catch (error) {
-    throw new Error('Falha ao gerar o relatório PDF');
+    console.error("Error generating PDF:", error);
+    throw new Error(`Falha ao gerar o relatório PDF: ${error.message || error}`);
   }
 };
 

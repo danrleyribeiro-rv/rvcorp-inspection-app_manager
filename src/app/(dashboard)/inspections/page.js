@@ -24,6 +24,7 @@ import { useToast } from "@/hooks/use-toast";
 import InspectionListItem from "./components/InspectionListItem";
 import DeleteInspectionDialog from "./components/DeleteInspectionDialog";
 import FilterPanel from "./components/FilterPanel";
+import { generateInspectionPDF, downloadPDF, openPDFInNewTab } from "@/services/pdf-service"; // Import PDF functions
 
 const INSPECTIONS_PER_PAGE = 10;
 
@@ -248,6 +249,33 @@ export default function InspectionsPage() {
     router.push(`/inspections/${inspection.id}/editor`);
   };
 
+  const handlePreviewPDF = async (inspection) => {
+    toast({
+      title: "Gerando Preview do PDF",
+      description: "Por favor, aguarde...",
+    });
+    try {
+      const result = await generateInspectionPDF(inspection, { isPreview: true, inspectionCode: inspection.cod });
+      if (result.success) {
+        console.log("Generated PDF URL:", result.url); // Add this line
+        openPDFInNewTab(result.url);
+        toast({
+          title: "Preview gerado com sucesso!",
+          description: "O preview do PDF foi aberto em uma nova aba.",
+        });
+      } else {
+        throw new Error("Falha ao gerar o PDF.");
+      }
+    } catch (error) {
+      console.error("Error in handlePreviewPDF:", error);
+      toast({
+        title: "Erro ao gerar Preview do PDF",
+        description: error.message || "Ocorreu um erro inesperado.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const filterInspections = () => {
     const lowerCaseSearch = search.toLowerCase();
     const filtered = inspections.filter(inspection => {
@@ -344,6 +372,7 @@ export default function InspectionsPage() {
                     onEditData={() => handleEditData(inspection)}
                     onEditInspection={() => handleEditInspection(inspection)}
                     onDelete={() => setDeletingInspection(inspection)}
+                    onPreviewPDF={handlePreviewPDF} // Pass the new handler
                   />
                 </div>
               );
