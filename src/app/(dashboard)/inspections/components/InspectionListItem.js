@@ -77,16 +77,27 @@ import { Eye } from "lucide-react"; // Add Eye icon import
 export default function InspectionListItem({ inspection, onEdit, onDelete, onEditData, onEditInspection, onPreviewPDF }) {
   const [expanded, setExpanded] = useState(false);
 
-  // Count non-conformities
+  // Count non-conformities (topics and details)
   const getNonConformitiesCount = () => {
     if (!inspection.topics) return 0;
     
     let count = 0;
     inspection.topics.forEach(topic => {
+      // Count topic-level non-conformities
+      if (topic.non_conformities && topic.non_conformities.length > 0) {
+        count += topic.non_conformities.length;
+      }
+      
       if (topic.items) {
         topic.items.forEach(item => {
+          // Count item-level non-conformities
+          if (item.non_conformities && item.non_conformities.length > 0) {
+            count += item.non_conformities.length;
+          }
+          
           if (item.details) {
             item.details.forEach(detail => {
+              // Count detail-level non-conformities
               if (detail.non_conformities && detail.non_conformities.length > 0) {
                 count += detail.non_conformities.length;
               }
@@ -195,9 +206,6 @@ export default function InspectionListItem({ inspection, onEdit, onDelete, onEdi
         </div>
         
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" className="text-gray-700 hover:bg-gray-100" onClick={(e) => { e.stopPropagation(); onPreviewPDF(inspection); }}>
-            <Eye className="h-5 w-5" />
-          </Button>
           <Badge variant={getStatusColor(inspection.status)}>
             {getStatusText(inspection.status)}
           </Badge>

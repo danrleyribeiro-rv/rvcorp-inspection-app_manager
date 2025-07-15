@@ -23,6 +23,14 @@ import {
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Download,
   FileText,
   AlertTriangle,
@@ -31,10 +39,11 @@ import {
   Calendar,
   MapPin,
   User,
-  Package
+  Package,
+  ChevronDown
 } from "lucide-react";
 
-export default function ReportViewer({ inspection, open, onClose }) {
+export default function ReportViewer({ inspection, open, onClose, onGeneratePreview, onGenerateNCPDF, onGenerateHTMLReport, onViewHTMLReport }) {
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
     try {
@@ -91,12 +100,13 @@ export default function ReportViewer({ inspection, open, onClose }) {
 
   const getSeverityColor = (severity) => {
     const colors = {
-      'Baixa': 'bg-green-100 text-green-800',
-      'Média': 'bg-yellow-100 text-yellow-800', 
-      'Alta': 'bg-red-100 text-red-800',
-      'Crítica': 'bg-red-600 text-white'
+      'baixa': 'bg-yellow-100 text-yellow-800 border-yellow-200',
+      'média': 'bg-orange-100 text-orange-800 border-orange-200',
+      'alta': 'bg-red-100 text-red-800 border-red-200',
+      'crítica': 'bg-purple-100 text-purple-800 border-purple-200',
+      'resolved': 'bg-green-100 text-green-800 border-green-200'
     };
-    return colors[severity] || 'bg-gray-100 text-gray-800';
+    return colors[severity?.toLowerCase()] || 'bg-gray-100 text-gray-800 border-gray-200';
   };
 
   const nonConformities = getNonConformities();
@@ -115,52 +125,70 @@ export default function ReportViewer({ inspection, open, onClose }) {
             )}
             </div>
             <div className="flex items-center gap-2">
-            {/* Dropdown para escolher release ou preview */}
-            <Select onValueChange={(value) => {
-            if (value === 'preview') {
-                onGeneratePreview(inspection);
-            } else {
-                const release = inspection.releases.find(r => r.id === value);
-                onGeneratePreview(inspection, release);
-            }
-            }}>
-            <SelectTrigger className="w-48">
-                <SelectValue placeholder="Gerar PDF" />
-            </SelectTrigger>
-            <SelectContent>
-                <SelectItem value="preview">
-                <div className="flex items-center gap-2">
-                    <Download className="h-3 w-3" />
-                    Preview Atual
-                </div>
-                </SelectItem>
-                {inspection.releases?.map((release, index) => (
-                <SelectItem key={release.id} value={release.id}>
-                    <div className="flex flex-col items-start">
-                    <div className="flex items-center gap-2">
-                        <Package className="h-3 w-3" />
-                        <span className="font-mono text-xs">
-                        RLT{(index + 1).toString().padStart(2, '0')}-{inspection.cod}
-                        </span>
-                        {release.is_delivered && (
-                        <Badge variant="default" className="text-xs ml-1">
-                            Entregue
-                        </Badge>
-                        )}
-                    </div>
-                    {release.release_notes && (
-                        <span className="text-xs text-muted-foreground truncate max-w-40">
-                        {release.release_notes}
-                        </span>
-                    )}
-                    </div>
-                </SelectItem>
-                ))}
-            </SelectContent>
-            </Select>
-            <Button variant="ghost" size="icon" onClick={onClose}>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="primary">
+                    <Download className="mr-2 h-4 w-4" />
+                    Gerar Relatório
+                    <ChevronDown className="ml-2 h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>Relatório Completo (PDF)</DropdownMenuLabel>
+                  <DropdownMenuItem onClick={() => onGeneratePreview(inspection, null)}>
+                    <FileText className="mr-2 h-4 w-4" />
+                    <span>Preview PDF Completo</span>
+                  </DropdownMenuItem>
+                  {inspection.releases?.map((release, index) => (
+                    <DropdownMenuItem key={release.id} onClick={() => onGeneratePreview(inspection, release)}>
+                      <Package className="mr-2 h-4 w-4" />
+                      <span>PDF Release V{release.version}</span>
+                    </DropdownMenuItem>
+                  ))}
+                  
+                  <DropdownMenuSeparator />
+                  
+                  <DropdownMenuLabel>Relatório de Não Conformidades (PDF)</DropdownMenuLabel>
+                  <DropdownMenuItem onClick={() => onGenerateNCPDF(inspection, null)}>
+                    <AlertTriangle className="mr-2 h-4 w-4" />
+                    <span>Preview PDF de NCs</span>
+                  </DropdownMenuItem>
+                   {inspection.releases?.map((release, index) => (
+                    <DropdownMenuItem key={release.id} onClick={() => onGenerateNCPDF(inspection, release)}>
+                      <Package className="mr-2 h-4 w-4" />
+                      <span>PDF NCs do Release V{release.version}</span>
+                    </DropdownMenuItem>
+                  ))}
+                  
+                  {onGenerateHTMLReport && onViewHTMLReport && (
+                    <>
+                      <DropdownMenuSeparator />
+                      
+                      <DropdownMenuLabel>Relatório HTML</DropdownMenuLabel>
+                      <DropdownMenuItem onClick={() => onViewHTMLReport(inspection, 'complete')}>
+                        <FileText className="mr-2 h-4 w-4" />
+                        <span>Visualizar HTML Completo</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => onGenerateHTMLReport(inspection, 'complete')}>
+                        <Download className="mr-2 h-4 w-4" />
+                        <span>Baixar HTML Completo</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => onViewHTMLReport(inspection, 'nonconformities')}>
+                        <AlertTriangle className="mr-2 h-4 w-4" />
+                        <span>Visualizar HTML de NCs</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => onGenerateHTMLReport(inspection, 'nonconformities')}>
+                        <Download className="mr-2 h-4 w-4" />
+                        <span>Baixar HTML de NCs</span>
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <Button variant="ghost" size="icon" onClick={onClose}>
                 <X className="h-4 w-4" />
-            </Button>
+              </Button>
             </div>
         </div>
         </DialogHeader>

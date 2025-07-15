@@ -18,7 +18,7 @@ import { Tabs, TabsContent} from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Settings, ListChecks, Search, Filter } from "lucide-react";
+import { Settings, ListChecks, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { addWatermarkToImage, detectImageSource } from "@/utils/ImageWatermark";
@@ -38,6 +38,7 @@ import DetailEditor from "@/components/inspection/DetailEditor";
 import MediaMoveDialog from "@/components/inspection/MediaMoveDialog";
 import InspectionControlPanel from "@/components/inspection/InspectionControlPanel";
 import MediaManagementTab from "@/components/inspection/MediaManagementTab";
+import NonConformityEditor from "@/components/inspection/NonConformityEditor";
 import { UniversalDropZone, DRAG_TYPES } from "@/components/inspection/EnhancedDragDropProvider";
 import UniversalMediaSection from "@/components/inspection/UniversalMediaSection";
 import { DraggableTopic, DraggableItem } from "@/components/inspection/DraggableStructureItem";
@@ -207,7 +208,7 @@ export default function InspectionEditorPage({ params }) {
       const mediaObject = {
         id: `${mediaType}_${timestamp}`,
         type: mediaType,
-        url: url,
+        cloudUrl: url,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
@@ -920,17 +921,21 @@ const handleMoveMediaDrop = (item, destination) => {
     }
   };
 
-  const addNonConformity = (topicIndex, itemIndex, detailIndex) => {
+  const addNonConformity = (topicIndex, itemIndex = null, detailIndex = null) => {
     const newNC = {
       id: `nc_${Date.now()}`,
+      title: "",
       description: "",
-      severity: "Baixa",
-      status: "pendente",
+      severity: "média",
+      status: "open",
       corrective_action: "",
       deadline: null,
       media: [],
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      solved_media: [],
+      is_resolved: false,
+      resolved_at: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     };
 
     setInspection(prev => ({
@@ -939,10 +944,18 @@ const handleMoveMediaDrop = (item, destination) => {
         tIndex === topicIndex
           ? {
               ...topic,
+              // Topic level non-conformity
+              ...(itemIndex === null && detailIndex === null && {
+                non_conformities: [...(topic.non_conformities || []), newNC]
+              }),
               items: topic.items.map((item, iIndex) =>
                 iIndex === itemIndex
                   ? {
                       ...item,
+                      // Item level non-conformity
+                      ...(detailIndex === null && {
+                        non_conformities: [...(item.non_conformities || []), newNC]
+                      }),
                       details: item.details.map((detail, dIndex) =>
                         dIndex === detailIndex
                           ? { ...detail, non_conformities: [...(detail.non_conformities || []), newNC] }
@@ -957,17 +970,25 @@ const handleMoveMediaDrop = (item, destination) => {
     }));
   };
 
-  const removeNonConformity = (topicIndex, itemIndex, detailIndex, ncIndex) => {
+  const removeNonConformity = (topicIndex, itemIndex = null, detailIndex = null, ncIndex) => {
     setInspection(prev => ({
       ...prev,
       topics: prev.topics.map((topic, tIndex) =>
         tIndex === topicIndex
           ? {
               ...topic,
+              // Remove topic level non-conformity
+              ...(itemIndex === null && detailIndex === null && {
+                non_conformities: topic.non_conformities.filter((_, index) => index !== ncIndex)
+              }),
               items: topic.items.map((item, iIndex) =>
                 iIndex === itemIndex
                   ? {
                       ...item,
+                      // Remove item level non-conformity
+                      ...(detailIndex === null && {
+                        non_conformities: item.non_conformities.filter((_, index) => index !== ncIndex)
+                      }),
                       details: item.details.map((detail, dIndex) =>
                         dIndex === detailIndex
                           ? {
@@ -985,24 +1006,40 @@ const handleMoveMediaDrop = (item, destination) => {
     }));
   };
 
-  const updateNonConformity = (topicIndex, itemIndex, detailIndex, ncIndex, field, value) => {
+  const updateNonConformity = (topicIndex, itemIndex = null, detailIndex = null, ncIndex, field, value) => {
     setInspection(prev => ({
       ...prev,
       topics: prev.topics.map((topic, tIndex) =>
         tIndex === topicIndex
           ? {
               ...topic,
+              // Update topic level non-conformity
+              ...(itemIndex === null && detailIndex === null && {
+                non_conformities: topic.non_conformities.map((nc, index) =>
+                  index === ncIndex
+                    ? { ...nc, [field]: value, updatedAt: new Date().toISOString() }
+                    : nc
+                )
+              }),
               items: topic.items.map((item, iIndex) =>
                 iIndex === itemIndex
                   ? {
                       ...item,
+                      // Update item level non-conformity
+                      ...(detailIndex === null && {
+                        non_conformities: item.non_conformities.map((nc, index) =>
+                          index === ncIndex
+                            ? { ...nc, [field]: value, updatedAt: new Date().toISOString() }
+                            : nc
+                        )
+                      }),
                       details: item.details.map((detail, dIndex) =>
                         dIndex === detailIndex
                           ? {
                               ...detail,
                               non_conformities: detail.non_conformities.map((nc, index) =>
                                 index === ncIndex
-                                  ? { ...nc, [field]: value, updated_at: new Date().toISOString() }
+                                  ? { ...nc, [field]: value, updatedAt: new Date().toISOString() }
                                   : nc
                               )
                             }
@@ -1170,7 +1207,7 @@ const handleMoveMediaDrop = (item, destination) => {
         </div>
 
         {/* Content */}
-        <div className="p-4">
+        <div className="p-4 max-w-full">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
             <TabsList className="mb-4">
               <TabsTrigger value="general" className="flex items-center gap-2">
@@ -1251,7 +1288,67 @@ const handleMoveMediaDrop = (item, destination) => {
             </TabsContent>
 
             <TabsContent value="topics" className="space-y-4">
-              <div className="grid grid-cols-7 gap-1 h-[calc(100vh-200px)]">
+              {/* Search and Filter Bar */}
+              <div className="bg-card border rounded-lg p-4">
+                <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+                  <div className="flex-1">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                      <Input
+                        placeholder="Buscar em tópicos, itens, detalhes, não conformidades..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-2 items-center">
+                    <Select value={filterType} onValueChange={setFilterType}>
+                      <SelectTrigger className="w-32">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="text">Texto</SelectItem>
+                        <SelectItem value="select">Seleção</SelectItem>
+                        <SelectItem value="boolean">Sim/Não</SelectItem>
+                        <SelectItem value="measure">Medida</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      variant={showOnlyWithMedia ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setShowOnlyWithMedia(!showOnlyWithMedia)}
+                      className="whitespace-nowrap"
+                    >
+                      <Images className="h-4 w-4 mr-1" />
+                      Com Mídia
+                    </Button>
+                    <Button
+                      variant={showOnlyWithNC ? "destructive" : "outline"}
+                      size="sm"
+                      onClick={() => setShowOnlyWithNC(!showOnlyWithNC)}
+                      className="whitespace-nowrap"
+                    >
+                      <AlertTriangle className="h-4 w-4 mr-1" />
+                      Com NC
+                    </Button>
+                    {(searchTerm || filterType !== "all" || showOnlyWithMedia || showOnlyWithNC) && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={resetFilters}
+                        className="whitespace-nowrap"
+                      >
+                        <X className="h-4 w-4 mr-1" />
+                        Limpar
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-7 gap-1 h-[calc(100vh-280px)]">
                 {/* Topics Column */}
                 <div className="col-span-2 border rounded-lg">
                   <div className="p-3 border-b flex justify-between items-center">
@@ -1262,10 +1359,13 @@ const handleMoveMediaDrop = (item, destination) => {
                   </div>
                   <ScrollArea className="h-[calc(100vh-280px)]">
                     <div className="p-2 space-y-1">
-                      {inspection.topics?.map((topic, topicIndex) => (
+                      {filterTopics().map((topic, topicIndex) => {
+                        // Get the original topic index
+                        const originalTopicIndex = inspection.topics.findIndex(t => t === topic);
+                        return (
                         <UniversalDropZone
-                          key={topicIndex}
-                          topicIndex={topicIndex}
+                          key={originalTopicIndex}
+                          topicIndex={originalTopicIndex}
                           onDropMedia={handleMoveMediaDrop}
                           onDropTopic={handleMoveStructure}
                           onDropItem={handleMoveStructure}
@@ -1275,8 +1375,8 @@ const handleMoveMediaDrop = (item, destination) => {
                         >
                           <DraggableTopic
                             topic={topic}
-                            topicIndex={topicIndex}
-                            isActive={activeTopicIndex === topicIndex}
+                            topicIndex={originalTopicIndex}
+                            isActive={activeTopicIndex === originalTopicIndex}
                             onReorder={reorderTopic}
                             onDuplicate={duplicateTopic}
                             onRemove={removeTopic}
@@ -1288,13 +1388,13 @@ const handleMoveMediaDrop = (item, destination) => {
                                   : 'hover:bg-accent'
                               }`}
                               onClick={() => {
-                                setActiveTopicIndex(topicIndex);
+                                setActiveTopicIndex(originalTopicIndex);
                                 setActiveItemIndex(null);
                               }}
                             >
                               <div className="flex justify-between items-center">
                                 <span className="text-sm font-medium truncate">
-                                  {topic.name || `Tópico ${topicIndex + 1}`}
+                                  {topic.name || `Tópico ${originalTopicIndex + 1}`}
                                 </span>
                                 <Button
                                   size="sm"
@@ -1302,7 +1402,7 @@ const handleMoveMediaDrop = (item, destination) => {
                                   className="h-6 w-6 p-0"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    removeTopic(topicIndex);
+                                    removeTopic(originalTopicIndex);
                                   }}
                                 >
                                   <Trash2 className="h-3 w-3" />
@@ -1331,12 +1431,12 @@ const handleMoveMediaDrop = (item, destination) => {
                                       className="aspect-square border rounded overflow-hidden bg-gray-50 cursor-pointer hover:opacity-80"
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        openMediaViewer(mediaItem, topicIndex, null, null, mediaIndex);
+                                        openMediaViewer(mediaItem, originalTopicIndex, null, null, mediaIndex);
                                       }}
                                     >
                                       {mediaItem.type === 'image' ? (
                                         <img
-                                          src={mediaItem.url}
+                                          src={mediaItem.cloudUrl}
                                           alt="Topic Media"
                                           className="w-full h-full object-cover"
                                         />
@@ -1360,7 +1460,8 @@ const handleMoveMediaDrop = (item, destination) => {
                             </div>
                           </DraggableTopic>
                         </UniversalDropZone>
-                      ))}
+                        );
+                      })}
                     </div>
                   </ScrollArea>
                 </div>
@@ -1424,15 +1525,48 @@ const handleMoveMediaDrop = (item, destination) => {
                              title="Adicionar Mídia ao Tópico"
                            />
                          </div>
+                         
+                         {/* Topic Non-Conformities */}
+                         <div>
+                           <div className="flex items-center justify-between mb-2">
+                             <Label className="text-xs font-bold">Não Conformidades do Tópico</Label>
+                             <Button
+                               size="sm"
+                               variant="outline"
+                               onClick={() => addNonConformity(activeTopicIndex)}
+                               className="h-6 px-2 text-xs"
+                             >
+                               + NC
+                             </Button>
+                           </div>
+                           {currentTopic.non_conformities && currentTopic.non_conformities.length > 0 && (
+                             <NonConformityEditor
+                               nonConformities={currentTopic.non_conformities}
+                               topicIndex={activeTopicIndex}
+                               itemIndex={null}
+                               detailIndex={null}
+                               onRemoveNC={removeNonConformity}
+                               onUpdateNC={updateNonConformity}
+                               onUploadMedia={uploadMedia}
+                               onRemoveMedia={removeMedia}
+                               onMoveMedia={openMoveDialog}
+                               onViewMedia={openMediaViewer}
+                               onMoveMediaDrop={handleMoveMediaDrop}
+                             />
+                           )}
+                         </div>
                        </div>
                        
                        {/* Items list */}
                        <div className="space-y-1">
-                         {currentTopic.items?.map((item, itemIndex) => (
+                         {filterItems(currentTopic?.items || []).map((item, itemIndex) => {
+                           // Get the original item index
+                           const originalItemIndex = currentTopic.items.findIndex(i => i === item);
+                           return (
                            <UniversalDropZone
-                             key={itemIndex}
+                             key={originalItemIndex}
                              topicIndex={activeTopicIndex}
-                             itemIndex={itemIndex}
+                             itemIndex={originalItemIndex}
                              onDropMedia={handleMoveMediaDrop}
                              onDropTopic={handleMoveStructure}
                              onDropItem={handleMoveStructure}
@@ -1443,8 +1577,8 @@ const handleMoveMediaDrop = (item, destination) => {
                              <DraggableItem
                                item={item}
                                topicIndex={activeTopicIndex}
-                               itemIndex={itemIndex}
-                               isActive={activeItemIndex === itemIndex}
+                               itemIndex={originalItemIndex}
+                               isActive={activeItemIndex === originalItemIndex}
                                onReorder={reorderItem}
                                onDuplicate={duplicateItem}
                                onRemove={removeItem}
@@ -1456,11 +1590,11 @@ const handleMoveMediaDrop = (item, destination) => {
                                        ? 'bg-primary text-primary-foreground' 
                                        : 'hover:bg-accent'
                                    }`}
-                                   onClick={() => setActiveItemIndex(itemIndex)}
+                                   onClick={() => setActiveItemIndex(originalItemIndex)}
                                  >
                                    <div className="flex justify-between items-center">
                                      <span className="text-sm font-medium truncate">
-                                       {item.name || `Item ${itemIndex + 1}`}
+                                       {item.name || `Item ${originalItemIndex + 1}`}
                                      </span>
                                      <Button
                                        size="sm"
@@ -1468,7 +1602,7 @@ const handleMoveMediaDrop = (item, destination) => {
                                        className="h-6 w-6 p-0"
                                        onClick={(e) => {
                                          e.stopPropagation();
-                                         removeItem(activeTopicIndex, itemIndex);
+                                         removeItem(activeTopicIndex, originalItemIndex);
                                        }}
                                      >
                                        <Trash2 className="h-3 w-3" />
@@ -1497,12 +1631,12 @@ const handleMoveMediaDrop = (item, destination) => {
                                          className="aspect-square border rounded overflow-hidden bg-gray-50 cursor-pointer hover:opacity-80"
                                          onClick={(e) => {
                                            e.stopPropagation();
-                                           openMediaViewer(mediaItem, activeTopicIndex, itemIndex, null, mediaIndex);
+                                           openMediaViewer(mediaItem, activeTopicIndex, originalItemIndex, null, mediaIndex);
                                          }}
                                        >
                                          {mediaItem.type === 'image' ? (
                                            <img
-                                             src={mediaItem.url}
+                                             src={mediaItem.cloudUrl}
                                              alt="Item Media"
                                              className="w-full h-full object-cover"
                                            />
@@ -1517,14 +1651,14 @@ const handleMoveMediaDrop = (item, destination) => {
                                  )}
                                </div>
                                
-                               {/* Item Media Upload Section - show when item is selected */}
-                               {activeItemIndex === itemIndex && (
-                                 <div className="px-2">
+                               {/* Item Media Upload Section and NC - show when item is selected */}
+                               {activeItemIndex === originalItemIndex && (
+                                 <div className="px-2 space-y-3">
                                    <UniversalMediaSection
                                      media={[]}
                                      level="item"
                                      topicIndex={activeTopicIndex}
-                                     itemIndex={itemIndex}
+                                     itemIndex={originalItemIndex}
                                      onUpload={uploadMedia}
                                      onRemove={removeMedia}
                                      onMove={openMoveDialog}
@@ -1532,12 +1666,43 @@ const handleMoveMediaDrop = (item, destination) => {
                                      onMoveMediaDrop={handleMoveMediaDrop}
                                      title="Adicionar Mídia ao Item"
                                    />
+                                   
+                                   {/* Item Non-Conformities */}
+                                   <div>
+                                     <div className="flex items-center justify-between mb-2">
+                                       <Label className="text-xs font-bold">NC do Item</Label>
+                                       <Button
+                                         size="sm"
+                                         variant="outline"
+                                         onClick={() => addNonConformity(activeTopicIndex, originalItemIndex)}
+                                         className="h-6 px-2 text-xs"
+                                       >
+                                         + NC
+                                       </Button>
+                                     </div>
+                                     {item.non_conformities && item.non_conformities.length > 0 && (
+                                       <NonConformityEditor
+                                         nonConformities={item.non_conformities}
+                                         topicIndex={activeTopicIndex}
+                                         itemIndex={originalItemIndex}
+                                         detailIndex={null}
+                                         onRemoveNC={removeNonConformity}
+                                         onUpdateNC={updateNonConformity}
+                                         onUploadMedia={uploadMedia}
+                                         onRemoveMedia={removeMedia}
+                                         onMoveMedia={openMoveDialog}
+                                         onViewMedia={openMediaViewer}
+                                         onMoveMediaDrop={handleMoveMediaDrop}
+                                       />
+                                     )}
+                                   </div>
                                  </div>
                                )}
                                </div>
                              </DraggableItem>
                            </UniversalDropZone>
-                         ))}
+                           );
+                         })}
                        </div>
                      </div>
                    ) : (
@@ -1689,13 +1854,13 @@ const handleMoveMediaDrop = (item, destination) => {
                >
                  {selectedMedia.type === "image" ? (
                    <img
-                     src={selectedMedia.url}
+                     src={selectedMedia.cloudUrl}
                      alt="Media"
                      className="max-h-[70vh] object-contain"
                    />
                  ) : (
                    <video
-                     src={selectedMedia.url}
+                     src={selectedMedia.cloudUrl}
                      controls
                      className="max-h-[70vh]"
                    />

@@ -246,11 +246,11 @@ export function dataURLtoFile(dataURL, filename) {
  * Verifica se uma imagem já possui marca d'água
  */
 export function hasWatermark(media) {
-  if (!media || !media.url) return false;
+  if (!media || !media.cloudUrl) return false;
   
   return (
-    media.url.includes('watermark') || 
-    media.url.includes('watermarked') ||
+    media.cloudUrl.includes('watermark') || 
+    media.cloudUrl.includes('watermarked') ||
     media.id?.includes('watermark') ||
     media.id?.includes('watermarked')
   );

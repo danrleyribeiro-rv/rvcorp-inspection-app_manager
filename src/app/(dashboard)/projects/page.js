@@ -110,7 +110,7 @@ export default function ProjectsPage() {
 
   return (
     <ResponsiveContainer>
-      <div className="container p-6 animate-in fade-in-0 duration-300">
+      <div className="w-full p-6 animate-in fade-in-0 duration-300 max-w-none">
       <div className="flex justify-between items-center mb-6 animate-in slide-in-from-top-4 duration-500">
         <h1 className="text-3xl font-bold animate-in slide-in-from-left-4 duration-700">Projetos</h1>
         <EnhancedButton onClick={() => router.push('/projects/create')} className="flex-1 sm:flex-none">

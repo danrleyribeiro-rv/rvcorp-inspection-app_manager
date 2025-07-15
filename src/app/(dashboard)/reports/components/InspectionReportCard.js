@@ -9,6 +9,12 @@ import { Progress } from "@/components/ui/progress";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   FileText,
   Download,
   Eye,
@@ -19,7 +25,7 @@ import {
   Calendar
 } from "lucide-react";
 
-export default function InspectionReportCard({ inspection, onView, onGeneratePreview }) {
+export default function InspectionReportCard({ inspection, onView, onGeneratePreview, onGenerateNCPDF }) {
   const [expanded, setExpanded] = useState(false);
 
   const formatDate = (dateString) => {
@@ -36,10 +42,21 @@ export default function InspectionReportCard({ inspection, onView, onGeneratePre
     
     let count = 0;
     inspection.topics.forEach(topic => {
+      // Count topic-level non-conformities
+      if (topic.non_conformities) {
+        count += topic.non_conformities.length;
+      }
+      
       if (topic.items) {
         topic.items.forEach(item => {
+          // Count item-level non-conformities
+          if (item.non_conformities) {
+            count += item.non_conformities.length;
+          }
+          
           if (item.details) {
             item.details.forEach(detail => {
+              // Count detail-level non-conformities
               if (detail.non_conformities) {
                 count += detail.non_conformities.length;
               }
@@ -189,12 +206,28 @@ export default function InspectionReportCard({ inspection, onView, onGeneratePre
           <div className="flex justify-end gap-2">
             <Button variant="outline" size="sm" onClick={onView}>
               <Eye className="mr-1 h-3 w-3" />
-              Ver
+              Ver Detalhes
             </Button>
-            <Button size="sm" onClick={() => onGeneratePreview(inspection)}>
-              <Download className="mr-1 h-3 w-3" />
-              Preview PDF
-            </Button>
+            
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm">
+                  <Download className="mr-1 h-3 w-3" />
+                  Preview PDF
+                  <ChevronDown className="ml-1 h-3 w-3" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => onGeneratePreview(inspection, null)}>
+                  <FileText className="mr-2 h-4 w-4" />
+                  <span>Preview Completo</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onGenerateNCPDF(inspection, null)}>
+                  <AlertTriangle className="mr-2 h-4 w-4" />
+                  <span>Preview de NCs</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </CardContent>
       )}

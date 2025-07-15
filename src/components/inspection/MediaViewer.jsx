@@ -36,14 +36,14 @@ export function MediaViewer({ media, open, onClose, onMove }) {
           >
             {media.type === "image" ? (
               <img
-                src={media.url}
+                src={media.cloudUrl}
                 alt="Media"
                 className="max-h-[70vh] object-contain"
                 draggable="true"
               />
             ) : (
               <video
-                src={media.url}
+                src={media.cloudUrl}
                 controls
                 className="max-h-[70vh]"
               />

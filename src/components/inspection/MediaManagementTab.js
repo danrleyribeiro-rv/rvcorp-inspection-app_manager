@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useRef } from "react";
 import { ChevronUp, ChevronDown } from "lucide-react";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
@@ -10,7 +10,10 @@ import {
   Droplets,
   CheckCircle,
   Clock,
-  Loader2
+  Loader2,
+  RotateCw,
+  Crop,
+  Calculator
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -62,6 +65,11 @@ export default function MediaManagementTab({
   const [isApplyingWatermark, setIsApplyingWatermark] = useState(false);
   const [isBulkWatermark, setIsBulkWatermark] = useState(false);
   const [bulkProgress, setBulkProgress] = useState({ current: 0, total: 0 });
+  const [isCropDialogOpen, setIsCropDialogOpen] = useState(false);
+  const [selectedImageForCrop, setSelectedImageForCrop] = useState(null);
+  const [isCropping, setIsCropping] = useState(false);
+  const [cropProgress, setCropProgress] = useState({ current: 0, total: 0 });
+  const canvasRef = useRef(null);
 
   // Calcular estatísticas de mídia
   const mediaStats = useMemo(() => {
@@ -150,14 +158,14 @@ export default function MediaManagementTab({
     try {
       const { media, context } = selectedMediaForWatermark;
       
-      console.log("Aplicando marca d'água para:", media.url);
+      console.log("Aplicando marca d'água para:", media.cloudUrl);
       
       // Detectar origem da imagem
       const imageSource = detectImageSource(null, false);
       
       // Aplicar marca d'água
       const watermarkedDataURL = await addWatermarkToImage(
-        media.url, 
+        media.cloudUrl, 
         inspection.id, 
         imageSource
       );
@@ -192,7 +200,7 @@ export default function MediaManagementTab({
           .details[context.detailIndex].non_conformities[context.ncIndex]
           .media[context.mediaIndex] = {
             ...media,
-            url: downloadURL,
+            cloudUrl: downloadURL,
             id: `watermarked_${media.id}`,
             updated_at: new Date().toISOString()
           };
@@ -200,7 +208,7 @@ export default function MediaManagementTab({
         updatedInspection.topics[context.topicIndex].items[context.itemIndex]
           .details[context.detailIndex].media[context.mediaIndex] = {
             ...media,
-            url: downloadURL,
+            cloudUrl: downloadURL,
             id: `watermarked_${media.id}`,
             updated_at: new Date().toISOString()
           };
@@ -208,14 +216,14 @@ export default function MediaManagementTab({
         updatedInspection.topics[context.topicIndex].items[context.itemIndex]
           .media[context.mediaIndex] = {
             ...media,
-            url: downloadURL,
+            cloudUrl: downloadURL,
             id: `watermarked_${media.id}`,
             updated_at: new Date().toISOString()
           };
       } else {
         updatedInspection.topics[context.topicIndex].media[context.mediaIndex] = {
           ...media,
-          url: downloadURL,
+          cloudUrl: downloadURL,
           id: `watermarked_${media.id}`,
           updated_at: new Date().toISOString()
         };
@@ -354,12 +362,12 @@ export default function MediaManagementTab({
     try {
       for (const { media, context } of imagesWithoutWatermark) {
         try {
-          console.log(`Processando ${processedCount + 1}/${imagesWithoutWatermark.length}:`, media.url);
+          console.log(`Processando ${processedCount + 1}/${imagesWithoutWatermark.length}:`, media.cloudUrl);
           
           // Aplicar marca d'água
           const imageSource = detectImageSource(null, false);
           const watermarkedDataURL = await addWatermarkToImage(
-            media.url, 
+            media.cloudUrl, 
             inspection.id, 
             imageSource
           );
@@ -392,7 +400,7 @@ export default function MediaManagementTab({
               .details[context.detailIndex].non_conformities[context.ncIndex]
               .media[context.mediaIndex] = {
                 ...media,
-                url: downloadURL,
+                cloudUrl: downloadURL,
                 id: `watermarked_${media.id}`,
                 updated_at: new Date().toISOString()
               };
@@ -400,7 +408,7 @@ export default function MediaManagementTab({
             updatedInspection.topics[context.topicIndex].items[context.itemIndex]
               .details[context.detailIndex].media[context.mediaIndex] = {
                 ...media,
-                url: downloadURL,
+                cloudUrl: downloadURL,
                 id: `watermarked_${media.id}`,
                 updated_at: new Date().toISOString()
               };
@@ -408,14 +416,14 @@ export default function MediaManagementTab({
             updatedInspection.topics[context.topicIndex].items[context.itemIndex]
               .media[context.mediaIndex] = {
                 ...media,
-                url: downloadURL,
+                cloudUrl: downloadURL,
                 id: `watermarked_${media.id}`,
                 updated_at: new Date().toISOString()
               };
           } else {
             updatedInspection.topics[context.topicIndex].media[context.mediaIndex] = {
               ...media,
-              url: downloadURL,
+              cloudUrl: downloadURL,
               id: `watermarked_${media.id}`,
               updated_at: new Date().toISOString()
             };
@@ -456,6 +464,459 @@ export default function MediaManagementTab({
     }
   }, [inspection, onUpdateInspection, toast]);
 
+  // Image processing functions
+  const loadImageFromUrl = (url) => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = url;
+    });
+  };
+
+  const cropImageTo4x3 = async (imageUrl) => {
+    try {
+      const img = await loadImageFromUrl(imageUrl);
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      const { width: originalWidth, height: originalHeight } = img;
+      const aspectRatio = 4 / 3;
+      
+      let newWidth, newHeight, offsetX = 0, offsetY = 0;
+      
+      // Determine if image is landscape or portrait
+      if (originalWidth > originalHeight) {
+        // Landscape image - crop horizontally
+        newHeight = originalHeight;
+        newWidth = newHeight * aspectRatio;
+        offsetX = (originalWidth - newWidth) / 2;
+      } else {
+        // Portrait image - crop vertically  
+        newWidth = originalWidth;
+        newHeight = newWidth / aspectRatio;
+        offsetY = (originalHeight - newHeight) / 2;
+      }
+      
+      // Set canvas dimensions to 4:3 ratio
+      canvas.width = newWidth;
+      canvas.height = newHeight;
+      
+      // Draw cropped image
+      ctx.drawImage(
+        img,
+        offsetX, offsetY, newWidth, newHeight,
+        0, 0, newWidth, newHeight
+      );
+      
+      return canvas.toDataURL('image/jpeg', 0.9);
+    } catch (error) {
+      console.error('Error cropping image:', error);
+      throw error;
+    }
+  };
+
+  const rotateImage = async (imageUrl, degrees = 90) => {
+    try {
+      const img = await loadImageFromUrl(imageUrl);
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      // Set canvas dimensions based on rotation
+      if (degrees === 90 || degrees === 270) {
+        canvas.width = img.height;
+        canvas.height = img.width;
+      } else {
+        canvas.width = img.width;
+        canvas.height = img.height;
+      }
+      
+      // Move to center and rotate
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate((degrees * Math.PI) / 180);
+      
+      // Draw image
+      ctx.drawImage(img, -img.width / 2, -img.height / 2);
+      
+      return canvas.toDataURL('image/jpeg', 0.9);
+    } catch (error) {
+      console.error('Error rotating image:', error);
+      throw error;
+    }
+  };
+
+  const uploadProcessedImage = async (dataUrl, originalMedia, context, suffix = 'processed') => {
+    try {
+      // Convert data URL to blob
+      const response = await fetch(dataUrl);
+      const blob = await response.blob();
+      
+      // Create file
+      const timestamp = Date.now();
+      const fileName = `image_${suffix}_${timestamp}.jpg`;
+      const file = new File([blob], fileName, { type: 'image/jpeg' });
+      
+      // Define storage path
+      let storagePath;
+      if (context.isNC && context.ncIndex !== null) {
+        storagePath = `inspections/${inspection.id}/topic_${context.topicIndex}/item_${context.itemIndex}/detail_${context.detailIndex}/non_conformities/nc_${context.ncIndex}/${fileName}`;
+      } else if (context.detailIndex !== null) {
+        storagePath = `inspections/${inspection.id}/topic_${context.topicIndex}/item_${context.itemIndex}/detail_${context.detailIndex}/media/${fileName}`;
+      } else if (context.itemIndex !== null) {
+        storagePath = `inspections/${inspection.id}/topic_${context.topicIndex}/item_${context.itemIndex}/media/${fileName}`;
+      } else {
+        storagePath = `inspections/${inspection.id}/topic_${context.topicIndex}/media/${fileName}`;
+      }
+
+      // Upload to Firebase
+      const storageRef = ref(storage, storagePath);
+      const uploadResult = await uploadBytes(storageRef, file);
+      const downloadURL = await getDownloadURL(uploadResult.ref);
+      
+      return downloadURL;
+    } catch (error) {
+      console.error('Error uploading processed image:', error);
+      throw error;
+    }
+  };
+
+  const handleCropImage = useCallback((media, context) => {
+    if (media.type !== 'image') {
+      toast({
+        title: "Aviso",
+        description: "Apenas imagens podem ser cortadas",
+        variant: "default"
+      });
+      return;
+    }
+
+    setSelectedImageForCrop({ media, context });
+    setIsCropDialogOpen(true);
+  }, [toast]);
+
+  const applyCrop = useCallback(async () => {
+    if (!selectedImageForCrop) return;
+
+    setIsCropping(true);
+
+    try {
+      const { media, context } = selectedImageForCrop;
+      
+      // Crop image to 4:3 ratio
+      const croppedDataURL = await cropImageTo4x3(media.cloudUrl);
+      
+      // Upload processed image
+      const downloadURL = await uploadProcessedImage(croppedDataURL, media, context, 'cropped');
+      
+      // Update inspection data
+      const updatedInspection = { ...inspection };
+      
+      if (context.isNC && context.ncIndex !== null) {
+        updatedInspection.topics[context.topicIndex].items[context.itemIndex]
+          .details[context.detailIndex].non_conformities[context.ncIndex]
+          .media[context.mediaIndex] = {
+            ...media,
+            cloudUrl: downloadURL,
+            id: `cropped_${media.id}`,
+            updated_at: new Date().toISOString()
+          };
+      } else if (context.detailIndex !== null) {
+        updatedInspection.topics[context.topicIndex].items[context.itemIndex]
+          .details[context.detailIndex].media[context.mediaIndex] = {
+            ...media,
+            cloudUrl: downloadURL,
+            id: `cropped_${media.id}`,
+            updated_at: new Date().toISOString()
+          };
+      } else if (context.itemIndex !== null) {
+        updatedInspection.topics[context.topicIndex].items[context.itemIndex]
+          .media[context.mediaIndex] = {
+            ...media,
+            cloudUrl: downloadURL,
+            id: `cropped_${media.id}`,
+            updated_at: new Date().toISOString()
+          };
+      } else {
+        updatedInspection.topics[context.topicIndex].media[context.mediaIndex] = {
+          ...media,
+          cloudUrl: downloadURL,
+          id: `cropped_${media.id}`,
+          updated_at: new Date().toISOString()
+        };
+      }
+
+      onUpdateInspection(updatedInspection);
+      
+      toast({
+        title: "Sucesso",
+        description: "Imagem cortada para proporção 4:3 com sucesso!",
+        variant: "default"
+      });
+      
+      setIsCropDialogOpen(false);
+      setSelectedImageForCrop(null);
+      
+    } catch (error) {
+      console.error("Erro ao cortar imagem:", error);
+      
+      toast({
+        title: "Erro",
+        description: "Erro ao processar imagem. Tente novamente.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsCropping(false);
+    }
+  }, [selectedImageForCrop, inspection, onUpdateInspection, toast]);
+
+  const handleRotateImage = useCallback(async (media, context, degrees = 90) => {
+    if (media.type !== 'image') {
+      toast({
+        title: "Aviso",
+        description: "Apenas imagens podem ser rotacionadas",
+        variant: "default"
+      });
+      return;
+    }
+
+    try {
+      // Rotate image
+      const rotatedDataURL = await rotateImage(media.cloudUrl, degrees);
+      
+      // Upload processed image
+      const downloadURL = await uploadProcessedImage(rotatedDataURL, media, context, 'rotated');
+      
+      // Update inspection data
+      const updatedInspection = { ...inspection };
+      
+      if (context.isNC && context.ncIndex !== null) {
+        updatedInspection.topics[context.topicIndex].items[context.itemIndex]
+          .details[context.detailIndex].non_conformities[context.ncIndex]
+          .media[context.mediaIndex] = {
+            ...media,
+            cloudUrl: downloadURL,
+            id: `rotated_${media.id}`,
+            updated_at: new Date().toISOString()
+          };
+      } else if (context.detailIndex !== null) {
+        updatedInspection.topics[context.topicIndex].items[context.itemIndex]
+          .details[context.detailIndex].media[context.mediaIndex] = {
+            ...media,
+            cloudUrl: downloadURL,
+            id: `rotated_${media.id}`,
+            updated_at: new Date().toISOString()
+          };
+      } else if (context.itemIndex !== null) {
+        updatedInspection.topics[context.topicIndex].items[context.itemIndex]
+          .media[context.mediaIndex] = {
+            ...media,
+            cloudUrl: downloadURL,
+            id: `rotated_${media.id}`,
+            updated_at: new Date().toISOString()
+          };
+      } else {
+        updatedInspection.topics[context.topicIndex].media[context.mediaIndex] = {
+          ...media,
+          cloudUrl: downloadURL,
+          id: `rotated_${media.id}`,
+          updated_at: new Date().toISOString()
+        };
+      }
+
+      onUpdateInspection(updatedInspection);
+      
+      toast({
+        title: "Sucesso",
+        description: `Imagem rotacionada ${degrees}° com sucesso!`,
+        variant: "default"
+      });
+      
+    } catch (error) {
+      console.error("Erro ao rotacionar imagem:", error);
+      
+      toast({
+        title: "Erro",
+        description: "Erro ao rotacionar imagem. Tente novamente.",
+        variant: "destructive"
+      });
+    }
+  }, [inspection, onUpdateInspection, toast]);
+
+  // Crop all images to 4:3 ratio
+  const cropAllImagesTo4x3 = useCallback(async () => {
+    const imagesToCrop = [];
+    
+    inspection?.topics?.forEach((topic, topicIndex) => {
+      // Topic media
+      topic.media?.forEach((media, mediaIndex) => {
+        if (media.type === 'image') {
+          imagesToCrop.push({
+            media,
+            context: { 
+              topicIndex, 
+              itemIndex: null, 
+              detailIndex: null, 
+              mediaIndex, 
+              isNC: false, 
+              ncIndex: null 
+            }
+          });
+        }
+      });
+
+      // Item media
+      topic.items?.forEach((item, itemIndex) => {
+        item.media?.forEach((media, mediaIndex) => {
+          if (media.type === 'image') {
+            imagesToCrop.push({
+              media,
+              context: { 
+                topicIndex, 
+                itemIndex, 
+                detailIndex: null, 
+                mediaIndex, 
+                isNC: false, 
+                ncIndex: null 
+              }
+            });
+          }
+        });
+
+        // Detail media
+        item.details?.forEach((detail, detailIndex) => {
+          detail.media?.forEach((media, mediaIndex) => {
+            if (media.type === 'image') {
+              imagesToCrop.push({
+                media,
+                context: { 
+                  topicIndex, 
+                  itemIndex, 
+                  detailIndex, 
+                  mediaIndex, 
+                  isNC: false, 
+                  ncIndex: null 
+                }
+              });
+            }
+          });
+
+          // NC media
+          detail.non_conformities?.forEach((nc, ncIndex) => {
+            nc.media?.forEach((media, mediaIndex) => {
+              if (media.type === 'image') {
+                imagesToCrop.push({
+                  media,
+                  context: { 
+                    topicIndex, 
+                    itemIndex, 
+                    detailIndex, 
+                    mediaIndex, 
+                    isNC: true, 
+                    ncIndex 
+                  }
+                });
+              }
+            });
+          });
+        });
+      });
+    });
+
+    if (imagesToCrop.length === 0) {
+      toast({
+        title: "Informação",
+        description: "Nenhuma imagem encontrada para processar!",
+      });
+      return;
+    }
+
+    setIsCropping(true);
+    setCropProgress({ current: 0, total: imagesToCrop.length });
+
+    let updatedInspection = { ...inspection };
+    let processedCount = 0;
+
+    try {
+      for (const { media, context } of imagesToCrop) {
+        try {
+          console.log(`Processando imagem ${processedCount + 1}/${imagesToCrop.length}`);
+          
+          // Crop image
+          const croppedDataURL = await cropImageTo4x3(media.cloudUrl);
+          
+          // Upload processed image
+          const downloadURL = await uploadProcessedImage(croppedDataURL, media, context, 'cropped');
+          
+          // Update data
+          if (context.isNC && context.ncIndex !== null) {
+            updatedInspection.topics[context.topicIndex].items[context.itemIndex]
+              .details[context.detailIndex].non_conformities[context.ncIndex]
+              .media[context.mediaIndex] = {
+                ...media,
+                cloudUrl: downloadURL,
+                id: `cropped_${media.id}`,
+                updated_at: new Date().toISOString()
+              };
+          } else if (context.detailIndex !== null) {
+            updatedInspection.topics[context.topicIndex].items[context.itemIndex]
+              .details[context.detailIndex].media[context.mediaIndex] = {
+                ...media,
+                cloudUrl: downloadURL,
+                id: `cropped_${media.id}`,
+                updated_at: new Date().toISOString()
+              };
+          } else if (context.itemIndex !== null) {
+            updatedInspection.topics[context.topicIndex].items[context.itemIndex]
+              .media[context.mediaIndex] = {
+                ...media,
+                cloudUrl: downloadURL,
+                id: `cropped_${media.id}`,
+                updated_at: new Date().toISOString()
+              };
+          } else {
+            updatedInspection.topics[context.topicIndex].media[context.mediaIndex] = {
+              ...media,
+              cloudUrl: downloadURL,
+              id: `cropped_${media.id}`,
+              updated_at: new Date().toISOString()
+            };
+          }
+
+          processedCount++;
+          setCropProgress({ current: processedCount, total: imagesToCrop.length });
+          
+          // Small delay to avoid overwhelming
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
+        } catch (error) {
+          console.error(`Erro ao processar imagem ${processedCount + 1}:`, error);
+          processedCount++;
+          setCropProgress({ current: processedCount, total: imagesToCrop.length });
+        }
+      }
+
+      // Update inspection
+      onUpdateInspection(updatedInspection);
+      
+      toast({
+        title: "Processamento Concluído",
+        description: `${processedCount} imagens processadas para proporção 4:3!`,
+      });
+      
+    } catch (error) {
+      console.error("Erro no processamento em lote:", error);
+      toast({
+        title: "Erro no Processamento",
+        description: `Erro após processar ${processedCount} imagens.`,
+        variant: "destructive"
+      });
+    } finally {
+      setIsCropping(false);
+      setCropProgress({ current: 0, total: 0 });
+    }
+  }, [inspection, onUpdateInspection, toast]);
+
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="space-y-4">
@@ -483,32 +944,59 @@ export default function MediaManagementTab({
               )}
             </div>
             
-            {mediaStats.imagesWithoutWatermark > 0 && (
+            <div className="flex gap-2">
               <Button
                 variant="outline"
-                onClick={applyWatermarkToAll}
-                disabled={isBulkWatermark}
+                onClick={cropAllImagesTo4x3}
+                disabled={isCropping || isBulkWatermark}
                 className="flex items-center gap-2"
               >
-                {isBulkWatermark ? (
+                {isCropping ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  <Droplets className="h-4 w-4" />
+                  <Crop className="h-4 w-4" />
                 )}
-                {isBulkWatermark ? "Processando..." : "Aplicar Marca d'Água em Todas"}
+                {isCropping ? "Cortando..." : "Cortar Todas 4:3"}
               </Button>
-            )}
+              {mediaStats.imagesWithoutWatermark > 0 && (
+                <Button
+                  variant="outline"
+                  onClick={applyWatermarkToAll}
+                  disabled={isBulkWatermark || isCropping}
+                  className="flex items-center gap-2"
+                >
+                  {isBulkWatermark ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Droplets className="h-4 w-4" />
+                  )}
+                  {isBulkWatermark ? "Processando..." : "Aplicar Marca d'Água"}
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                className="flex items-center gap-2"
+              >
+                <Calculator className="h-4 w-4" />
+                Contar: {mediaStats.totalImages} img
+              </Button>
+            </div>
           </div>
           
           {/* Barra de progresso do processamento em lote */}
-          {isBulkWatermark && (
+          {(isBulkWatermark || isCropping) && (
             <div className="mt-4 space-y-2">
               <div className="flex justify-between text-sm text-muted-foreground">
-                <span>Processando imagens...</span>
-                <span>{bulkProgress.current}/{bulkProgress.total}</span>
+                <span>{isCropping ? "Cortando imagens..." : "Processando imagens..."}</span>
+                <span>
+                  {isCropping ? `${cropProgress.current}/${cropProgress.total}` : `${bulkProgress.current}/${bulkProgress.total}`}
+                </span>
               </div>
               <Progress 
-                value={(bulkProgress.current / bulkProgress.total) * 100} 
+                value={isCropping ? 
+                  (cropProgress.current / cropProgress.total) * 100 : 
+                  (bulkProgress.current / bulkProgress.total) * 100
+                } 
                 className="w-full"
               />
             </div>
@@ -576,6 +1064,8 @@ export default function MediaManagementTab({
                               onMove={handleMoveMedia}
                               onRemove={handleRemoveMedia}
                               onWatermark={handleWatermark}
+                              onCrop={handleCropImage}
+                              onRotate={handleRotateImage}
                             />
                           ))}
                         </div>
@@ -647,6 +1137,8 @@ export default function MediaManagementTab({
                                 onMove={handleMoveMedia}
                                 onRemove={handleRemoveMedia}
                                 onWatermark={handleWatermark}
+                              onCrop={handleCropImage}
+                              onRotate={handleRotateImage}
                               />
                             ))}
                           </div>
@@ -705,7 +1197,7 @@ export default function MediaManagementTab({
                                 Danos
                               </Badge>
                             )}
-                            {hasWatermark({ url: detail.media?.[0]?.url }) && (
+                            {hasWatermark({ cloudUrl: detail.media?.[0]?.cloudUrl }) && (
                               <Badge variant="outline" className="text-xs">
                                 <CheckCircle className="w-3 h-3 mr-1" />
                                 Marca d'água
@@ -739,6 +1231,8 @@ export default function MediaManagementTab({
                                       onMove={handleMoveMedia}
                                       onRemove={handleRemoveMedia}
                                       onWatermark={handleWatermark}
+                              onCrop={handleCropImage}
+                              onRotate={handleRotateImage}
                                     />
                                   ))}
                                 </div>
@@ -769,6 +1263,8 @@ export default function MediaManagementTab({
                                         onMove={handleMoveMedia}
                                         onRemove={handleRemoveMedia}
                                         onWatermark={handleWatermark}
+                              onCrop={handleCropImage}
+                              onRotate={handleRotateImage}
                                       />
                                     ))}
                                   </div>
@@ -809,7 +1305,7 @@ export default function MediaManagementTab({
               {selectedMediaForWatermark && (
                 <div className="border rounded-lg p-4">
                   <img
-                    src={selectedMediaForWatermark.media.url}
+                    src={selectedMediaForWatermark.media.cloudUrl}
                     alt="Preview"
                     className="w-full max-h-48 object-contain rounded"
                   />
@@ -835,6 +1331,51 @@ export default function MediaManagementTab({
                   <Droplets className="h-4 w-4" />
                 )}
                 {isApplyingWatermark ? "Aplicando..." : "Aplicar Marca d'Água"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        
+        {/* Crop Confirmation Dialog */}
+        <Dialog open={isCropDialogOpen} onOpenChange={setIsCropDialogOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Cortar Imagem para 4:3</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Esta imagem será cortada automaticamente para a proporção 4:3. 
+                Imagens em paisagem serão cortadas horizontalmente e imagens em retrato serão cortadas verticalmente.
+              </p>
+              {selectedImageForCrop && (
+                <div className="border rounded-lg p-4">
+                  <img
+                    src={selectedImageForCrop.media.cloudUrl}
+                    alt="Preview"
+                    className="w-full max-h-48 object-contain rounded"
+                  />
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button 
+                variant="outline" 
+                onClick={() => setIsCropDialogOpen(false)}
+                disabled={isCropping}
+              >
+                Cancelar
+              </Button>
+              <Button 
+                onClick={applyCrop} 
+                disabled={isCropping}
+                className="flex items-center gap-2"
+              >
+                {isCropping ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Crop className="h-4 w-4" />
+                )}
+                {isCropping ? "Cortando..." : "Cortar para 4:3"}
               </Button>
             </DialogFooter>
           </DialogContent>

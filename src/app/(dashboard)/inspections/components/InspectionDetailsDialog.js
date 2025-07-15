@@ -848,8 +848,8 @@ export default function InspectionDetailsDialog({
                                             )}
                                             <span className="text-sm">{media.type}</span>
                                           </div>
-                                          {media.url && (
-                                            <a href={media.url} target="_blank" rel="noopener noreferrer" className="text-blue-500 text-xs hover:underline">
+                                          {media.cloudUrl && (
+                                            <a href={media.cloudUrl} target="_blank" rel="noopener noreferrer" className="text-blue-500 text-xs hover:underline">
                                               Ver arquivo
                                             </a>
                                           )}

@@ -34,7 +34,7 @@ function DraggableMediaItem({ media, context, onView, onMove, onRemove }) {
       <div className="aspect-square relative">
         {media.type === 'image' ? (
           <img
-            src={media.url}
+            src={media.cloudUrl}
             alt="Media"
             className="w-full h-full object-cover"
           />

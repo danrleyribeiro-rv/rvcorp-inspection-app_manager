@@ -3,7 +3,7 @@
 
 import { useDrag } from 'react-dnd';
 import { Button } from "@/components/ui/button";
-import { X, Move, Video } from "lucide-react";
+import { X, Move, Video, Droplets, RotateCw, Crop } from "lucide-react";
 
 export default function DraggableMedia({ 
   media, 
@@ -15,8 +15,20 @@ export default function DraggableMedia({
   ncIndex = null, 
   onView, 
   onRemove, 
-  onMove 
+  onMove,
+  onWatermark,
+  onCrop,
+  onRotate
 }) {
+  
+  const context = {
+    topicIndex,
+    itemIndex,
+    detailIndex,
+    mediaIndex,
+    isNC,
+    ncIndex
+  };
   const [{ isDragging }, drag] = useDrag({
     type: 'MEDIA_ITEM',
     item: { 
@@ -44,7 +56,7 @@ export default function DraggableMedia({
       <div className="aspect-square border rounded-md overflow-hidden bg-gray-50">
         {media.type === 'image' ? (
           <img
-            src={media.url}
+            src={media.cloudUrl}
             alt="Media"
             className="w-full h-full object-cover"
           />
@@ -54,28 +66,75 @@ export default function DraggableMedia({
           </div>
         )}
       </div>
-      <Button
-        size="sm"
-        variant="destructive"
-        className="absolute top-0 right-0 h-4 w-4 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-        onClick={(e) => {
-          e.stopPropagation();
-          onRemove(topicIndex, itemIndex, detailIndex, mediaIndex, isNC, ncIndex);
-        }}
-      >
-        <X className="h-2 w-2" />
-      </Button>
-      <Button
-        size="sm"
-        variant="secondary"
-        className="absolute bottom-0 right-0 h-4 w-4 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-        onClick={(e) => {
-          e.stopPropagation();
-          onMove(media, topicIndex, itemIndex, detailIndex, mediaIndex, isNC, ncIndex);
-        }}
-      >
-        <Move className="h-2 w-2" />
-      </Button>
+      {/* Action buttons */}
+      <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+        <Button
+          size="sm"
+          variant="secondary"
+          className="h-6 w-6 p-0"
+          onClick={(e) => {
+            e.stopPropagation();
+            onMove && onMove(media, context);
+          }}
+          title="Mover"
+        >
+          <Move className="h-3 w-3" />
+        </Button>
+        {media.type === 'image' && onWatermark && (
+          <Button
+            size="sm"
+            variant="secondary"
+            className="h-6 w-6 p-0"
+            onClick={(e) => {
+              e.stopPropagation();
+              onWatermark(media, context);
+            }}
+            title="Marca d'água"
+          >
+            <Droplets className="h-3 w-3" />
+          </Button>
+        )}
+        {media.type === 'image' && onCrop && (
+          <Button
+            size="sm"
+            variant="secondary"
+            className="h-6 w-6 p-0"
+            onClick={(e) => {
+              e.stopPropagation();
+              onCrop(media, context);
+            }}
+            title="Cortar 4:3"
+          >
+            <Crop className="h-3 w-3" />
+          </Button>
+        )}
+        {media.type === 'image' && onRotate && (
+          <Button
+            size="sm"
+            variant="secondary"
+            className="h-6 w-6 p-0"
+            onClick={(e) => {
+              e.stopPropagation();
+              onRotate(media, context, 90);
+            }}
+            title="Rotacionar 90°"
+          >
+            <RotateCw className="h-3 w-3" />
+          </Button>
+        )}
+        <Button
+          size="sm"
+          variant="destructive"
+          className="h-6 w-6 p-0"
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove(topicIndex, itemIndex, detailIndex, mediaIndex, isNC, ncIndex);
+          }}
+          title="Remover"
+        >
+          <X className="h-3 w-3" />
+        </Button>
+      </div>
     </div>
   );
 }

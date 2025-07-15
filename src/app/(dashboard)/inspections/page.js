@@ -18,13 +18,17 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetTrigger } from "@/components/ui/sheet";
-import { Plus, Search, Filter, Loader2 } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Plus, Search, Filter, Loader2, List, Grid, FileText, CheckCircle, Clock, AlertCircle } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import InspectionListItem from "./components/InspectionListItem";
 import DeleteInspectionDialog from "./components/DeleteInspectionDialog";
 import FilterPanel from "./components/FilterPanel";
-import { generateInspectionPDF, downloadPDF, openPDFInNewTab } from "@/services/pdf-service"; // Import PDF functions
+import InspectionReportCard from "../reports/components/InspectionReportCard";
+import ReportViewer from "../reports/components/ReportViewer";
+import { generateInspectionPDF, generateNonConformitiesPDF } from "@/services/pdf-service";
+import { generateReportDownloadUrl } from "@/services/report-service";
 
 const INSPECTIONS_PER_PAGE = 10;
 
@@ -34,6 +38,7 @@ export default function InspectionsPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [editingInspection, setEditingInspection] = useState(null);
   const [deletingInspection, setDeletingInspection] = useState(null);
+  const [viewMode, setViewMode] = useState("list");
   const [filterState, setFilterState] = useState({
     status: "all",
     project: "all",
@@ -48,6 +53,9 @@ export default function InspectionsPage() {
   const [hasMore, setHasMore] = useState(true);
   const [lastVisible, setLastVisible] = useState(null);
   const [isFiltering, setIsFiltering] = useState(false);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [selectedInspection, setSelectedInspection] = useState(null);
+  const [showViewer, setShowViewer] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
@@ -206,6 +214,24 @@ export default function InspectionsPage() {
               inspection.template_details = null;
             }
         }
+
+        // Fetch releases
+        try {
+          const releasesQuery = query(
+            collection(db, 'inspection_releases'),
+            where('inspection_id', '==', inspectionDoc.id),
+            orderBy('created_at', 'desc')
+          );
+          const releasesSnapshot = await getDocs(releasesQuery);
+          inspection.releases = releasesSnapshot.docs.map(releaseDoc => ({
+            id: releaseDoc.id,
+            ...releaseDoc.data(),
+            created_at: releaseDoc.data().created_at?.toDate?.()?.toISOString()
+          }));
+        } catch (err) {
+          console.error(`Error fetching releases for inspection ${inspection.id}:`, err);
+          inspection.releases = [];
+        }
         
         return inspection;
       });
@@ -276,6 +302,100 @@ export default function InspectionsPage() {
     }
   };
 
+  const handleGenerateReport = async (reportGenerator, inspection, release = null) => {
+    if (isGeneratingPDF) return;
+    setIsGeneratingPDF(true);
+    
+    const { id: toastId, update: updateToast } = toast({
+      title: "Gerando PDF...",
+      description: "Aguarde enquanto preparamos o seu relatório.",
+    });
+
+    try {
+      const result = await reportGenerator(inspection, release);
+      
+      updateToast({
+        id: toastId,
+        title: result.success ? "PDF Gerado com Sucesso!" : "Falha ao Gerar PDF",
+        description: result.success ? "O download começará em breve." : result.error,
+        variant: result.success ? "success" : "destructive",
+      });
+
+    } catch (error) {
+      updateToast({
+        id: toastId,
+        title: "Erro Inesperado",
+        description: "Ocorreu um erro inesperado ao gerar o PDF.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingPDF(false);
+    }
+  };
+
+  const handleGenerateHTMLReport = async (inspection, type = 'complete') => {
+    if (isGeneratingPDF) return;
+    setIsGeneratingPDF(true);
+    
+    const { id: toastId, update: updateToast } = toast({
+      title: "Gerando Relatório HTML...",
+      description: "Aguarde enquanto preparamos o seu relatório.",
+    });
+
+    try {
+      const downloadUrl = generateReportDownloadUrl(inspection, type);
+      
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = `${inspection.cod || inspection.id}_${type}_${Date.now()}.html`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      setTimeout(() => URL.revokeObjectURL(downloadUrl), 100);
+      
+      updateToast({
+        id: toastId,
+        title: "Relatório HTML Gerado!",
+        description: "O download foi iniciado.",
+        variant: "default",
+      });
+
+    } catch (error) {
+      console.error('Error generating HTML report:', error);
+      updateToast({
+        id: toastId,
+        title: "Erro ao Gerar Relatório",
+        description: "Ocorreu um erro inesperado ao gerar o relatório HTML.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingPDF(false);
+    }
+  };
+
+  const handleViewHTMLReport = async (inspection, type = 'complete') => {
+    try {
+      const downloadUrl = generateReportDownloadUrl(inspection, type);
+      window.open(downloadUrl, '_blank');
+      
+      setTimeout(() => URL.revokeObjectURL(downloadUrl), 5000);
+      
+      toast({
+        title: "Relatório Aberto",
+        description: "O relatório foi aberto em uma nova aba.",
+      });
+
+    } catch (error) {
+      console.error('Error viewing HTML report:', error);
+      toast({
+        title: "Erro ao Visualizar Relatório",
+        description: "Ocorreu um erro ao abrir o relatório.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const filterInspections = () => {
     const lowerCaseSearch = search.toLowerCase();
     const filtered = inspections.filter(inspection => {
@@ -317,10 +437,93 @@ export default function InspectionsPage() {
     setFilteredInspections(filtered);
   };
 
+  const calculateCompletion = (inspection) => {
+    if (!inspection.topics || inspection.topics.length === 0) return 0;
+
+    let totalFields = 0;
+    let filledFields = 0;
+
+    inspection.topics.forEach(topic => {
+      if (topic.items) {
+        topic.items.forEach(item => {
+          if (item.details) {
+            item.details.forEach(detail => {
+              totalFields++;
+              if (detail.value !== null && detail.value !== undefined && detail.value !== "") {
+                filledFields++;
+              }
+            });
+          }
+        });
+      }
+    });
+
+    return totalFields > 0 ? Math.round((filledFields / totalFields) * 100) : 0;
+  };
+
+  const getInspectionStats = () => {
+    const inspectionsWithCompletion = filteredInspections.map(inspection => ({
+      ...inspection,
+      completion: calculateCompletion(inspection)
+    }));
+
+    const total = inspectionsWithCompletion.length;
+    const complete = inspectionsWithCompletion.filter(i => i.completion === 100).length;
+    const inProgress = inspectionsWithCompletion.filter(i => i.completion > 0 && i.completion < 100).length;
+    const notStarted = inspectionsWithCompletion.filter(i => i.completion === 0).length;
+
+    return { total, complete, inProgress, notStarted };
+  };
+
+  const stats = getInspectionStats();
+
   return (
-    <div className="container p-4 md:p-6 mx-auto">
+    <div className="container p-4 md:p-6 mx-auto max-w-full">
       <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-6 gap-3">
         <h1 className="text-2xl md:text-3xl font-bold">Inspeções</h1>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total</CardTitle>
+            <FileText className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.total}</div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Completas</CardTitle>
+            <CheckCircle className="h-4 w-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{stats.complete}</div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Em Progresso</CardTitle>
+            <Clock className="h-4 w-4 text-blue-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">{stats.inProgress}</div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Não Iniciadas</CardTitle>
+            <AlertCircle className="h-4 w-4 text-orange-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-600">{stats.notStarted}</div>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3 mb-6 items-center justify-between">
@@ -334,6 +537,22 @@ export default function InspectionsPage() {
         <Button onClick={() => router.push('/inspections/create')} className="flex-1 sm:flex-none">
           <Plus className="mr-2 h-4 w-4" />
           Nova Inspeção
+        </Button>
+        <Button
+          variant={viewMode === "list" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setViewMode("list")}
+          className="px-3"
+        >
+          <List className="h-4 w-4" />
+        </Button>
+        <Button
+          variant={viewMode === "cards" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setViewMode("cards")}
+          className="px-3"
+        >
+          <Grid className="h-4 w-4" />
         </Button>
         <Sheet>
           <SheetTrigger asChild>
@@ -362,32 +581,73 @@ export default function InspectionsPage() {
             "Nenhuma inspeção corresponde aos filtros e busca aplicados."}
         </div>
       ) : (
-        <div className="space-y-3">
-          {filteredInspections.map((inspection, index) => {
-            if (index === filteredInspections.length - 1 && !isFiltering && hasMore) {
-              return (
-                <div key={inspection.id} ref={lastInspectionElementRef}>
-                  <InspectionListItem
-                    inspection={inspection}
-                    onEditData={() => handleEditData(inspection)}
-                    onEditInspection={() => handleEditInspection(inspection)}
-                    onDelete={() => setDeletingInspection(inspection)}
-                    onPreviewPDF={handlePreviewPDF} // Pass the new handler
-                  />
-                </div>
-              );
-            } else {
-              return (
-                <InspectionListItem
-                  key={inspection.id}
-                  inspection={inspection}
-                  onEditData={() => handleEditData(inspection)}
-                  onEditInspection={() => handleEditInspection(inspection)}
-                  onDelete={() => setDeletingInspection(inspection)}
-                />
-              );
-            }
-          })}
+        <>
+          {viewMode === "list" ? (
+            <div className="space-y-3">
+              {filteredInspections.map((inspection, index) => {
+                if (index === filteredInspections.length - 1 && !isFiltering && hasMore) {
+                  return (
+                    <div key={inspection.id} ref={lastInspectionElementRef}>
+                      <InspectionListItem
+                        inspection={inspection}
+                        onEditData={() => handleEditData(inspection)}
+                        onEditInspection={() => handleEditInspection(inspection)}
+                        onDelete={() => setDeletingInspection(inspection)}
+                        onPreviewPDF={handlePreviewPDF}
+                      />
+                    </div>
+                  );
+                } else {
+                  return (
+                    <InspectionListItem
+                      key={inspection.id}
+                      inspection={inspection}
+                      onEditData={() => handleEditData(inspection)}
+                      onEditInspection={() => handleEditInspection(inspection)}
+                      onDelete={() => setDeletingInspection(inspection)}
+                    />
+                  );
+                }
+              })}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {filteredInspections.map((inspection, index) => {
+                if (index === filteredInspections.length - 1 && !isFiltering && hasMore) {
+                  return (
+                    <div key={inspection.id} ref={lastInspectionElementRef}>
+                      <InspectionReportCard 
+                        inspection={{...inspection, completion: calculateCompletion(inspection)}}
+                        onView={() => {
+                          setSelectedInspection(inspection);
+                          setShowViewer(true);
+                        }}
+                        onGeneratePreview={(inspection, release) => handleGenerateReport(generateInspectionPDF, inspection, release)}
+                        onGenerateNCPDF={(inspection, release) => handleGenerateReport(generateNonConformitiesPDF, inspection, release)}
+                        onGenerateHTMLReport={handleGenerateHTMLReport}
+                        onViewHTMLReport={handleViewHTMLReport}
+                      />
+                    </div>
+                  );
+                } else {
+                  return (
+                    <InspectionReportCard 
+                      key={inspection.id} 
+                      inspection={{...inspection, completion: calculateCompletion(inspection)}}
+                      onView={() => {
+                        setSelectedInspection(inspection);
+                        setShowViewer(true);
+                      }}
+                      onGeneratePreview={(inspection, release) => handleGenerateReport(generateInspectionPDF, inspection, release)}
+                      onGenerateNCPDF={(inspection, release) => handleGenerateReport(generateNonConformitiesPDF, inspection, release)}
+                      onGenerateHTMLReport={handleGenerateHTMLReport}
+                      onViewHTMLReport={handleViewHTMLReport}
+                    />
+                  );
+                }
+              })}
+            </div>
+          )}
           
           {loadingMore && (
             <div className="flex justify-center py-4">
@@ -398,7 +658,7 @@ export default function InspectionsPage() {
           {!hasMore && !loading && inspections.length > 0 && !isFiltering && (
              <p className="text-center text-sm text-muted-foreground py-4">Fim da lista de inspeções.</p>
           )}
-        </div>
+        </>
       )}
 
       {showCreate && (
@@ -417,6 +677,22 @@ export default function InspectionsPage() {
           open={!!deletingInspection}
           onClose={() => setDeletingInspection(null)}
           onDelete={resetAndFetchInspections}
+        />
+      )}
+
+      {/* Report Viewer */}
+      {showViewer && selectedInspection && (
+        <ReportViewer
+          inspection={selectedInspection}
+          open={showViewer}
+          onClose={() => {
+            setShowViewer(false);
+            setSelectedInspection(null);
+          }}
+          onGeneratePreview={(inspection, release) => handleGenerateReport(generateInspectionPDF, inspection, release)}
+          onGenerateNCPDF={(inspection, release) => handleGenerateReport(generateNonConformitiesPDF, inspection, release)}
+          onGenerateHTMLReport={handleGenerateHTMLReport}
+          onViewHTMLReport={handleViewHTMLReport}
         />
       )}
     </div>

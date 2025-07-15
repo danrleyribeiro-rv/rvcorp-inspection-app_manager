@@ -8,64 +8,11 @@
   <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
   <style>
-        /* Bricolage Grotesque */
-        @font-face {
-            font-family: 'Bricolage Grotesque';
-            src: url('/fonts/BricolageGrotesque_24pt-Regular.ttf') format('truetype');
-            font-weight: 400;
-            font-style: normal;
-        }
-        @font-face {
-            font-family: 'Bricolage Grotesque';
-            src: url('/fonts/BricolageGrotesque_24pt-Medium.ttf') format('truetype');
-            font-weight: 500;
-            font-style: normal;
-        }
-        @font-face {
-            font-family: 'Bricolage Grotesque';
-            src: url('/fonts/BricolageGrotesque_24pt-SemiBold.ttf') format('truetype');
-            font-weight: 600;
-            font-style: normal;
-        }
-        @font-face {
-            font-family: 'Bricolage Grotesque';
-            src: url('/fonts/BricolageGrotesque_24pt-Bold.ttf') format('truetype');
-            font-weight: 700;
-            font-style: normal;
-        }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
 
-        /* Inter */
-        @font-face {
-            font-family: 'Inter';
-            src: url('/fonts/Inter-Regular.ttf') format('truetype');
-            font-weight: 400;
-            font-style: normal;
-        }
-        @font-face {
-            font-family: 'Inter';
-            src: url('/fonts/Inter-Medium.ttf') format('truetype');
-            font-weight: 500;
-            font-style: normal;
-        }
-        @font-face {
-            font-family: 'Inter';
-            src: url('/fonts/Inter-Bold.ttf') format('truetype');
-            font-weight: 700;
-            font-style: normal;
-        }
-
-        :root {
-            --font-heading: 'Bricolage Grotesque', sans-serif;
-            --font-body: 'Inter', sans-serif;
-        }
-
-        body {
-            font-family: var(--font-body);
-        }
-
-        h1, h2, h3, h4, h5, h6 {
-            font-family: var(--font-heading);
-        }
+    body {
+      font-family: 'Inter', sans-serif;
+    }
 
     @media print {
       body {
@@ -101,10 +48,11 @@
   <div class="min-h-screen flex flex-col">
     <div class="container mx-auto p-4 md:p-8 print:p-0">
       <div class="bg-white shadow-lg print:shadow-none print-page">
-        <header style="background-color: #312456;" class="text-white p-6 print:p-4">
+        <header class="bg-purple-700 text-white p-6 print:p-4">
           <div class="flex justify-between items-center">
             <div class="flex items-center">
-              <img alt="Lince Logo" class="h-10 mr-3 print:h-8" src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik01MCAwQzIyLjM4NTggMCAwIDIyLjM4NTggMCA1MEMwIDc3LjYxNDIgMjIuMzg1OCAxMDAgNTAgMTAwQzc3LjYxNDIgMTAwIDEwMCA3Ny42MTQyIDEwMCA1MEMxMDAgMjIuMzg1OCA3Ny42MTQyIDAgNTAgMFpNNTAgMTBDNzIuMDkxNCAxMCA5MCAyNy45MDg2IDkwIDUwQzkwIDcyLjA5MTQgNzIuMDkxNCA5MCA1MCA5MEMyNy45MDg2IDkwIDEwIDcyLjA5MTQgMTAgNTBDMTAgMjcuOTA4NiAyNy45MDg2IDEwIDUwIDEwWk01MCAyMEMzMy40MzE1IDIwIDIwIDMzLjQzMTUgMjAgNTBDMjAgNjYuNTY4NSAzMy40MzE1IDgwIDUwIDgwQzY2LjU2ODUgODAgODAgNjYuNTY4NSA4MCA1MEM4MCAzMy40MzE1IDY2LjU2ODUgMjAgNTAgMjBaTTUwIDMwQ0Q0LjQ3NzIgMzAgNDAgMzQuNDc3MiA0MCA0MEM0MCA0NS41MjI4IDQ0LjQ3NzIgNTAgNTAgNTVDNTUuNTIyOCA1MCA2MCA0NS41MjI4IDYwIDQwQzYwIDM0LjQ3NzIgNTUuNTIyOCAzMCA1MCAzMFpNNTAgNjBDNDQuNDc3MiA2MCA0MCA2NC40NzcyIDQwIDcwQzQwIDc1LjUyMjggNDQuNDc3MiA4MCA1MCA4MEM1NS41MjI4IDgwIDYwIDc1LjUyMjggNjAgNzBDNjAgNjQuNDc3MiA1NS41MjI4IDYwIDUwIDYwWiIgZmlsbD0iIzRBOTBFMiIvPgo8L3N2Zz4=" />
+              <img alt="Lince Logo" class="h-10 mr-3 print:h-8"
+                src="~/home/corp/Imagens/lincelogo.png" />
               <div>
                 <h1 class="text-xl font-semibold print:text-lg">Lince</h1>
                 <p class="text-sm print:text-xs">Em algum lugar Bacana - 777, Último Andar</p>
@@ -220,7 +168,7 @@
             </div>
           </section>
         </main>
-        <footer style="background-color: #312456;" class="text-white text-xs p-4 print:p-2 mt-auto">
+        <footer class="bg-purple-700 text-white text-xs p-4 print:p-2 mt-auto">
           <div class="container mx-auto flex justify-between items-center">
             <div class="flex items-center">
               <span class="material-icons text-lg mr-2 print:text-base">home_work</span>

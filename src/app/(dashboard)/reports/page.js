@@ -7,9 +7,7 @@ import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
+import { Card, CardContent } from "@/components/ui/card";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { 
   FileText, 
@@ -19,22 +17,21 @@ import {
   Search,
   Calendar,
   Building,
-  User,
-  AlertCircle,
-  CheckCircle,
-  Clock
+  User
 } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import ReportFilters from "./components/ReportFilters";
 import InspectionReportCard from "./components/InspectionReportCard";
 import ReportViewer from "./components/ReportViewer";
-import { generateInspectionPDF } from "@/services/pdf-service";
+import { generateInspectionPDF, generateNonConformitiesPDF } from "@/services/pdf-service";
+import { generateReportDownloadUrl, uploadReportToStorage } from "@/services/report-service";
 
 export default function ReportsPage() {
   const [inspections, setInspections] = useState([]);
   const [filteredInspections, setFilteredInspections] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedInspection, setSelectedInspection] = useState(null);
   const [showViewer, setShowViewer] = useState(false);
@@ -139,7 +136,103 @@ export default function ReportsPage() {
     }
   };
 
+  const handleGenerateReport = async (reportGenerator, inspection, release = null) => {
+    if (isGeneratingPDF) return;
+    setIsGeneratingPDF(true);
     
+    const { id: toastId, update: updateToast } = toast({
+      title: "Gerando PDF...",
+      description: "Aguarde enquanto preparamos o seu relatório.",
+    });
+
+    try {
+      const result = await reportGenerator(inspection, release);
+      
+      updateToast({
+        id: toastId,
+        title: result.success ? "PDF Gerado com Sucesso!" : "Falha ao Gerar PDF",
+        description: result.success ? "O download começará em breve." : result.error,
+        variant: result.success ? "success" : "destructive",
+      });
+
+    } catch (error) {
+      updateToast({
+        id: toastId,
+        title: "Erro Inesperado",
+        description: "Ocorreu um erro inesperado ao gerar o PDF.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingPDF(false);
+    }
+  };
+
+  const handleGenerateHTMLReport = async (inspection, type = 'complete') => {
+    if (isGeneratingPDF) return;
+    setIsGeneratingPDF(true);
+    
+    const { id: toastId, update: updateToast } = toast({
+      title: "Gerando Relatório HTML...",
+      description: "Aguarde enquanto preparamos o seu relatório.",
+    });
+
+    try {
+      // Generate download URL for HTML report
+      const downloadUrl = generateReportDownloadUrl(inspection, type);
+      
+      // Create download link
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = `${inspection.cod || inspection.id}_${type}_${Date.now()}.html`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up blob URL
+      setTimeout(() => URL.revokeObjectURL(downloadUrl), 100);
+      
+      updateToast({
+        id: toastId,
+        title: "Relatório HTML Gerado!",
+        description: "O download foi iniciado.",
+        variant: "default",
+      });
+
+    } catch (error) {
+      console.error('Error generating HTML report:', error);
+      updateToast({
+        id: toastId,
+        title: "Erro ao Gerar Relatório",
+        description: "Ocorreu um erro inesperado ao gerar o relatório HTML.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingPDF(false);
+    }
+  };
+
+  const handleViewHTMLReport = async (inspection, type = 'complete') => {
+    try {
+      const downloadUrl = generateReportDownloadUrl(inspection, type);
+      window.open(downloadUrl, '_blank');
+      
+      // Clean up blob URL after a delay
+      setTimeout(() => URL.revokeObjectURL(downloadUrl), 5000);
+      
+      toast({
+        title: "Relatório Aberto",
+        description: "O relatório foi aberto em uma nova aba.",
+      });
+
+    } catch (error) {
+      console.error('Error viewing HTML report:', error);
+      toast({
+        title: "Erro ao Visualizar Relatório",
+        description: "Ocorreu um erro ao abrir o relatório.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const calculateCompletion = (inspection) => {
     if (!inspection.topics || inspection.topics.length === 0) return 0;
@@ -212,16 +305,6 @@ export default function ReportsPage() {
     setFilteredInspections(filtered);
   };
 
-  const getCompletionStats = () => {
-    const total = filteredInspections.length;
-    const complete = filteredInspections.filter(i => i.completion === 100).length;
-    const inProgress = filteredInspections.filter(i => i.completion > 0 && i.completion < 100).length;
-    const notStarted = filteredInspections.filter(i => i.completion === 0).length;
-
-    return { total, complete, inProgress, notStarted };
-  };
-
-  const stats = getCompletionStats();
 
   return (
     <div className="container p-6">
@@ -235,48 +318,6 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.total}</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Completas</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{stats.complete}</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Em Progresso</CardTitle>
-            <Clock className="h-4 w-4 text-blue-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{stats.inProgress}</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Não Iniciadas</CardTitle>
-            <AlertCircle className="h-4 w-4 text-orange-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{stats.notStarted}</div>
-          </CardContent>
-        </Card>
-      </div>
 
       {/* Filtros e Busca */}
       <div className="flex gap-4 mb-6">
@@ -314,9 +355,9 @@ export default function ReportsPage() {
           </div>
         ) : filteredInspections.length === 0 ? (
           <Card>
-            <CardContent className="flex flex-col items-center justify-center py-6"> {/* Reduzido de py-8 para py-6 */}
-              <FileText className="h-10 w-10 text-muted-foreground mb-3" /> {/* Reduzido de h-12 w-12 mb-4 */}
-              <h3 className="text-base font-medium mb-1">Nenhum relatório encontrado</h3> {/* Reduzido */}
+            <CardContent className="flex flex-col items-center justify-center py-6">
+              <FileText className="h-10 w-10 text-muted-foreground mb-3" />
+              <h3 className="text-base font-medium mb-1">Nenhum relatório encontrado</h3>
               <p className="text-sm text-muted-foreground text-center">
                 Ajuste os filtros ou crie novas inspeções para gerar relatórios.
               </p>
@@ -331,7 +372,10 @@ export default function ReportsPage() {
                 setSelectedInspection(inspection);
                 setShowViewer(true);
               }}
-              
+              onGeneratePreview={(inspection, release) => handleGenerateReport(generateInspectionPDF, inspection, release)}
+              onGenerateNCPDF={(inspection, release) => handleGenerateReport(generateNonConformitiesPDF, inspection, release)}
+              onGenerateHTMLReport={handleGenerateHTMLReport}
+              onViewHTMLReport={handleViewHTMLReport}
             />
           ))
         )}
@@ -346,7 +390,10 @@ export default function ReportsPage() {
             setShowViewer(false);
             setSelectedInspection(null);
           }}
-          generateInspectionPDF={generateInspectionPDF}
+          onGeneratePreview={(inspection, release) => handleGenerateReport(generateInspectionPDF, inspection, release)}
+          onGenerateNCPDF={(inspection, release) => handleGenerateReport(generateNonConformitiesPDF, inspection, release)}
+          onGenerateHTMLReport={handleGenerateHTMLReport}
+          onViewHTMLReport={handleViewHTMLReport}
         />
       )}
     </div>
