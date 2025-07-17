@@ -155,27 +155,56 @@ export default function CreateInspectionPage() {
     const template = templates.find(t => t.id === templateId);
     if (!template?.topics) return [];
     
-    return template.topics.map(topic => ({
-      name: topic.name,
-      description: topic.description || null,
-      observation: null,
-      items: (topic.items || []).map(item => ({
-        name: item.name,
-        description: item.description || null,
+    return template.topics.map(topic => {
+      const baseTopic = {
+        name: topic.name,
+        description: topic.description || null,
         observation: null,
-        details: (item.details || []).map(detail => ({
-          name: detail.name,
-          type: detail.type,
-          required: detail.required || false,
-          options: detail.options || [],
-          value: null,
-          observation: null,
-          is_damaged: false,
-          media: [],
-          non_conformities: []
-        }))
-      }))
-    }));
+        direct_details: topic.direct_details || false
+      };
+
+      if (topic.direct_details) {
+        // Estrutura Tópico → Detalhe (sem items)
+        return {
+          ...baseTopic,
+          details: (topic.details || []).map(detail => ({
+            name: detail.name,
+            type: detail.type,
+            required: detail.required || false,
+            options: detail.options || [],
+            value: null,
+            observation: null,
+            is_damaged: false,
+            media: [],
+            non_conformities: []
+          }))
+        };
+      } else {
+        // Estrutura Tópico → Item → Detalhe (tradicional)
+        return {
+          ...baseTopic,
+          items: (topic.items || []).map(item => ({
+            name: item.name,
+            description: item.description || null,
+            observation: null,
+            evaluable: item.evaluable || false,
+            evaluation_options: item.evaluation_options || [],
+            evaluation_value: null,
+            details: (item.details || []).map(detail => ({
+              name: detail.name,
+              type: detail.type,
+              required: detail.required || false,
+              options: detail.options || [],
+              value: null,
+              observation: null,
+              is_damaged: false,
+              media: [],
+              non_conformities: []
+            }))
+          }))
+        };
+      }
+    });
   };
 
   const handleSubmit = async (e) => {

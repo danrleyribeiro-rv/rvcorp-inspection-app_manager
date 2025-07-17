@@ -1,9 +1,9 @@
-// src/app/(dashboard)/templates/[id]/editor/page.js
+// src/app/(dashboard)/templates/new/editor/page.js
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase";
-import { doc, getDoc, updateDoc, addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -46,8 +46,6 @@ const RESPONSE_TYPES = [
   { value: "measure", label: "Medida" }
 ];
 
-const NEW_TEMPLATE_ID = "new";
-
 const defaultNewTemplate = {
   title: "",
   description: "",
@@ -68,13 +66,9 @@ const editorIconComponents = {
   'store': Store,
 };
 
-export default function TemplateEditorPage({ params: routeParams }) {
-  const { id: initialTemplateId } = use(routeParams);
-  const [templateId, setTemplateId] = useState(initialTemplateId);
-  const [template, setTemplate] = useState(null);
-  const [originalTemplate, setOriginalTemplate] = useState(null);
-  const [isCreatingNew, setIsCreatingNew] = useState(initialTemplateId === NEW_TEMPLATE_ID);
-  const [loading, setLoading] = useState(true);
+export default function NewTemplateEditorPage() {
+  const [template, setTemplate] = useState(defaultNewTemplate);
+  const [originalTemplate, setOriginalTemplate] = useState(defaultNewTemplate);
   const [saving, setSaving] = useState(false);
   const [activeTopicIndex, setActiveTopicIndex] = useState(0);
   const [activeItemIndex, setActiveItemIndex] = useState(null);
@@ -100,16 +94,10 @@ export default function TemplateEditorPage({ params: routeParams }) {
   };
 
   useEffect(() => {
-    if (template && originalTemplate) {
-      const current = JSON.stringify(template);
-      const original = JSON.stringify(originalTemplate);
-      setHasUnsavedChanges(current !== original);
-    } else if (template && !originalTemplate && isCreatingNew) {
-      const current = JSON.stringify(template);
-      const initial = JSON.stringify(defaultNewTemplate);
-      setHasUnsavedChanges(current !== initial);
-    }
-  }, [template, originalTemplate, isCreatingNew]);
+    const current = JSON.stringify(template);
+    const initial = JSON.stringify(defaultNewTemplate);
+    setHasUnsavedChanges(current !== initial);
+  }, [template]);
 
   useEffect(() => {
     const handleBeforeUnload = (e) => {
@@ -122,53 +110,6 @@ export default function TemplateEditorPage({ params: routeParams }) {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [hasUnsavedChanges]);
 
-  useEffect(() => {
-    initializePageData();
-  }, [initialTemplateId]);
-
-  const initializePageData = async () => {
-    setLoading(true);
-    if (initialTemplateId === NEW_TEMPLATE_ID) {
-      setIsCreatingNew(true);
-      const newTpl = structuredClone(defaultNewTemplate);
-      setTemplate(newTpl);
-      setOriginalTemplate(structuredClone(newTpl));
-      setLoading(false);
-      setActiveTab("general");
-    } else {
-      setIsCreatingNew(false);
-      await fetchTemplateData(initialTemplateId);
-    }
-  };
-
-  const fetchTemplateData = async (idToFetch) => {
-    try {
-      const templateRef = doc(db, 'templates', idToFetch);
-      const templateDoc = await getDoc(templateRef);
-
-      if (!templateDoc.exists()) {
-        toast({ title: "Template não encontrado", variant: "destructive" });
-        router.replace("/templates");
-        return;
-      }
-      const data = templateDoc.data();
-      const formattedData = {
-        id: templateDoc.id,
-        ...data,
-        template_price: (data.template_price || 0).toFixed(2),
-        topics: data.topics || []
-      };
-      setTemplate(formattedData);
-      setOriginalTemplate(structuredClone(formattedData));
-      setActiveTab("general");
-    } catch (error) {
-      console.error("Error fetching template:", error);
-      toast({ title: "Erro ao carregar template", description: error.message, variant: "destructive" });
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const saveTemplate = async () => {
     if (!template.title?.trim()) {
       toast({ title: "Erro de Validação", description: "O título do template é obrigatório.", variant: "destructive"});
@@ -180,39 +121,21 @@ export default function TemplateEditorPage({ params: routeParams }) {
       const dataToSave = {
         ...template,
         template_price: parseFloat(template.template_price) || 0,
-        updated_at: serverTimestamp()
+        updated_at: serverTimestamp(),
+        deleted_at: null
       };
-      const { id, ...docData } = dataToSave;
 
-      if (isCreatingNew) {
-        const newCode = await codeService.generateUniqueCode('templates');
-        docData.cod = newCode;
-        docData.created_at = serverTimestamp();
-        
-        const newTemplateRef = await addDoc(collection(db, 'templates'), docData);
-        const newId = newTemplateRef.id;
+      const newCode = await codeService.generateUniqueCode('templates');
+      dataToSave.cod = newCode;
+      dataToSave.created_at = serverTimestamp();
+      
+      const newTemplateRef = await addDoc(collection(db, 'templates'), dataToSave);
+      const newId = newTemplateRef.id;
 
-        toast({ title: "Template criado com sucesso!", description: `Código: ${newCode}` });
-        
-        const newlySavedTemplate = { ...docData, id: newId, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
-        setTemplate(newlySavedTemplate);
-        setOriginalTemplate(structuredClone(newlySavedTemplate));
-        setIsCreatingNew(false);
-        setTemplateId(newId);
-        router.replace(`/templates/${newId}/editor`, { scroll: false });
-        setHasUnsavedChanges(false);
-
-      } else {
-        const templateRef = doc(db, 'templates', templateId);
-        await updateDoc(templateRef, docData);
-        toast({ title: "Template salvo com sucesso" });
-
-        const updatedTemplateData = { ...docData, id: templateId, updated_at: new Date().toISOString() };
-        if (template.created_at) updatedTemplateData.created_at = template.created_at;
-        setTemplate(updatedTemplateData);
-        setOriginalTemplate(structuredClone(updatedTemplateData));
-        setHasUnsavedChanges(false);
-      }
+      toast({ title: "Template criado com sucesso!", description: `Código: ${newCode}` });
+      
+      router.push(`/templates/${newId}/editor`);
+      
     } catch (error) {
       console.error("Error saving template:", error);
       toast({ title: "Erro ao salvar template", description: error.message, variant: "destructive" });
@@ -533,28 +456,6 @@ export default function TemplateEditorPage({ params: routeParams }) {
     </Dialog>
   );
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="animate-spin h-8 w-8 text-primary" />
-      </div>
-    );
-  }
-
-  if (!template) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold mb-4">Não foi possível carregar os dados do template.</h2>
-          <Button onClick={() => router.push("/templates")}>
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Voltar para Templates
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
   const currentTopic = template.topics?.[activeTopicIndex];
   const currentItem = activeItemIndex !== null ? currentTopic?.items?.[activeItemIndex] : null;
 
@@ -568,14 +469,9 @@ export default function TemplateEditorPage({ params: routeParams }) {
               <span className="hidden sm:inline ml-1">Voltar</span>
             </Button>
             <div>
-              <h1 className="text-xl font-bold">
-                {isCreatingNew ? "Criar Novo Template" : `Editar: ${template?.title || 'Template'}`}
-              </h1>
+              <h1 className="text-xl font-bold">Criar Novo Template</h1>
               <p className="text-xs text-muted-foreground">
-                {isCreatingNew 
-                  ? "Defina as configurações e a estrutura do novo template."
-                  : (template?.cod ? `Código: ${template.cod} | ` : '') + `ID: ${templateId}`
-                }
+                Defina as configurações e a estrutura do novo template.
               </p>
             </div>
           </div>
@@ -589,10 +485,10 @@ export default function TemplateEditorPage({ params: routeParams }) {
             <Button 
               size="sm" 
               onClick={saveTemplate} 
-              disabled={saving || (!hasUnsavedChanges && !isCreatingNew && templateId !== NEW_TEMPLATE_ID)}
+              disabled={saving}
             >
               {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-              {isCreatingNew ? "Criar e Salvar" : "Salvar Alterações"}
+              Criar Template
             </Button>
           </div>
         </div>

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Plus, Trash2, Copy, ChevronDown, ChevronUp } from "lucide-react";
 import ItemDetailEditor from "./ItemDetailEditor";
 
@@ -22,7 +23,9 @@ export default function ItemEditor({ items = [], onChange }) {
     const newItems = [...items, {
       name: "",
       description: "",
-      details: []
+      details: [],
+      evaluable: false,
+      evaluation_options: []
     }];
     onChange(newItems);
     
@@ -39,6 +42,20 @@ export default function ItemEditor({ items = [], onChange }) {
       newItems[index][main][sub][prop] = isNaN(numberValue) ? 0 : numberValue;
     } else {
       newItems[index][field] = value;
+    }
+    onChange(newItems);
+  };
+
+  const updateEvaluationOptions = (index, optionsString) => {
+    const newItems = [...items];
+    newItems[index].evaluation_options_text = optionsString;
+    if (optionsString.trim()) {
+      newItems[index].evaluation_options = optionsString
+        .split(",")
+        .map(option => option.trim())
+        .filter(Boolean);
+    } else {
+      newItems[index].evaluation_options = [];
     }
     onChange(newItems);
   };
@@ -156,6 +173,25 @@ export default function ItemEditor({ items = [], onChange }) {
                         className="h-7 text-sm"
                       />
                     </div>
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs">Item avaliável</Label>
+                      <Switch
+                        checked={item.evaluable || false}
+                        onCheckedChange={checked => updateItem(index, "evaluable", checked)}
+                        className="h-4 w-8"
+                      />
+                    </div>
+                    {item.evaluable && (
+                      <div className="space-y-1">
+                        <Label className="text-xs">Opções de avaliação (separadas por vírgula)</Label>
+                        <Input
+                          value={item.evaluation_options_text || item.evaluation_options?.join(", ") || ""}
+                          onChange={e => updateEvaluationOptions(index, e.target.value)}
+                          placeholder="Aprovado, Reprovado, Pendente..."
+                          className="h-7 text-sm"
+                        />
+                      </div>
+                    )}
                     <div className="max-h-64 overflow-auto">
                       <ItemDetailEditor
                         details={item.details || []}

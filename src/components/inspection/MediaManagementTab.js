@@ -155,8 +155,41 @@ export default function MediaManagementTab({
 
     setIsApplyingWatermark(true);
 
+    // Store reference to avoid issues with state changes during async operations
+    const currentSelection = selectedMediaForWatermark;
+
     try {
-      const { media, context } = selectedMediaForWatermark;
+      if (!currentSelection) {
+        throw new Error('No media selected for watermark');
+      }
+      
+      const { media, context } = currentSelection;
+      
+      if (!media || !media.cloudUrl) {
+        throw new Error('Invalid media object or missing cloudUrl');
+      }
+      
+      // Validate context indices and attempt to fix them using current active indices
+      if (context.topicIndex === undefined || context.mediaIndex === undefined) {
+        // If we're dealing with topic-level media and topicIndex is undefined
+        if (context.topicIndex === undefined && context.itemIndex === null && context.detailIndex === null) {
+          context.topicIndex = activeTopicIndex;
+          
+          // Find the mediaIndex by looking for the media in the current topic
+          const currentTopic = inspection.topics[activeTopicIndex];
+          if (currentTopic && currentTopic.media) {
+            const foundIndex = currentTopic.media.findIndex(m => m.cloudUrl === media.cloudUrl);
+            if (foundIndex !== -1) {
+              context.mediaIndex = foundIndex;
+            }
+          }
+        }
+        
+        // Final validation
+        if (context.topicIndex === undefined || context.mediaIndex === undefined) {
+          throw new Error(`Invalid context indices: topicIndex=${context.topicIndex}, mediaIndex=${context.mediaIndex}`);
+        }
+      }
       
       console.log("Aplicando marca d'água para:", media.cloudUrl);
       
@@ -241,7 +274,27 @@ export default function MediaManagementTab({
       setSelectedMediaForWatermark(null);
       
     } catch (error) {
-      console.error("Erro ao aplicar marca d'água:", error);
+      // Safely log error with context information
+      let safeLogData = {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+        mediaId: 'N/A',
+        mediaUrl: 'N/A',
+        context: 'N/A'
+      };
+      
+      try {
+        if (currentSelection) {
+          safeLogData.mediaId = currentSelection.media?.id || 'N/A';
+          safeLogData.mediaUrl = currentSelection.media?.cloudUrl || 'N/A';
+          safeLogData.context = currentSelection.context || 'N/A';
+        }
+      } catch (logError) {
+        safeLogData.logError = logError.message;
+      }
+      
+      console.error("Erro ao aplicar marca d'água:", safeLogData);
       
       let errorMessage = "Erro desconhecido ao aplicar marca d'água";
       
@@ -263,7 +316,7 @@ export default function MediaManagementTab({
     } finally {
       setIsApplyingWatermark(false);
     }
-  }, [selectedMediaForWatermark, inspection, onUpdateInspection, toast]);
+  }, [selectedMediaForWatermark, inspection, onUpdateInspection, toast, activeTopicIndex]);
 
   // Aplicar marca d'água em todas as imagens sem marca d'água
   const applyWatermarkToAll = useCallback(async () => {
@@ -468,10 +521,45 @@ export default function MediaManagementTab({
   const loadImageFromUrl = (url) => {
     return new Promise((resolve, reject) => {
       const img = new Image();
-      img.crossOrigin = "anonymous";
-      img.onload = () => resolve(img);
-      img.onerror = reject;
-      img.src = url;
+      
+      // Check if this is a Firebase Storage URL that might need proxy
+      const isFirebaseStorage = url.includes('firebasestorage.googleapis.com');
+      
+      // Try with CORS first, fallback without if blocked, then try proxy
+      const tryLoadImage = (useCors = true, useProxy = false) => {
+        const newImg = new Image();
+        let imageUrl = url;
+        
+        if (useProxy && isFirebaseStorage) {
+          imageUrl = `/api/proxy-image?url=${encodeURIComponent(url)}`;
+        }
+        
+        if (useCors && !useProxy) {
+          newImg.crossOrigin = "anonymous";
+        }
+        
+        newImg.onload = () => resolve(newImg);
+        newImg.onerror = (error) => {
+          if (useCors && !useProxy) {
+            tryLoadImage(false, false);
+          } else if (!useCors && !useProxy && isFirebaseStorage) {
+            tryLoadImage(true, true);
+          } else {
+            console.error('Error loading image from URL:', {
+              url,
+              error,
+              message: 'Failed to load image with all methods',
+              useCors,
+              useProxy,
+              isFirebaseStorage
+            });
+            reject(new Error(`Failed to load image from URL: ${url}`));
+          }
+        };
+        newImg.src = imageUrl;
+      };
+      
+      tryLoadImage(true, false);
     });
   };
 
@@ -510,10 +598,86 @@ export default function MediaManagementTab({
         0, 0, newWidth, newHeight
       );
       
-      return canvas.toDataURL('image/jpeg', 0.9);
+      try {
+        return canvas.toDataURL('image/jpeg', 0.9);
+      } catch (canvasError) {
+        // If canvas is tainted due to CORS, try using fetch to proxy the image
+        return await cropImageWithFetch(imageUrl);
+      }
     } catch (error) {
-      console.error('Error cropping image:', error);
+      console.error('Error cropping image:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+        imageUrl
+      });
       throw error;
+    }
+  };
+
+  const cropImageWithFetch = async (imageUrl) => {
+    try {
+      // Use proxy API to fetch the image and avoid CORS issues
+      const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(imageUrl)}`;
+      console.log('Fetching via proxy:', proxyUrl);
+      
+      const response = await fetch(proxyUrl);
+      
+      console.log('Proxy response status:', response.status);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch image via proxy: ${response.status}`);
+      }
+      
+      const blob = await response.blob();
+      console.log('Blob created:', blob);
+      
+      const img = await createImageBitmap(blob);
+      console.log('ImageBitmap created:', img);
+      
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      const { width: originalWidth, height: originalHeight } = img;
+      const aspectRatio = 4 / 3;
+      
+      let newWidth, newHeight, offsetX = 0, offsetY = 0;
+      
+      // Determine if image is landscape or portrait
+      if (originalWidth > originalHeight) {
+        // Landscape image - crop horizontally
+        newHeight = originalHeight;
+        newWidth = newHeight * aspectRatio;
+        offsetX = (originalWidth - newWidth) / 2;
+      } else {
+        // Portrait image - crop vertically  
+        newWidth = originalWidth;
+        newHeight = newWidth / aspectRatio;
+        offsetY = (originalHeight - newHeight) / 2;
+      }
+      
+      // Set canvas dimensions to 4:3 ratio
+      canvas.width = newWidth;
+      canvas.height = newHeight;
+      
+      // Draw cropped image
+      ctx.drawImage(
+        img,
+        offsetX, offsetY, newWidth, newHeight,
+        0, 0, newWidth, newHeight
+      );
+      
+      const result = canvas.toDataURL('image/jpeg', 0.9);
+      console.log('Canvas cropped successfully via fetch');
+      return result;
+    } catch (error) {
+      console.error('Error cropping image with fetch:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+        imageUrl
+      });
+      throw new Error(`Failed to crop image using fetch method: ${error.message}`);
     }
   };
 
@@ -548,6 +712,8 @@ export default function MediaManagementTab({
 
   const uploadProcessedImage = async (dataUrl, originalMedia, context, suffix = 'processed') => {
     try {
+      console.log('uploadProcessedImage called with:', { originalMedia, context, suffix });
+      
       // Convert data URL to blob
       const response = await fetch(dataUrl);
       const blob = await response.blob();
@@ -582,6 +748,8 @@ export default function MediaManagementTab({
   };
 
   const handleCropImage = useCallback((media, context) => {
+    console.log('handleCropImage called with:', { media, context });
+    
     if (media.type !== 'image') {
       toast({
         title: "Aviso",
@@ -596,21 +764,70 @@ export default function MediaManagementTab({
   }, [toast]);
 
   const applyCrop = useCallback(async () => {
+    console.log('applyCrop called, selectedImageForCrop:', selectedImageForCrop);
+    console.log('Current activeTopicIndex:', activeTopicIndex);
+    console.log('Current activeItemIndex:', activeItemIndex);
+    
     if (!selectedImageForCrop) return;
 
     setIsCropping(true);
 
+    // Store reference to avoid issues with state changes during async operations
+    const currentSelection = selectedImageForCrop;
+    
+    console.log('currentSelection:', currentSelection);
+
     try {
-      const { media, context } = selectedImageForCrop;
+      if (!currentSelection) {
+        throw new Error('No image selected for cropping');
+      }
+      
+      const { media, context } = currentSelection;
+      
+      console.log('Extracted media and context:', { media, context });
+      
+      if (!media || !media.cloudUrl) {
+        throw new Error('Invalid media object or missing cloudUrl');
+      }
       
       // Crop image to 4:3 ratio
       const croppedDataURL = await cropImageTo4x3(media.cloudUrl);
       
+      console.log('Cropped data URL generated, length:', croppedDataURL.length);
+      console.log('About to upload processed image with:', { media, context });
+      
       // Upload processed image
       const downloadURL = await uploadProcessedImage(croppedDataURL, media, context, 'cropped');
       
+      console.log('Upload completed, downloadURL:', downloadURL);
+      
       // Update inspection data
       const updatedInspection = { ...inspection };
+      
+      console.log('About to update inspection data with context:', context);
+      console.log('Current selection at this point:', currentSelection);
+      
+      // Validate context indices and attempt to fix them using current active indices
+      if (context.topicIndex === undefined || context.mediaIndex === undefined) {
+        // If we're dealing with topic-level media and topicIndex is undefined
+        if (context.topicIndex === undefined && context.itemIndex === null && context.detailIndex === null) {
+          context.topicIndex = activeTopicIndex;
+          
+          // Find the mediaIndex by looking for the media in the current topic
+          const currentTopic = inspection.topics[activeTopicIndex];
+          if (currentTopic && currentTopic.media) {
+            const foundIndex = currentTopic.media.findIndex(m => m.cloudUrl === media.cloudUrl);
+            if (foundIndex !== -1) {
+              context.mediaIndex = foundIndex;
+            }
+          }
+        }
+        
+        // Final validation
+        if (context.topicIndex === undefined || context.mediaIndex === undefined) {
+          throw new Error(`Invalid context indices: topicIndex=${context.topicIndex}, mediaIndex=${context.mediaIndex}`);
+        }
+      }
       
       if (context.isNC && context.ncIndex !== null) {
         updatedInspection.topics[context.topicIndex].items[context.itemIndex]
@@ -658,11 +875,48 @@ export default function MediaManagementTab({
       setSelectedImageForCrop(null);
       
     } catch (error) {
-      console.error("Erro ao cortar imagem:", error);
+      // Safely extract info for logging
+      let safeLogData = {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+        mediaId: 'N/A',
+        mediaUrl: 'N/A',
+        context: 'N/A',
+        currentSelectionExists: false,
+        currentSelectionType: 'undefined',
+        currentSelectionValue: null
+      };
+      
+      try {
+        if (currentSelection) {
+          safeLogData.currentSelectionExists = true;
+          safeLogData.currentSelectionType = typeof currentSelection;
+          safeLogData.currentSelectionValue = currentSelection;
+          safeLogData.mediaId = currentSelection.media?.id || 'N/A';
+          safeLogData.mediaUrl = currentSelection.media?.cloudUrl || 'N/A';
+          safeLogData.context = currentSelection.context || 'N/A';
+          // Add detailed context breakdown
+          if (currentSelection.context) {
+            safeLogData.contextDetails = {
+              topicIndex: currentSelection.context.topicIndex,
+              itemIndex: currentSelection.context.itemIndex,
+              detailIndex: currentSelection.context.detailIndex,
+              mediaIndex: currentSelection.context.mediaIndex,
+              isNC: currentSelection.context.isNC,
+              ncIndex: currentSelection.context.ncIndex
+            };
+          }
+        }
+      } catch (logError) {
+        safeLogData.logError = logError.message;
+      }
+      
+      console.error("Erro ao cortar imagem:", safeLogData);
       
       toast({
         title: "Erro",
-        description: "Erro ao processar imagem. Tente novamente.",
+        description: `Erro ao processar imagem: ${error.message || 'Erro desconhecido'}`,
         variant: "destructive"
       });
     } finally {
@@ -681,6 +935,28 @@ export default function MediaManagementTab({
     }
 
     try {
+      // Validate context indices and attempt to fix them using current active indices
+      if (context.topicIndex === undefined || context.mediaIndex === undefined) {
+        // If we're dealing with topic-level media and topicIndex is undefined
+        if (context.topicIndex === undefined && context.itemIndex === null && context.detailIndex === null) {
+          context.topicIndex = activeTopicIndex;
+          
+          // Find the mediaIndex by looking for the media in the current topic
+          const currentTopic = inspection.topics[activeTopicIndex];
+          if (currentTopic && currentTopic.media) {
+            const foundIndex = currentTopic.media.findIndex(m => m.cloudUrl === media.cloudUrl);
+            if (foundIndex !== -1) {
+              context.mediaIndex = foundIndex;
+            }
+          }
+        }
+        
+        // Final validation
+        if (context.topicIndex === undefined || context.mediaIndex === undefined) {
+          throw new Error(`Invalid context indices: topicIndex=${context.topicIndex}, mediaIndex=${context.mediaIndex}`);
+        }
+      }
+      
       // Rotate image
       const rotatedDataURL = await rotateImage(media.cloudUrl, degrees);
       
@@ -741,7 +1017,7 @@ export default function MediaManagementTab({
         variant: "destructive"
       });
     }
-  }, [inspection, onUpdateInspection, toast]);
+  }, [inspection, onUpdateInspection, toast, activeTopicIndex]);
 
   // Crop all images to 4:3 ratio
   const cropAllImagesTo4x3 = useCallback(async () => {

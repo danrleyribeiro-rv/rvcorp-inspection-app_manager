@@ -27,7 +27,6 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { parseCode } from "@/utils/codeGenerator";
 import { useRouter } from "next/navigation"; // Added for navigation
-import TemplateCreationDialog from "./components/TemplateCreationDialog";
 import ImportTemplateDialog from "./components/ImportTemplateDialog";
 import ExportTemplateDialog from "./components/ExportTemplateDialog";
 import DeleteTemplateDialog from "./components/DeleteTemplateDialog";
@@ -48,7 +47,6 @@ export default function TemplatesPage() {
   const [templateToDelete, setTemplateToDelete] = useState(null);
   const [showImport, setShowImport] = useState(false);
   const [showExport, setShowExport] = useState(false);
-  const [showCreate, setShowCreate] = useState(false);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
@@ -141,7 +139,7 @@ export default function TemplatesPage() {
       <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-6 gap-4">
         <h1 className="text-3xl font-bold">Templates</h1>
         <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
-          <Button onClick={() => setShowCreate(true)} className="w-full sm:w-auto">
+          <Button onClick={() => router.push('/templates/new/editor')} className="w-full sm:w-auto">
             <Plus className="mr-2 h-4 w-4" />
             Novo Template
           </Button>
@@ -266,13 +264,6 @@ export default function TemplatesPage() {
 
       {/* Statistics cards have been removed */}
 
-      {showCreate && (
-        <TemplateCreationDialog 
-          onClose={() => setShowCreate(false)} 
-          open={showCreate}
-          onSuccess={fetchTemplates}
-        />
-      )}
 
       {/* TemplateEditDialog is no longer used here */}
 

@@ -7,53 +7,76 @@ import { useCallback } from 'react';
 
 export function useNavigation() {
   const router = useRouter();
-  const { startNavigation, endNavigation } = useLoading();
-
+  
+  let loadingContext;
+  try {
+    loadingContext = useLoading();
+  } catch (error) {
+    loadingContext = null;
+  }
+  
   const navigateTo = useCallback((href, options = {}) => {
     const { delay = 100, replace = false } = options;
     
-    startNavigation();
-    
-    // Pequeno delay para mostrar o loading
-    setTimeout(() => {
+    if (loadingContext?.startNavigation) {
+      loadingContext.startNavigation();
+      
+      // Pequeno delay para mostrar o loading
+      setTimeout(() => {
+        if (replace) {
+          router.replace(href);
+        } else {
+          router.push(href);
+        }
+        
+        // Simula um tempo mínimo de loading para UX
+        setTimeout(() => {
+          loadingContext.endNavigation();
+        }, 300);
+      }, delay);
+    } else {
+      // Navegação direta sem loading se contexto não estiver disponível
       if (replace) {
         router.replace(href);
       } else {
         router.push(href);
       }
-      
-      // Simula um tempo mínimo de loading para UX
-      setTimeout(() => {
-        endNavigation();
-      }, 300);
-    }, delay);
-  }, [router, startNavigation, endNavigation]);
+    }
+  }, [router, loadingContext]);
 
   const goBack = useCallback((options = {}) => {
     const { delay = 100 } = options;
     
-    startNavigation();
-    
-    setTimeout(() => {
-      router.back();
+    if (loadingContext?.startNavigation) {
+      loadingContext.startNavigation();
+      
       setTimeout(() => {
-        endNavigation();
-      }, 300);
-    }, delay);
-  }, [router, startNavigation, endNavigation]);
+        router.back();
+        setTimeout(() => {
+          loadingContext.endNavigation();
+        }, 300);
+      }, delay);
+    } else {
+      router.back();
+    }
+  }, [router, loadingContext]);
 
   const refresh = useCallback((options = {}) => {
     const { delay = 100 } = options;
     
-    startNavigation();
-    
-    setTimeout(() => {
-      router.refresh();
+    if (loadingContext?.startNavigation) {
+      loadingContext.startNavigation();
+      
       setTimeout(() => {
-        endNavigation();
-      }, 500);
-    }, delay);
-  }, [router, startNavigation, endNavigation]);
+        router.refresh();
+        setTimeout(() => {
+          loadingContext.endNavigation();
+        }, 500);
+      }, delay);
+    } else {
+      router.refresh();
+    }
+  }, [router, loadingContext]);
 
   return {
     navigateTo,

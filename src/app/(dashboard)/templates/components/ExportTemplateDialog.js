@@ -58,8 +58,9 @@ export default function ExportTemplateDialog({ open, onClose, templates }) {
           templatesData.forEach(template => {
             const rows = [];
             template.topics?.forEach(topic => {
-              topic.items?.forEach(item => {
-                item.details?.forEach(detail => {
+              if (topic.direct_details) {
+                // Topic with direct details (no items)
+                topic.details?.forEach(detail => {
                   rows.push({
                     title: template.title,
                     description: template.description,
@@ -68,15 +69,40 @@ export default function ExportTemplateDialog({ open, onClose, templates }) {
                     icon_color: template.icon_color,
                     topic_name: topic.name,
                     topic_description: topic.description,
-                    item_name: item.name,
-                    item_description: item.description,
+                    item_name: "",
+                    item_description: "",
+                    item_evaluable: false,
+                    item_evaluation_options: "",
                     detail_name: detail.name,
                     detail_type: detail.type,
                     detail_required: detail.required,
                     detail_options: detail.options?.join("|") || ""
                   });
                 });
-              });
+              } else {
+                // Topic with items
+                topic.items?.forEach(item => {
+                  item.details?.forEach(detail => {
+                    rows.push({
+                      title: template.title,
+                      description: template.description,
+                      template_price: template.template_price,
+                      icon: template.icon,
+                      icon_color: template.icon_color,
+                      topic_name: topic.name,
+                      topic_description: topic.description,
+                      item_name: item.name,
+                      item_description: item.description,
+                      item_evaluable: item.evaluable || false,
+                      item_evaluation_options: item.evaluation_options?.join("|") || "",
+                      detail_name: detail.name,
+                      detail_type: detail.type,
+                      detail_required: detail.required,
+                      detail_options: detail.options?.join("|") || ""
+                    });
+                  });
+                });
+              }
             });
             if (type === "csv") {
               const csv = Papa.unparse(rows);
@@ -111,8 +137,9 @@ export default function ExportTemplateDialog({ open, onClose, templates }) {
           const template = templatesData[0];
           const rows = [];
           template.topics?.forEach(topic => {
-            topic.items?.forEach(item => {
-              item.details?.forEach(detail => {
+            if (topic.direct_details) {
+              // Topic with direct details (no items)
+              topic.details?.forEach(detail => {
                 rows.push({
                   title: template.title,
                   description: template.description,
@@ -121,15 +148,40 @@ export default function ExportTemplateDialog({ open, onClose, templates }) {
                   icon_color: template.icon_color,
                   topic_name: topic.name,
                   topic_description: topic.description,
-                  item_name: item.name,
-                  item_description: item.description,
+                  item_name: "",
+                  item_description: "",
+                  item_evaluable: false,
+                  item_evaluation_options: "",
                   detail_name: detail.name,
                   detail_type: detail.type,
                   detail_required: detail.required,
                   detail_options: detail.options?.join("|") || ""
                 });
               });
-            });
+            } else {
+              // Topic with items
+              topic.items?.forEach(item => {
+                item.details?.forEach(detail => {
+                  rows.push({
+                    title: template.title,
+                    description: template.description,
+                    template_price: template.template_price,
+                    icon: template.icon,
+                    icon_color: template.icon_color,
+                    topic_name: topic.name,
+                    topic_description: topic.description,
+                    item_name: item.name,
+                    item_description: item.description,
+                    item_evaluable: item.evaluable || false,
+                    item_evaluation_options: item.evaluation_options?.join("|") || "",
+                    detail_name: detail.name,
+                    detail_type: detail.type,
+                    detail_required: detail.required,
+                    detail_options: detail.options?.join("|") || ""
+                  });
+                });
+              });
+            }
           });
           const csv = Papa.unparse(rows);
           const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -145,8 +197,9 @@ export default function ExportTemplateDialog({ open, onClose, templates }) {
           const template = templatesData[0];
           const rows = [];
           template.topics?.forEach(topic => {
-            topic.items?.forEach(item => {
-              item.details?.forEach(detail => {
+            if (topic.direct_details) {
+              // Topic with direct details (no items)
+              topic.details?.forEach(detail => {
                 rows.push({
                   title: template.title,
                   description: template.description,
@@ -155,15 +208,40 @@ export default function ExportTemplateDialog({ open, onClose, templates }) {
                   icon_color: template.icon_color,
                   topic_name: topic.name,
                   topic_description: topic.description,
-                  item_name: item.name,
-                  item_description: item.description,
+                  item_name: "",
+                  item_description: "",
+                  item_evaluable: false,
+                  item_evaluation_options: "",
                   detail_name: detail.name,
                   detail_type: detail.type,
                   detail_required: detail.required,
                   detail_options: detail.options?.join("|") || ""
                 });
               });
-            });
+            } else {
+              // Topic with items
+              topic.items?.forEach(item => {
+                item.details?.forEach(detail => {
+                  rows.push({
+                    title: template.title,
+                    description: template.description,
+                    template_price: template.template_price,
+                    icon: template.icon,
+                    icon_color: template.icon_color,
+                    topic_name: topic.name,
+                    topic_description: topic.description,
+                    item_name: item.name,
+                    item_description: item.description,
+                    item_evaluable: item.evaluable || false,
+                    item_evaluation_options: item.evaluation_options?.join("|") || "",
+                    detail_name: detail.name,
+                    detail_type: detail.type,
+                    detail_required: detail.required,
+                    detail_options: detail.options?.join("|") || ""
+                  });
+                });
+              });
+            }
           });
           const ws = XLSX.utils.json_to_sheet(rows);
           const wb = XLSX.utils.book_new();

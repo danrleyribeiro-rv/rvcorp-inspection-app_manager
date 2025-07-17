@@ -215,23 +215,46 @@ export default function InspectionEditorPage({ params }) {
 
       setInspection(prev => {
         const updated = structuredClone(prev);
+        const topic = updated.topics[topicIndex];
         
         if (isNC && ncIndex !== null) {
-          if (!updated.topics[topicIndex].items[itemIndex].details[detailIndex].non_conformities[ncIndex].media) {
-            updated.topics[topicIndex].items[itemIndex].details[detailIndex].non_conformities[ncIndex].media = [];
+          // Non-conformity media
+          if (topic.direct_details) {
+            // Direct details structure
+            if (!updated.topics[topicIndex].details[detailIndex].non_conformities[ncIndex].media) {
+              updated.topics[topicIndex].details[detailIndex].non_conformities[ncIndex].media = [];
+            }
+            updated.topics[topicIndex].details[detailIndex].non_conformities[ncIndex].media.push(mediaObject);
+          } else {
+            // Traditional structure
+            if (!updated.topics[topicIndex].items[itemIndex].details[detailIndex].non_conformities[ncIndex].media) {
+              updated.topics[topicIndex].items[itemIndex].details[detailIndex].non_conformities[ncIndex].media = [];
+            }
+            updated.topics[topicIndex].items[itemIndex].details[detailIndex].non_conformities[ncIndex].media.push(mediaObject);
           }
-          updated.topics[topicIndex].items[itemIndex].details[detailIndex].non_conformities[ncIndex].media.push(mediaObject);
         } else if (detailIndex !== null) {
-          if (!updated.topics[topicIndex].items[itemIndex].details[detailIndex].media) {
-            updated.topics[topicIndex].items[itemIndex].details[detailIndex].media = [];
+          // Detail media
+          if (topic.direct_details) {
+            // Direct details structure
+            if (!updated.topics[topicIndex].details[detailIndex].media) {
+              updated.topics[topicIndex].details[detailIndex].media = [];
+            }
+            updated.topics[topicIndex].details[detailIndex].media.push(mediaObject);
+          } else {
+            // Traditional structure
+            if (!updated.topics[topicIndex].items[itemIndex].details[detailIndex].media) {
+              updated.topics[topicIndex].items[itemIndex].details[detailIndex].media = [];
+            }
+            updated.topics[topicIndex].items[itemIndex].details[detailIndex].media.push(mediaObject);
           }
-          updated.topics[topicIndex].items[itemIndex].details[detailIndex].media.push(mediaObject);
-        } else if (itemIndex !== null) {
+        } else if (itemIndex !== null && !topic.direct_details) {
+          // Item media (only for traditional structure)
           if (!updated.topics[topicIndex].items[itemIndex].media) {
             updated.topics[topicIndex].items[itemIndex].media = [];
           }
           updated.topics[topicIndex].items[itemIndex].media.push(mediaObject);
         } else {
+          // Topic media
           if (!updated.topics[topicIndex].media) {
             updated.topics[topicIndex].media = [];
           }
@@ -597,6 +620,32 @@ export default function InspectionEditorPage({ params }) {
     }));
   };
 
+  const addDirectDetail = (topicIndex) => {
+    setInspection(prev => ({
+      ...prev,
+      topics: prev.topics.map((topic, tIndex) =>
+        tIndex === topicIndex
+          ? {
+              ...topic,
+              details: [
+                ...(topic.details || []),
+                {
+                  name: `Novo Detalhe ${(topic.details?.length || 0) + 1}`,
+                  type: "text",
+                  required: false,
+                  value: null,
+                  observation: "",
+                  is_damaged: false,
+                  media: [],
+                  non_conformities: []
+                }
+              ]
+            }
+          : topic
+      )
+    }));
+  };
+
   const duplicateDetail = (topicIndex, itemIndex, detailIndex) => {
     const detailToDuplicate = inspection.topics[topicIndex].items[itemIndex].details[detailIndex];
     const duplicatedDetail = {
@@ -895,14 +944,31 @@ const handleMoveMediaDrop = (item, destination) => {
     try {
       setInspection(prev => {
         const updated = structuredClone(prev);
+        const topic = updated.topics[topicIndex];
         
         if (isNC && ncIndex !== null) {
-          updated.topics[topicIndex].items[itemIndex].details[detailIndex].non_conformities[ncIndex].media.splice(mediaIndex, 1);
+          // Non-conformity media
+          if (topic.direct_details) {
+            // Direct details structure
+            updated.topics[topicIndex].details[detailIndex].non_conformities[ncIndex].media.splice(mediaIndex, 1);
+          } else {
+            // Traditional structure
+            updated.topics[topicIndex].items[itemIndex].details[detailIndex].non_conformities[ncIndex].media.splice(mediaIndex, 1);
+          }
         } else if (detailIndex !== null) {
-          updated.topics[topicIndex].items[itemIndex].details[detailIndex].media.splice(mediaIndex, 1);
-        } else if (itemIndex !== null) {
+          // Detail media
+          if (topic.direct_details) {
+            // Direct details structure
+            updated.topics[topicIndex].details[detailIndex].media.splice(mediaIndex, 1);
+          } else {
+            // Traditional structure
+            updated.topics[topicIndex].items[itemIndex].details[detailIndex].media.splice(mediaIndex, 1);
+          }
+        } else if (itemIndex !== null && !topic.direct_details) {
+          // Item media (only for traditional structure)
           updated.topics[topicIndex].items[itemIndex].media.splice(mediaIndex, 1);
         } else {
+          // Topic media
           updated.topics[topicIndex].media.splice(mediaIndex, 1);
         }
         
@@ -948,22 +1014,33 @@ const handleMoveMediaDrop = (item, destination) => {
               ...(itemIndex === null && detailIndex === null && {
                 non_conformities: [...(topic.non_conformities || []), newNC]
               }),
-              items: topic.items.map((item, iIndex) =>
-                iIndex === itemIndex
-                  ? {
-                      ...item,
-                      // Item level non-conformity
-                      ...(detailIndex === null && {
-                        non_conformities: [...(item.non_conformities || []), newNC]
-                      }),
-                      details: item.details.map((detail, dIndex) =>
-                        dIndex === detailIndex
-                          ? { ...detail, non_conformities: [...(detail.non_conformities || []), newNC] }
-                          : detail
-                      )
-                    }
-                  : item
-              )
+              // Direct details structure
+              ...(topic.direct_details && {
+                details: topic.details.map((detail, dIndex) =>
+                  dIndex === detailIndex
+                    ? { ...detail, non_conformities: [...(detail.non_conformities || []), newNC] }
+                    : detail
+                )
+              }),
+              // Traditional structure
+              ...(!topic.direct_details && {
+                items: topic.items.map((item, iIndex) =>
+                  iIndex === itemIndex
+                    ? {
+                        ...item,
+                        // Item level non-conformity
+                        ...(detailIndex === null && {
+                          non_conformities: [...(item.non_conformities || []), newNC]
+                        }),
+                        details: item.details.map((detail, dIndex) =>
+                          dIndex === detailIndex
+                            ? { ...detail, non_conformities: [...(detail.non_conformities || []), newNC] }
+                            : detail
+                        )
+                      }
+                    : item
+                )
+              })
             }
           : topic
       )
@@ -981,25 +1058,39 @@ const handleMoveMediaDrop = (item, destination) => {
               ...(itemIndex === null && detailIndex === null && {
                 non_conformities: topic.non_conformities.filter((_, index) => index !== ncIndex)
               }),
-              items: topic.items.map((item, iIndex) =>
-                iIndex === itemIndex
-                  ? {
-                      ...item,
-                      // Remove item level non-conformity
-                      ...(detailIndex === null && {
-                        non_conformities: item.non_conformities.filter((_, index) => index !== ncIndex)
-                      }),
-                      details: item.details.map((detail, dIndex) =>
-                        dIndex === detailIndex
-                          ? {
-                              ...detail,
-                              non_conformities: detail.non_conformities.filter((_, index) => index !== ncIndex)
-                            }
-                          : detail
-                      )
-                    }
-                  : item
-              )
+              // Direct details structure
+              ...(topic.direct_details && {
+                details: topic.details.map((detail, dIndex) =>
+                  dIndex === detailIndex
+                    ? {
+                        ...detail,
+                        non_conformities: detail.non_conformities.filter((_, index) => index !== ncIndex)
+                      }
+                    : detail
+                )
+              }),
+              // Traditional structure
+              ...(!topic.direct_details && {
+                items: topic.items.map((item, iIndex) =>
+                  iIndex === itemIndex
+                    ? {
+                        ...item,
+                        // Remove item level non-conformity
+                        ...(detailIndex === null && {
+                          non_conformities: item.non_conformities.filter((_, index) => index !== ncIndex)
+                        }),
+                        details: item.details.map((detail, dIndex) =>
+                          dIndex === detailIndex
+                            ? {
+                                ...detail,
+                                non_conformities: detail.non_conformities.filter((_, index) => index !== ncIndex)
+                              }
+                            : detail
+                        )
+                      }
+                    : item
+                )
+              })
             }
           : topic
       )
@@ -1021,33 +1112,51 @@ const handleMoveMediaDrop = (item, destination) => {
                     : nc
                 )
               }),
-              items: topic.items.map((item, iIndex) =>
-                iIndex === itemIndex
-                  ? {
-                      ...item,
-                      // Update item level non-conformity
-                      ...(detailIndex === null && {
-                        non_conformities: item.non_conformities.map((nc, index) =>
+              // Direct details structure
+              ...(topic.direct_details && {
+                details: topic.details.map((detail, dIndex) =>
+                  dIndex === detailIndex
+                    ? {
+                        ...detail,
+                        non_conformities: detail.non_conformities.map((nc, index) =>
                           index === ncIndex
                             ? { ...nc, [field]: value, updatedAt: new Date().toISOString() }
                             : nc
                         )
-                      }),
-                      details: item.details.map((detail, dIndex) =>
-                        dIndex === detailIndex
-                          ? {
-                              ...detail,
-                              non_conformities: detail.non_conformities.map((nc, index) =>
-                                index === ncIndex
-                                  ? { ...nc, [field]: value, updatedAt: new Date().toISOString() }
-                                  : nc
-                              )
-                            }
-                          : detail
-                      )
-                    }
-                  : item
-              )
+                      }
+                    : detail
+                )
+              }),
+              // Traditional structure
+              ...(!topic.direct_details && {
+                items: topic.items.map((item, iIndex) =>
+                  iIndex === itemIndex
+                    ? {
+                        ...item,
+                        // Update item level non-conformity
+                        ...(detailIndex === null && {
+                          non_conformities: item.non_conformities.map((nc, index) =>
+                            index === ncIndex
+                              ? { ...nc, [field]: value, updatedAt: new Date().toISOString() }
+                              : nc
+                          )
+                        }),
+                        details: item.details.map((detail, dIndex) =>
+                          dIndex === detailIndex
+                            ? {
+                                ...detail,
+                                non_conformities: detail.non_conformities.map((nc, index) =>
+                                  index === ncIndex
+                                    ? { ...nc, [field]: value, updatedAt: new Date().toISOString() }
+                                    : nc
+                                )
+                              }
+                            : detail
+                        )
+                      }
+                    : item
+                )
+              })
             }
           : topic
       )
@@ -1348,7 +1457,7 @@ const handleMoveMediaDrop = (item, destination) => {
                 </div>
               </div>
               
-              <div className="grid grid-cols-7 gap-1 h-[calc(100vh-280px)]">
+              <div className={`grid gap-1 h-[calc(100vh-280px)] ${currentTopic?.direct_details ? 'grid-cols-5' : 'grid-cols-7'}`}>
                 {/* Topics Column */}
                 <div className="col-span-2 border rounded-lg">
                   <div className="p-3 border-b flex justify-between items-center">
@@ -1466,16 +1575,20 @@ const handleMoveMediaDrop = (item, destination) => {
                   </ScrollArea>
                 </div>
 
-                {/* Items Column */}
-                <div className="col-span-2 border rounded-lg">
+                {/* Items Column or Direct Details Column */}
+                <div className={`border rounded-lg ${currentTopic?.direct_details ? 'col-span-3' : 'col-span-2'}`}>
                   <div className="p-3 border-b flex justify-between items-center">
                     <div className="flex items-center gap-2">
                       <span className="text-sm text-muted-foreground">Tópico {activeTopicIndex + 1}</span>
                       <ChevronRight className="h-3 w-3" />
-                      <span className="font-medium">Itens ({currentTopic?.items?.length || 0})</span>
+                      {currentTopic?.direct_details ? (
+                        <span className="font-medium">Detalhes ({currentTopic?.details?.length || 0})</span>
+                      ) : (
+                        <span className="font-medium">Itens ({currentTopic?.items?.length || 0})</span>
+                      )}
                     </div>
                     {currentTopic && (
-                      <Button size="sm" onClick={() => addItem(activeTopicIndex)}>
+                      <Button size="sm" onClick={() => currentTopic.direct_details ? addDirectDetail(activeTopicIndex) : addItem(activeTopicIndex)}>
                         <Plus className="h-3 w-3" />
                       </Button>
                     )}
@@ -1557,9 +1670,107 @@ const handleMoveMediaDrop = (item, destination) => {
                          </div>
                        </div>
                        
-                       {/* Items list */}
-                       <div className="space-y-1">
-                         {filterItems(currentTopic?.items || []).map((item, itemIndex) => {
+                       {/* Direct Details or Items list */}
+                       {currentTopic.direct_details ? (
+                         /* Direct Details list */
+                         <div className="space-y-3">
+                           {currentTopic.details?.map((detail, detailIndex) => (
+                             <DetailEditor
+                               key={detailIndex}
+                               detail={detail}
+                               detailIndex={detailIndex}
+                               topicIndex={activeTopicIndex}
+                               itemIndex={null}
+                               onUpdateDetail={(topicIdx, itemIdx, detailIdx, field, value) => {
+                                 setInspection(prev => ({
+                                   ...prev,
+                                   topics: prev.topics.map((topic, tIdx) =>
+                                     tIdx === topicIdx
+                                       ? {
+                                           ...topic,
+                                           details: topic.details.map((detail, dIdx) =>
+                                             dIdx === detailIdx
+                                               ? { ...detail, [field]: value }
+                                               : detail
+                                           )
+                                         }
+                                       : topic
+                                   )
+                                 }));
+                               }}
+                               onRemoveDetail={(topicIdx, itemIdx, detailIdx) => {
+                                 setInspection(prev => ({
+                                   ...prev,
+                                   topics: prev.topics.map((topic, tIdx) =>
+                                     tIdx === topicIdx
+                                       ? {
+                                           ...topic,
+                                           details: topic.details.filter((_, dIdx) => dIdx !== detailIdx)
+                                         }
+                                       : topic
+                                   )
+                                 }));
+                               }}
+                               onAddNonConformity={addNonConformity}
+                               onRemoveNonConformity={removeNonConformity}
+                               onUpdateNonConformity={updateNonConformity}
+                               onUploadMedia={uploadMedia}
+                               onRemoveMedia={removeMedia}
+                               onMoveMedia={openMoveDialog}
+                               onViewMedia={openMediaViewer}
+                               onMoveMediaDrop={handleMoveMediaDrop}
+                               onReorderDetail={(topicIdx, itemIdx, detailIdx, direction) => {
+                                 const topic = inspection.topics[topicIdx];
+                                 const newIndex = detailIdx + direction;
+                                 if (newIndex < 0 || newIndex >= topic.details.length) return;
+                                 
+                                 setInspection(prev => ({
+                                   ...prev,
+                                   topics: prev.topics.map((topic, tIdx) =>
+                                     tIdx === topicIdx
+                                       ? {
+                                           ...topic,
+                                           details: (() => {
+                                             const newDetails = [...topic.details];
+                                             [newDetails[detailIdx], newDetails[newIndex]] = [newDetails[newIndex], newDetails[detailIdx]];
+                                             return newDetails;
+                                           })()
+                                         }
+                                       : topic
+                                   )
+                                 }));
+                               }}
+                               onDuplicateDetail={(topicIdx, itemIdx, detailIdx) => {
+                                 const detailToDuplicate = inspection.topics[topicIdx].details[detailIdx];
+                                 const duplicatedDetail = {
+                                   ...structuredClone(detailToDuplicate),
+                                   name: `${detailToDuplicate.name} (Cópia)`,
+                                 };
+                                 
+                                 setInspection(prev => ({
+                                   ...prev,
+                                   topics: prev.topics.map((topic, tIdx) =>
+                                     tIdx === topicIdx
+                                       ? {
+                                           ...topic,
+                                           details: [
+                                             ...topic.details.slice(0, detailIdx + 1),
+                                             duplicatedDetail,
+                                             ...topic.details.slice(detailIdx + 1)
+                                           ]
+                                         }
+                                       : topic
+                                   )
+                                 }));
+                               }}
+                               onMoveStructureDrop={handleMoveStructure}
+                             />
+                           ))}
+                         </div>
+                       ) : (
+                         /* Items list */
+                         <div className="space-y-1">
+                           {filterItems(currentTopic?.items || []).map((item, itemIndex) => {
                            // Get the original item index
                            const originalItemIndex = currentTopic.items.findIndex(i => i === item);
                            return (
@@ -1610,15 +1821,33 @@ const handleMoveMediaDrop = (item, destination) => {
                                    </div>
                                  
                                  <div className="flex items-center justify-between text-xs opacity-70">
-                                   {item.details?.length > 0 && (
-                                     <span>
-                                       {item.details.length} detalhe{item.details.length !== 1 ? 's' : ''}
-                                     </span>
-                                   )}
-                                   {item.media?.length > 0 && (
-                                     <span>
-                                       {item.media.length} mídia{item.media.length !== 1 ? 's' : ''}
-                                     </span>
+                                   <div className="flex items-center gap-2">
+                                     {item.details?.length > 0 && (
+                                       <span>
+                                         {item.details.length} detalhe{item.details.length !== 1 ? 's' : ''}
+                                       </span>
+                                     )}
+                                     {item.media?.length > 0 && (
+                                       <span>
+                                         {item.media.length} mídia{item.media.length !== 1 ? 's' : ''}
+                                       </span>
+                                     )}
+                                   </div>
+                                   {item.evaluable && (
+                                     <div className="flex items-center gap-1">
+                                       <Badge variant="outline" className="text-xs px-1 py-0">
+                                         Avaliável
+                                       </Badge>
+                                       {item.evaluation && (
+                                         <Badge variant={
+                                           item.evaluation.toLowerCase().includes('aprovado') || item.evaluation.toLowerCase().includes('ok') || item.evaluation.toLowerCase().includes('conforme') ? 'default' :
+                                           item.evaluation.toLowerCase().includes('reprovado') || item.evaluation.toLowerCase().includes('não conforme') || item.evaluation.toLowerCase().includes('crítico') ? 'destructive' :
+                                           'secondary'
+                                         } className="text-xs px-1 py-0">
+                                           {item.evaluation}
+                                         </Badge>
+                                       )}
+                                     </div>
                                    )}
                                  </div>
                                  
@@ -1651,9 +1880,66 @@ const handleMoveMediaDrop = (item, destination) => {
                                  )}
                                </div>
                                
-                               {/* Item Media Upload Section and NC - show when item is selected */}
+                               {/* Item fields, evaluation, media and NC - show when item is selected */}
                                {activeItemIndex === originalItemIndex && (
                                  <div className="px-2 space-y-3">
+                                   {/* Item Details and Evaluation */}
+                                   <div className="space-y-2 p-2 bg-accent/20 rounded">
+                                     <div>
+                                       <Label className="text-xs">Nome do Item</Label>
+                                       <Input
+                                         value={item.name || ''}
+                                         onChange={e => updateItemField(activeTopicIndex, originalItemIndex, 'name', e.target.value)}
+                                         className="h-7 text-sm mt-1"
+                                       />
+                                     </div>
+                                     <div>
+                                       <Label className="text-xs">Descrição</Label>
+                                       <Input
+                                         value={item.description || ''}
+                                         onChange={e => updateItemField(activeTopicIndex, originalItemIndex, 'description', e.target.value)}
+                                         className="h-7 text-sm mt-1"
+                                       />
+                                     </div>
+                                     <div>
+                                       <Label className="text-xs">Observação do Item</Label>
+                                       <Textarea
+                                         value={item.observation || ''}
+                                         onChange={e => updateItemField(activeTopicIndex, originalItemIndex, 'observation', e.target.value)}
+                                         rows={2}
+                                         className="text-sm mt-1"
+                                       />
+                                     </div>
+                                     
+                                     {/* Item Evaluation - only show if item is evaluable */}
+                                     {item.evaluable && item.evaluation_options && item.evaluation_options.length > 0 && (
+                                       <div>
+                                         <Label className="text-xs font-medium">Avaliação do Item</Label>
+                                         <select
+                                           value={item.evaluation || ''}
+                                           onChange={e => updateItemField(activeTopicIndex, originalItemIndex, 'evaluation', e.target.value)}
+                                           className="w-full h-8 text-sm mt-1 px-2 border rounded bg-background"
+                                         >
+                                           <option value="">Selecione uma avaliação...</option>
+                                           {item.evaluation_options.map((option, idx) => (
+                                             <option key={idx} value={option}>{option}</option>
+                                           ))}
+                                         </select>
+                                         {item.evaluation && (
+                                           <div className="mt-1">
+                                             <Badge variant={
+                                               item.evaluation.toLowerCase().includes('aprovado') || item.evaluation.toLowerCase().includes('ok') || item.evaluation.toLowerCase().includes('conforme') ? 'default' :
+                                               item.evaluation.toLowerCase().includes('reprovado') || item.evaluation.toLowerCase().includes('não conforme') || item.evaluation.toLowerCase().includes('crítico') ? 'destructive' :
+                                               'secondary'
+                                             } className="text-xs">
+                                               {item.evaluation}
+                                             </Badge>
+                                           </div>
+                                         )}
+                                       </div>
+                                     )}
+                                   </div>
+                                   
                                    <UniversalMediaSection
                                      media={[]}
                                      level="item"
@@ -1702,18 +1988,20 @@ const handleMoveMediaDrop = (item, destination) => {
                              </DraggableItem>
                            </UniversalDropZone>
                            );
-                         })}
-                       </div>
+                           })}
+                         </div>
+                       )}
                      </div>
                    ) : (
                      <div className="p-4 text-center text-muted-foreground">
-                       Selecione um tópico para ver os itens
+                       Selecione um tópico para ver {currentTopic?.direct_details ? 'os detalhes' : 'os itens'}
                      </div>
                    )}
                  </ScrollArea>
                </div>
 
-               {/* Details Column */}
+               {/* Details Column - only show when not using direct_details */}
+               {!currentTopic?.direct_details && (
                <div className="col-span-3 border rounded-lg">
                  <div className="p-3 border-b flex justify-between items-center">
                    <div className="flex items-center gap-2">
@@ -1803,6 +2091,7 @@ const handleMoveMediaDrop = (item, destination) => {
                    )}
                  </ScrollArea>
                </div>
+               )}
              </div>
            </TabsContent>
 

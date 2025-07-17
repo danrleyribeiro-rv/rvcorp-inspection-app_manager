@@ -47,9 +47,14 @@ export default function ImportTemplateDialog({ open, onClose, onSuccess }) {
             topics: Array.isArray(templateData.topics) ? templateData.topics.map(topic => ({
               name: topic.name || "",
               description: topic.description || "",
+              direct_details: topic.direct_details || false,
+              details: Array.isArray(topic.details) ? topic.details : [],
               items: Array.isArray(topic.items) ? topic.items.map(item => ({
                 name: item.name || "",
                 description: item.description || "",
+                evaluable: item.evaluable || false,
+                evaluation_options: Array.isArray(item.evaluation_options) ? item.evaluation_options : [],
+                evaluation_options_text: item.evaluation_options_text || "",
                 details: Array.isArray(item.details) ? item.details : []
               })) : []
             })) : []
@@ -93,20 +98,47 @@ export default function ImportTemplateDialog({ open, onClose, onSuccess }) {
                 let template = grouped[row.title];
                 let topic = template.topics.find(t => t.name === row.topic_name);
                 if (!topic) {
-                  topic = { name: row.topic_name, description: row.topic_description, items: [] };
+                  topic = { 
+                    name: row.topic_name, 
+                    description: row.topic_description, 
+                    direct_details: !row.item_name, // If no item name, it's direct details
+                    details: [],
+                    items: [] 
+                  };
                   template.topics.push(topic);
                 }
-                let item = topic.items.find(i => i.name === row.item_name);
-                if (!item) {
-                  item = { name: row.item_name, description: row.item_description, details: [] };
-                  topic.items.push(item);
+                
+                if (!row.item_name) {
+                  // Direct topic detail
+                  topic.direct_details = true;
+                  topic.details.push({
+                    name: row.detail_name,
+                    type: row.detail_type,
+                    required: row.detail_required === 'true',
+                    options: row.detail_options ? row.detail_options.split('|') : []
+                  });
+                } else {
+                  // Item with detail
+                  topic.direct_details = false;
+                  let item = topic.items.find(i => i.name === row.item_name);
+                  if (!item) {
+                    item = { 
+                      name: row.item_name, 
+                      description: row.item_description, 
+                      evaluable: row.item_evaluable === 'true',
+                      evaluation_options: row.item_evaluation_options ? row.item_evaluation_options.split('|') : [],
+                      evaluation_options_text: row.item_evaluation_options ? row.item_evaluation_options.replace(/\|/g, ', ') : '',
+                      details: [] 
+                    };
+                    topic.items.push(item);
+                  }
+                  item.details.push({
+                    name: row.detail_name,
+                    type: row.detail_type,
+                    required: row.detail_required === 'true',
+                    options: row.detail_options ? row.detail_options.split('|') : []
+                  });
                 }
-                item.details.push({
-                  name: row.detail_name,
-                  type: row.detail_type,
-                  required: row.detail_required === 'true',
-                  options: row.detail_options ? row.detail_options.split('|') : []
-                });
               });
               // Pega o primeiro template agrupado
               const templateData = Object.values(grouped)[0];
@@ -148,20 +180,47 @@ export default function ImportTemplateDialog({ open, onClose, onSuccess }) {
             let template = grouped[row.title];
             let topic = template.topics.find(t => t.name === row.topic_name);
             if (!topic) {
-              topic = { name: row.topic_name, description: row.topic_description, items: [] };
+              topic = { 
+                name: row.topic_name, 
+                description: row.topic_description, 
+                direct_details: !row.item_name, // If no item name, it's direct details
+                details: [],
+                items: [] 
+              };
               template.topics.push(topic);
             }
-            let item = topic.items.find(i => i.name === row.item_name);
-            if (!item) {
-              item = { name: row.item_name, description: row.item_description, details: [] };
-              topic.items.push(item);
+            
+            if (!row.item_name) {
+              // Direct topic detail
+              topic.direct_details = true;
+              topic.details.push({
+                name: row.detail_name,
+                type: row.detail_type,
+                required: row.detail_required === 'true',
+                options: row.detail_options ? row.detail_options.split('|') : []
+              });
+            } else {
+              // Item with detail
+              topic.direct_details = false;
+              let item = topic.items.find(i => i.name === row.item_name);
+              if (!item) {
+                item = { 
+                  name: row.item_name, 
+                  description: row.item_description, 
+                  evaluable: row.item_evaluable === 'true',
+                  evaluation_options: row.item_evaluation_options ? row.item_evaluation_options.split('|') : [],
+                  evaluation_options_text: row.item_evaluation_options ? row.item_evaluation_options.replace(/\|/g, ', ') : '',
+                  details: [] 
+                };
+                topic.items.push(item);
+              }
+              item.details.push({
+                name: row.detail_name,
+                type: row.detail_type,
+                required: row.detail_required === 'true',
+                options: row.detail_options ? row.detail_options.split('|') : []
+              });
             }
-            item.details.push({
-              name: row.detail_name,
-              type: row.detail_type,
-              required: row.detail_required === 'true',
-              options: row.detail_options ? row.detail_options.split('|') : []
-            });
           });
           const templateData = Object.values(grouped)[0];
           setPreview(templateData);
@@ -213,20 +272,47 @@ export default function ImportTemplateDialog({ open, onClose, onSuccess }) {
           let template = grouped[row.title];
           let topic = template.topics.find(t => t.name === row.topic_name);
           if (!topic) {
-            topic = { name: row.topic_name, description: row.topic_description, items: [] };
+            topic = { 
+              name: row.topic_name, 
+              description: row.topic_description, 
+              direct_details: !row.item_name, // If no item name, it's direct details
+              details: [],
+              items: [] 
+            };
             template.topics.push(topic);
           }
-          let item = topic.items.find(i => i.name === row.item_name);
-          if (!item) {
-            item = { name: row.item_name, description: row.item_description, details: [] };
-            topic.items.push(item);
+          
+          if (!row.item_name) {
+            // Direct topic detail
+            topic.direct_details = true;
+            topic.details.push({
+              name: row.detail_name,
+              type: row.detail_type,
+              required: row.detail_required === 'true',
+              options: row.detail_options ? row.detail_options.split('|') : []
+            });
+          } else {
+            // Item with detail
+            topic.direct_details = false;
+            let item = topic.items.find(i => i.name === row.item_name);
+            if (!item) {
+              item = { 
+                name: row.item_name, 
+                description: row.item_description, 
+                evaluable: row.item_evaluable === 'true',
+                evaluation_options: row.item_evaluation_options ? row.item_evaluation_options.split('|') : [],
+                evaluation_options_text: row.item_evaluation_options ? row.item_evaluation_options.replace(/\|/g, ', ') : '',
+                details: [] 
+              };
+              topic.items.push(item);
+            }
+            item.details.push({
+              name: row.detail_name,
+              type: row.detail_type,
+              required: row.detail_required === 'true',
+              options: row.detail_options ? row.detail_options.split('|') : []
+            });
           }
-          item.details.push({
-            name: row.detail_name,
-            type: row.detail_type,
-            required: row.detail_required === 'true',
-            options: row.detail_options ? row.detail_options.split('|') : []
-          });
         });
         const templateData = Object.values(grouped)[0];
         setPreview(templateData);

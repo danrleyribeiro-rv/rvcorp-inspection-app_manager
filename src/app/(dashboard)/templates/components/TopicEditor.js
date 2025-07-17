@@ -6,8 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Plus, Trash2, Copy, ChevronDown, ChevronUp } from "lucide-react";
 import ItemEditor from "./ItemEditor";
+import ItemDetailEditor from "./ItemDetailEditor";
 
 export default function TopicEditor({ topics = [], onChange }) {
   const [expandedTopics, setExpandedTopics] = useState(new Set());
@@ -23,7 +25,9 @@ export default function TopicEditor({ topics = [], onChange }) {
     const newTopics = [...topics, {
       name: `Novo Tópico ${topics.length + 1}`,
       description: "",
-      items: []
+      items: [],
+      direct_details: false,
+      details: []
     }];
     onChange(newTopics);
     
@@ -134,7 +138,10 @@ export default function TopicEditor({ topics = [], onChange }) {
                       )}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      {topic.items?.length || 0} ite{(topic.items?.length || 0) !== 1 ? 'ns' : 'm'}
+                      {topic.direct_details ? 
+                        `${topic.details?.length || 0} detalhe${(topic.details?.length || 0) !== 1 ? 's' : ''}` :
+                        `${topic.items?.length || 0} ite${(topic.items?.length || 0) !== 1 ? 'ns' : 'm'}`
+                      }
                     </div>
                   </div>
                   
@@ -184,13 +191,28 @@ export default function TopicEditor({ topics = [], onChange }) {
                             className="h-8"
                           />
                         </div>
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm">Tópico com detalhes diretos (sem itens)</Label>
+                          <Switch
+                            checked={topic.direct_details || false}
+                            onCheckedChange={checked => updateTopic(index, "direct_details", checked)}
+                            className="h-4 w-8"
+                          />
+                        </div>
                       </div>
                       
                       <div className="max-h-96 overflow-auto">
-                        <ItemEditor
-                          items={topic.items || []}
-                          onChange={items => updateTopic(index, "items", items)}
-                        />
+                        {topic.direct_details ? (
+                          <ItemDetailEditor
+                            details={topic.details || []}
+                            onChange={details => updateTopic(index, "details", details)}
+                          />
+                        ) : (
+                          <ItemEditor
+                            items={topic.items || []}
+                            onChange={items => updateTopic(index, "items", items)}
+                          />
+                        )}
                       </div>
                     </div>
                   </CardContent>

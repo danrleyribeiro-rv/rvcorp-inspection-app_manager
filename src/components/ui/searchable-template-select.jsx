@@ -81,18 +81,15 @@ export default function SearchableTemplateSelect({
                     </span>
                   )}
                 </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                <div
+                  className="h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground rounded-sm flex items-center justify-center cursor-pointer"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleClear();
                   }}
                 >
                   <X className="h-3 w-3" />
-                </Button>
+                </div>
               </div>
             ) : (
               <div className="flex items-center gap-2 text-muted-foreground">
