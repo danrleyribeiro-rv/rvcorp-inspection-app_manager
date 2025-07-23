@@ -19,6 +19,7 @@ import { Bar, Line, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Res
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import MapView from "@/components/MapView";
+import { getInternalStatus, getInternalStatusText, getInternalStatusHexColor } from "@/utils/inspection-status";
 import { 
   Building, Calendar, Users, DollarSign, File, Flag, FileText,
   Home, Layers, User, CheckSquare, AlertCircle, ArrowUp, ArrowDown,
@@ -57,9 +58,15 @@ export default function DashboardPage() {
       if (!user?.uid) return;
 
       // Fetch projects
+      // TODO: Restringir por manager_id quando necessário
+      // const projectsQuery = query(
+      //   collection(db, 'projects'),
+      //   where('manager_id', '==', user.uid),
+      //   where('deleted_at', '==', null),
+      //   orderBy('created_at', 'desc')
+      // );
       const projectsQuery = query(
         collection(db, 'projects'),
-        where('manager_id', '==', user.uid),
         where('deleted_at', '==', null),
         orderBy('created_at', 'desc')
       );
@@ -116,19 +123,29 @@ export default function DashboardPage() {
       }
       
       // Fetch clients
+      // TODO: Restringir por manager_id quando necessário
+      // const clientsQuery = query(
+      //   collection(db, 'clients'),
+      //   where('deleted_at', '==', null),
+      //   where('manager_id', '==', user.uid)
+      // );
       const clientsQuery = query(
         collection(db, 'clients'),
-        where('deleted_at', '==', null),
-        where('manager_id', '==', user.uid)
+        where('deleted_at', '==', null)
       );
       
       const clientsSnapshot = await getDocs(clientsQuery);
 
       // Fetch Inspectors
+      // TODO: Restringir por manager_id quando necessário
+      // const inspectorsQuery = query(
+      //   collection(db, 'inspectors'),
+      //   where('deleted_at', '==', null),
+      //   where('manager_id', '==', user.uid)
+      // );
       const inspectorsQuery = query(
         collection(db, 'inspectors'),
-        where('deleted_at', '==', null),
-        where('manager_id', '==', user.uid)
+        where('deleted_at', '==', null)
       );
 
       // Fetch templates
@@ -140,22 +157,23 @@ export default function DashboardPage() {
       const templatesSnapshot = await getDocs(templatesQuery);
       const inspectorsSnapshot = await getDocs(inspectorsQuery);
 
-      // Calculate stats
-      const completedInspections = inspectionsList.filter(i => i.status === 'completed').length;
-      const pendingInspections = inspectionsList.filter(i => i.status === 'pending').length;
-      const inProgressInspections = inspectionsList.filter(i => i.status === 'in_progress').length;
-      const canceledInspections = inspectionsList.filter(i => i.status === 'canceled').length;
+      // Calculate stats using internal status
+      const pendingInspections = inspectionsList.filter(i => getInternalStatus(i) === 'pendente').length;
+      const editedInspections = inspectionsList.filter(i => getInternalStatus(i) === 'editada').length;
+      const deliveredInspections = inspectionsList.filter(i => getInternalStatus(i) === 'entregue').length;
       
       // Set statistics
       setStats({
         totalProjects: projectsList.length,
         totalInspections: inspectionsList.length,
-        completedInspections,
+        completedInspections: deliveredInspections, // Renomeado para manter compatibilidade
         pendingInspections,
+        editedInspections,
+        deliveredInspections,
         totalClients: clientsSnapshot.size,
         totalTemplates: templatesSnapshot.size,
         totalInspectors: inspectorsSnapshot.size,
-        activeInspections: pendingInspections + inProgressInspections
+        activeInspections: pendingInspections + editedInspections
       });
       
       // Set recent projects
@@ -179,10 +197,9 @@ export default function DashboardPage() {
       
       // Inspections by status
       setInspectionsByStatus([
-        { name: 'Pendente', value: pendingInspections, color: '#facc15' },
-        { name: 'Em Andamento', value: inProgressInspections, color: '#3b82f6' },
-        { name: 'Concluída', value: completedInspections, color: '#22c55e' },
-        { name: 'Cancelada', value: canceledInspections, color: '#ef4444' }
+        { name: 'Pendente', value: pendingInspections, color: getInternalStatusHexColor('pendente') },
+        { name: 'Editada', value: editedInspections, color: getInternalStatusHexColor('editada') },
+        { name: 'Entregue', value: deliveredInspections, color: getInternalStatusHexColor('entregue') }
       ]);
       
       // Monthly inspections
@@ -273,7 +290,7 @@ export default function DashboardPage() {
           <CardContent>
             <div className="text-2xl font-bold">{stats.totalInspections}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              {stats.completedInspections} concluídas, {stats.pendingInspections} pendentes
+              {stats.deliveredInspections} entregues, {stats.editedInspections} editadas, {stats.pendingInspections} pendentes
             </p>
           </CardContent>
         </Card>
@@ -469,18 +486,18 @@ export default function DashboardPage() {
                       <div className="text-2xl font-bold text-amber-500">{stats.pendingInspections}</div>
                     </div>
                     <div className="border rounded-md p-3">
-                      <div className="text-sm text-muted-foreground">Em Andamento</div>
-                      <div className="text-2xl font-bold text-blue-500">{stats.activeInspections - stats.pendingInspections}</div>
+                      <div className="text-sm text-muted-foreground">Editadas</div>
+                      <div className="text-2xl font-bold text-blue-500">{stats.editedInspections}</div>
                     </div>
                     <div className="border rounded-md p-3">
-                      <div className="text-sm text-muted-foreground">Concluídas</div>
-                      <div className="text-2xl font-bold text-green-500">{stats.completedInspections}</div>
+                      <div className="text-sm text-muted-foreground">Entregues</div>
+                      <div className="text-2xl font-bold text-green-500">{stats.deliveredInspections}</div>
                     </div>
                     <div className="border rounded-md p-3">
-                      <div className="text-sm text-muted-foreground">Taxa de Conclusão</div>
+                      <div className="text-sm text-muted-foreground">Taxa de Entrega</div>
                       <div className="text-2xl font-bold">
                         {stats.totalInspections > 0 
-                          ? `${(stats.completedInspections / stats.totalInspections * 100).toFixed(1)}%` 
+                          ? `${(stats.deliveredInspections / stats.totalInspections * 100).toFixed(1)}%` 
                           : '0%'}
                       </div>
                     </div>
@@ -521,9 +538,9 @@ export default function DashboardPage() {
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Análise de Performance</AlertTitle>
             <AlertDescription>
-              {stats.completedInspections > stats.pendingInspections 
-                ? "Bom trabalho! A maioria das inspeções foram concluídas."
-                : "Atenção: Existem mais inspeções pendentes do que concluídas."}
+              {stats.deliveredInspections > stats.pendingInspections 
+                ? "Bom trabalho! A maioria das inspeções foram entregues."
+                : "Atenção: Existem mais inspeções pendentes do que entregues."}
             </AlertDescription>
           </Alert>
         </TabsContent>

@@ -24,12 +24,20 @@ import { useToast } from "@/hooks/use-toast"
 
 const statusOptions = ["Aguardando", "Em Andamento", "Em Revisão", "Concluído"]
 
-// Add project type options
+// Project type options
 const projectTypeOptions = [
   "Inspeção de Redes",
-  "Inspeção de Obras",
+  "Inspeção de Obras", 
   "Levantamento Arquitetônico",
   "Implantação",
+  "Inspeção Predial",
+  "Inspeção de Estruturas",
+  "Laudo Técnico",
+  "Vistoria de Imóveis",
+  "Perícia Técnica",
+  "Avaliação de Imóveis",
+  "Diagnóstico Estrutural",
+  "Inspeção de Instalações",
   "Outro"
 ];
 
@@ -44,6 +52,8 @@ export default function EditProjectDialog({ project, open, onClose, onSuccess })
   });
   const [isLoading, setIsLoading] = useState(false)
   const [clients, setClients] = useState([])
+  const [showCustomTypeInput, setShowCustomTypeInput] = useState(false)
+  const [customType, setCustomType] = useState("")
   const { toast } = useToast()
 
   useEffect(() => {
@@ -57,6 +67,17 @@ export default function EditProjectDialog({ project, open, onClose, onSuccess })
         client_id: project.client_id || "",
         status: project.status || "Aguardando",
       });
+      
+      // Check if current type is a custom type (not in predefined options)
+      const isCustomType = project.type && !projectTypeOptions.includes(project.type);
+      if (isCustomType) {
+        setShowCustomTypeInput(true);
+        setCustomType(project.type);
+        setFormData(prev => ({ ...prev, type: "Outro" }));
+      } else {
+        setShowCustomTypeInput(false);
+        setCustomType("");
+      }
     }
   }, [project]);
 
@@ -90,6 +111,18 @@ export default function EditProjectDialog({ project, open, onClose, onSuccess })
     }
   }
 
+  const handleTypeChange = (value) => {
+    setFormData(prev => ({ ...prev, type: value }));
+    
+    // Handle custom type logic
+    if (value === 'Outro') {
+      setShowCustomTypeInput(true);
+    } else {
+      setShowCustomTypeInput(false);
+      setCustomType("");
+    }
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setIsLoading(true)
@@ -97,6 +130,11 @@ export default function EditProjectDialog({ project, open, onClose, onSuccess })
     try {
       // Convert project price to number
       const projectPrice = parseFloat(formData.project_price) || 0;
+      
+      // Use custom type if "Outro" was selected and custom type is provided
+      const finalType = formData.type === 'Outro' && customType.trim() 
+        ? customType.trim() 
+        : formData.type;
 
       // Update the project document
       const projectRef = doc(db, 'projects', project.id);
@@ -104,7 +142,7 @@ export default function EditProjectDialog({ project, open, onClose, onSuccess })
       await updateDoc(projectRef, {
         title: formData.title,
         description: formData.description,
-        type: formData.type,
+        type: finalType,
         project_price: projectPrice,
         client_id: formData.client_id,
         status: formData.status,
@@ -155,23 +193,36 @@ export default function EditProjectDialog({ project, open, onClose, onSuccess })
             disabled={isLoading}
           />
           {/* Project Type Select */}
-          <Select
-            value={formData.type}
-            onValueChange={(value) => setFormData({ ...formData, type: value })}
-            disabled={isLoading}
-            required
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Selecione um Tipo de Projeto" />
-            </SelectTrigger>
-            <SelectContent>
-              {projectTypeOptions.map((type) => (
-                <SelectItem key={type} value={type}>
-                  {type}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div>
+            <Select
+              value={formData.type}
+              onValueChange={handleTypeChange}
+              disabled={isLoading}
+              required
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione um Tipo de Projeto" />
+              </SelectTrigger>
+              <SelectContent>
+                {projectTypeOptions.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {type}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            
+            {showCustomTypeInput && (
+              <Input
+                placeholder="Digite o novo tipo de projeto"
+                value={customType}
+                onChange={(e) => setCustomType(e.target.value)}
+                className="mt-2"
+                required={formData.type === 'Outro'}
+                disabled={isLoading}
+              />
+            )}
+          </div>
 
           <Input
             type="number"

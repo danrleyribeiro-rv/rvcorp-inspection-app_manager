@@ -41,6 +41,7 @@ import {
   InfoIcon,         // For "Sem descrição" etc.
   ExternalLinkIcon  // For navigation indication
 } from "lucide-react"
+import { getInternalStatus, getInternalStatusText, getInternalStatusColor } from "@/utils/inspection-status"
 
 // Status mapping similar to KanbanView
 const projectStatusConfig = {
@@ -67,25 +68,7 @@ const formatDateSafe = (dateInput, dateFormat = "PPP") => {
   }
 };
 
-// Helper for status badge in inspections list
-const getInspectionStatusBadgeVariant = (status) => {
-  switch (status?.toLowerCase()) {
-    case 'pending': return 'warning';
-    case 'in_progress': return 'info';
-    case 'completed': return 'success';
-    case 'canceled': return 'destructive';
-    default: return 'secondary';
-  }
-};
-const getInspectionStatusText = (status) => {
-  const map = {
-    pending: 'Pendente',
-    in_progress: 'Em Andamento',
-    completed: 'Concluída',
-    canceled: 'Cancelada',
-  };
-  return map[status?.toLowerCase()] || status || 'Desconhecido';
-};
+// Removido - usando funções do utils/inspection-status.js
 
 
 export default function ViewProjectDialog({ project, open, onClose }) {
@@ -313,8 +296,8 @@ export default function ViewProjectDialog({ project, open, onClose }) {
                               Agendada para: {formatDateSafe(inspection.scheduled_date, "dd/MM/yy HH:mm")}
                             </p>
                           </div>
-                          <Badge variant={getInspectionStatusBadgeVariant(inspection.status)} className="text-xs px-2 py-0.5">
-                            {getInspectionStatusText(inspection.status)}
+                          <Badge className={`text-xs px-2 py-0.5 ${getInternalStatusColor(getInternalStatus(inspection))}`}>
+                            {getInternalStatusText(getInternalStatus(inspection))}
                           </Badge>
                         </div>
                       ))}

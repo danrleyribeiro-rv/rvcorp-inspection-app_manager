@@ -21,13 +21,19 @@ import { useAuth } from "@/context/auth-context";
 import { useRouter } from "next/navigation";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
-const statusOptions = ["Aguardando", "Em Andamento", "Em Revisão", "Concluído"];
-
 const projectTypeOptions = [
   "Inspeção de Redes",
   "Inspeção de Obras", 
   "Levantamento Arquitetônico",
   "Implantação",
+  "Inspeção Predial",
+  "Inspeção de Estruturas",
+  "Laudo Técnico",
+  "Vistoria de Imóveis",
+  "Perícia Técnica",
+  "Avaliação de Imóveis",
+  "Diagnóstico Estrutural",
+  "Inspeção de Instalações",
   "Outro"
 ];
 
@@ -38,12 +44,13 @@ export default function CreateProjectPage() {
     type: "",
     project_price: "",
     client_id: "",
-    status: "Aguardando",
   });
   const [isLoading, setIsLoading] = useState(false);
   const [clients, setClients] = useState([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [confirmExitDialog, setConfirmExitDialog] = useState(false);
+  const [showCustomTypeInput, setShowCustomTypeInput] = useState(false);
+  const [customType, setCustomType] = useState("");
   const { toast } = useToast();
   const { user } = useAuth();
   const router = useRouter();
@@ -54,9 +61,9 @@ export default function CreateProjectPage() {
 
   useEffect(() => {
     const hasChanges = formData.title || formData.description || formData.type || 
-                      formData.project_price || formData.client_id || formData.status !== "Aguardando";
+                      formData.project_price || formData.client_id || customType;
     setHasUnsavedChanges(hasChanges);
-  }, [formData]);
+  }, [formData, customType]);
 
   useEffect(() => {
     const handleBeforeUnload = (e) => {
@@ -96,6 +103,16 @@ export default function CreateProjectPage() {
 
   const updateField = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    
+    // Handle custom type logic
+    if (field === 'type') {
+      if (value === 'Outro') {
+        setShowCustomTypeInput(true);
+      } else {
+        setShowCustomTypeInput(false);
+        setCustomType("");
+      }
+    }
   };
 
   const handleBack = () => {
@@ -113,14 +130,19 @@ export default function CreateProjectPage() {
     try {
       const projectPrice = parseFloat(formData.project_price) || 0;
 
+      // Use custom type if "Outro" was selected and custom type is provided
+      const finalType = formData.type === 'Outro' && customType.trim() 
+        ? customType.trim() 
+        : formData.type;
+
       const projectData = {
         title: formData.title,
         description: formData.description,
-        type: formData.type,
+        type: finalType,
         project_price: projectPrice,
         manager_id: user.uid,
         client_id: formData.client_id,
-        status: formData.status,
+        status: "Aguardando", // Status padrão ao criar
         created_at: serverTimestamp(),
         updated_at: serverTimestamp(),
         deleted_at: null
@@ -261,6 +283,23 @@ export default function CreateProjectPage() {
                     ))}
                   </SelectContent>
                 </Select>
+                
+                {showCustomTypeInput && (
+                  <div className="mt-2">
+                    <Label htmlFor="customType">Digite o novo tipo de projeto <span className="text-red-500">*</span></Label>
+                    <Input
+                      id="customType"
+                      placeholder="Ex: Inspeção de Segurança"
+                      value={customType}
+                      onChange={(e) => setCustomType(e.target.value)}
+                      className="mt-1"
+                      required={formData.type === 'Outro'}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Este novo tipo ficará disponível para futuros projetos
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -282,25 +321,6 @@ export default function CreateProjectPage() {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-
-            <div>
-              <Label htmlFor="status">Status</Label>
-              <Select
-                value={formData.status}
-                onValueChange={(value) => updateField('status', value)}
-              >
-                <SelectTrigger id="status">
-                  <SelectValue placeholder="Selecione um Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  {statusOptions.map((status) => (
-                    <SelectItem key={status} value={status}>
-                      {status}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </div>
           </div>
 

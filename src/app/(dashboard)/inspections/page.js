@@ -29,6 +29,7 @@ import InspectionReportCard from "../reports/components/InspectionReportCard";
 import ReportViewer from "../reports/components/ReportViewer";
 import { generateInspectionPDF, generateNonConformitiesPDF } from "@/services/pdf-service";
 import { generateReportDownloadUrl } from "@/services/report-service";
+import { getInternalStatus } from "@/utils/inspection-status";
 
 const INSPECTIONS_PER_PAGE = 10;
 
@@ -110,9 +111,14 @@ export default function InspectionsPage() {
       }
 
       // First, get all projects for this manager
+      // TODO: Restringir por manager_id quando necessário
+      // const projectsQuery = query(
+      //   collection(db, 'projects'),
+      //   where('manager_id', '==', user.uid),
+      //   where('deleted_at', '==', null)
+      // );
       const projectsQuery = query(
         collection(db, 'projects'),
-        where('manager_id', '==', user.uid),
         where('deleted_at', '==', null)
       );
       
@@ -416,7 +422,8 @@ export default function InspectionsPage() {
         ))
       );
 
-      const matchesStatus = filterState.status === "all" || inspection.status === filterState.status;
+      const internalStatus = getInternalStatus(inspection);
+      const matchesStatus = filterState.status === "all" || internalStatus === filterState.status;
       const matchesProject = filterState.project === "all" || inspection.project_id === filterState.project;
       const matchesInspector = filterState.inspector === "all" || inspection.inspector_id === filterState.inspector;
       const matchesState = filterState.state === "all" || inspection.address?.state === filterState.state;

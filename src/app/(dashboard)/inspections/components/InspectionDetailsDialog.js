@@ -41,16 +41,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 
 import DeliveryStatus from "@/components/inspection/DeliveryStatus";
 import { Lock, GitCommit, Package } from "lucide-react";
-
-const getStatusBadge = (status) => {
-  const statusMap = {
-    pending: { label: "Pendente", variant: "yellow" },
-    in_progress: { label: "Em Andamento", variant: "blue" },
-    completed: { label: "Concluída", variant: "green" },
-    canceled: { label: "Cancelada", variant: "red" },
-  };
-  return statusMap[status] || { label: status, variant: "gray" };
-};
+import { getInternalStatus, getInternalStatusText, getInternalStatusColor } from "@/utils/inspection-status";
 
 const getSeverityColor = (severity) => {
   const colors = {
@@ -268,7 +259,7 @@ export default function InspectionDetailsDialog({
     );
   }
 
-  const status = getStatusBadge(inspection.status);
+  const internalStatus = getInternalStatus(inspection);
   const totalNCs = getTotalNonConformities();
   const highestSeverity = getHighestSeverity();
 
@@ -287,7 +278,7 @@ export default function InspectionDetailsDialog({
                   {totalNCs} NC{totalNCs !== 1 ? "s" : ""}
                 </Badge>
               )}
-              <Badge variant={status.variant}>{status.label}</Badge>
+              <Badge className={getInternalStatusColor(internalStatus)}>{getInternalStatusText(internalStatus)}</Badge>
               <DeliveryStatus inspection={inspection} />
               {inspection.inspection_edit_blocked && (
                 <Badge variant="outline" className="flex items-center gap-1">

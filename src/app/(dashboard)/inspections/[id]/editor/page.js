@@ -4,7 +4,7 @@
 import { useState, useEffect, useRef } from "react";
 import { use } from "react";
 import { db, storage } from "@/lib/firebase";
-import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, updateDoc, serverTimestamp, collection, query, where, getDocs } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
@@ -22,6 +22,7 @@ import { Settings, ListChecks, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { addWatermarkToImage, detectImageSource } from "@/utils/ImageWatermark";
+import { getInternalStatus, markAsDelivered, unmarkAsDelivered } from "@/utils/inspection-status";
 import {
   ArrowLeft,
   Save,
@@ -32,21 +33,26 @@ import {
   AlertTriangle,
   ChevronRight,
   Video,
-  Images
+  Images,
+  CheckCircle,
+  Package
 } from "lucide-react";
 import DetailEditor from "@/components/inspection/DetailEditor";
 import MediaMoveDialog from "@/components/inspection/MediaMoveDialog";
 import InspectionControlPanel from "@/components/inspection/InspectionControlPanel";
 import MediaManagementTab from "@/components/inspection/MediaManagementTab";
 import NonConformityEditor from "@/components/inspection/NonConformityEditor";
+import InspectionVersionControl from "@/components/inspection/InspectionVersionControl";
 import { UniversalDropZone, DRAG_TYPES } from "@/components/inspection/EnhancedDragDropProvider";
 import UniversalMediaSection from "@/components/inspection/UniversalMediaSection";
 import { DraggableTopic, DraggableItem } from "@/components/inspection/DraggableStructureItem";
+import SearchableInspectorSelect from "@/components/ui/searchable-inspector-select";
 
 export default function InspectionEditorPage({ params }) {
   const inspectionId = use(params).id;
   const [inspection, setInspection] = useState(null);
   const [originalInspection, setOriginalInspection] = useState(null);
+  const [inspectionData, setInspectionData] = useState(null); // Data from inspections_data collection
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTopicIndex, setActiveTopicIndex] = useState(0);
@@ -63,6 +69,7 @@ export default function InspectionEditorPage({ params }) {
   const [filterType, setFilterType] = useState("all");
   const [showOnlyWithMedia, setShowOnlyWithMedia] = useState(false);
   const [showOnlyWithNC, setShowOnlyWithNC] = useState(false);
+  const [inspectors, setInspectors] = useState([]);
   const mediaRef = useRef(null);
   const { toast } = useToast();
   const router = useRouter();
@@ -101,6 +108,8 @@ export default function InspectionEditorPage({ params }) {
 
   useEffect(() => {
     fetchInspection();
+    fetchInspectionData();
+    fetchInspectors();
   }, [inspectionId]);
 
   const fetchInspection = async () => {
@@ -134,6 +143,48 @@ export default function InspectionEditorPage({ params }) {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchInspectionData = async () => {
+    try {
+      const inspectionDataRef = doc(db, 'inspections_data', inspectionId);
+      const inspectionDataDoc = await getDoc(inspectionDataRef);
+
+      if (inspectionDataDoc.exists()) {
+        const data = inspectionDataDoc.data();
+        const formattedData = {
+          id: inspectionDataDoc.id,
+          ...data,
+          topics: data.topics || []
+        };
+        setInspectionData(formattedData);
+      } else {
+        setInspectionData(null);
+      }
+    } catch (error) {
+      console.warn('Erro ao carregar dados de inspections_data:', error);
+      setInspectionData(null);
+    }
+  };
+
+  const fetchInspectors = async () => {
+    try {
+      const inspectorsQuery = query(
+        collection(db, 'inspectors'),
+        where('deleted_at', '==', null)
+      );
+      
+      const inspectorsSnapshot = await getDocs(inspectorsQuery);
+      
+      const inspectorsData = inspectorsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      setInspectors(inspectorsData || []);
+    } catch (error) {
+      console.error("Error fetching inspectors:", error);
     }
   };
 
@@ -1178,13 +1229,16 @@ const handleMoveMediaDrop = (item, destination) => {
   // Função para atualizar dados de controle
   const handleControlUpdate = async () => {
     await fetchInspection();
+    await fetchInspectionData();
   };
 
   // Funções de filtro e pesquisa
   const filterTopics = () => {
-    if (!inspection.topics) return [];
+    // Use inspectionData for Structure tab, otherwise use inspection
+    const dataSource = activeTab === 'topics' && inspectionData ? inspectionData : inspection;
+    if (!dataSource.topics) return [];
     
-    return inspection.topics.filter((topic, topicIndex) => {
+    return dataSource.topics.filter((topic, topicIndex) => {
       const topicMatches = searchTerm === "" || 
         topic.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         topic.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -1269,7 +1323,9 @@ const handleMoveMediaDrop = (item, destination) => {
     );
   }
 
-  const currentTopic = inspection.topics[activeTopicIndex];
+  // Use inspectionData for Structure tab, otherwise use inspection
+  const dataSource = activeTab === 'topics' && inspectionData ? inspectionData : inspection;
+  const currentTopic = dataSource.topics[activeTopicIndex];
   const currentItem = activeItemIndex !== null ? currentTopic?.items?.[activeItemIndex] : null;
 
   return (
@@ -1323,10 +1379,12 @@ const handleMoveMediaDrop = (item, destination) => {
                 <Settings className="h-4 w-4" />
                 Informações Gerais
               </TabsTrigger>
-              <TabsTrigger value="topics" className="flex items-center gap-2">
-                <ListChecks className="h-4 w-4" />
-                Estrutura da Inspeção
-              </TabsTrigger>
+              {inspectionData && (
+                <TabsTrigger value="topics" className="flex items-center gap-2">
+                  <ListChecks className="h-4 w-4" />
+                  Estrutura da Inspeção
+                </TabsTrigger>
+              )}
               <TabsTrigger value="media" className="flex items-center gap-2">
                 <Images className="h-4 w-4" />
                 Mídias
@@ -1375,7 +1433,7 @@ const handleMoveMediaDrop = (item, destination) => {
                   />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                   <div>
                     <Label>Data de Criação</Label>
                     <Input
@@ -1394,9 +1452,322 @@ const handleMoveMediaDrop = (item, destination) => {
                   </div>
                 </div>
               </div>
+
+              {/* Endereço */}
+              <div className="bg-card border rounded-lg p-6">
+                <h2 className="text-lg font-semibold mb-4">Endereço da Inspeção</h2>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                  <div className="md:col-span-2">
+                    <Label htmlFor="address">Logradouro</Label>
+                    <Input
+                      id="address"
+                      value={inspection?.address?.street || inspection?.street || ''}
+                      onChange={e => {
+                        if (inspection?.address) {
+                          updateInspectionField('address', { ...inspection.address, street: e.target.value });
+                        } else {
+                          updateInspectionField('street', e.target.value);
+                        }
+                      }}
+                      placeholder="Rua, Avenida, etc."
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="number">Número</Label>
+                    <Input
+                      id="number"
+                      value={inspection?.address?.number || inspection?.number || ''}
+                      onChange={e => {
+                        if (inspection?.address) {
+                          updateInspectionField('address', { ...inspection.address, number: e.target.value });
+                        } else {
+                          updateInspectionField('number', e.target.value);
+                        }
+                      }}
+                      placeholder="Número"
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                  <div>
+                    <Label htmlFor="complement">Complemento</Label>
+                    <Input
+                      id="complement"
+                      value={inspection?.address?.complement || inspection?.complement || ''}
+                      onChange={e => {
+                        if (inspection?.address) {
+                          updateInspectionField('address', { ...inspection.address, complement: e.target.value });
+                        } else {
+                          updateInspectionField('complement', e.target.value);
+                        }
+                      }}
+                      placeholder="Apto, Bloco, etc."
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="neighborhood">Bairro</Label>
+                    <Input
+                      id="neighborhood"
+                      value={inspection?.address?.neighborhood || inspection?.neighborhood || ''}
+                      onChange={e => {
+                        if (inspection?.address) {
+                          updateInspectionField('address', { ...inspection.address, neighborhood: e.target.value });
+                        } else {
+                          updateInspectionField('neighborhood', e.target.value);
+                        }
+                      }}
+                      placeholder="Bairro"
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="postal_code">CEP</Label>
+                    <Input
+                      id="postal_code"
+                      value={inspection?.address?.cep || inspection?.postal_code || inspection?.zip_code || ''}
+                      onChange={e => {
+                        if (inspection?.address) {
+                          updateInspectionField('address', { ...inspection.address, cep: e.target.value });
+                        } else {
+                          updateInspectionField('postal_code', e.target.value);
+                        }
+                      }}
+                      placeholder="00000-000"
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="city">Cidade</Label>
+                    <Input
+                      id="city"
+                      value={inspection?.address?.city || inspection?.city || ''}
+                      onChange={e => {
+                        if (inspection?.address) {
+                          updateInspectionField('address', { ...inspection.address, city: e.target.value });
+                        } else {
+                          updateInspectionField('city', e.target.value);
+                        }
+                      }}
+                      placeholder="Cidade"
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="state">Estado</Label>
+                    <Input
+                      id="state"
+                      value={inspection?.address?.state || inspection?.state || ''}
+                      onChange={e => {
+                        if (inspection?.address) {
+                          updateInspectionField('address', { ...inspection.address, state: e.target.value });
+                        } else {
+                          updateInspectionField('state', e.target.value);
+                        }
+                      }}
+                      placeholder="Estado"
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Inspetor */}
+              <div className="bg-card border rounded-lg p-6">
+                <h2 className="text-lg font-semibold mb-4">Inspetor Responsável</h2>
+                
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="inspector">Selecionar Inspetor</Label>
+                    <div className="mt-1">
+                      <SearchableInspectorSelect
+                        inspectors={inspectors}
+                        value={inspection?.inspector_id}
+                        onValueChange={(value) => updateInspectionField('inspector_id', value)}
+                        placeholder="Pesquisar e selecionar um inspetor..."
+                      />
+                    </div>
+                  </div>
+
+                  {/* Informações detalhadas do inspetor selecionado */}
+                  {inspection?.inspector_id && (() => {
+                    const selectedInspector = inspectors.find(i => i.id === inspection.inspector_id);
+                    if (selectedInspector) {
+                      return (
+                        <div className="bg-accent/20 border rounded-lg p-4">
+                          <h3 className="font-medium mb-3">Informações do Inspetor</h3>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <Label className="text-xs text-muted-foreground">Nome Completo</Label>
+                              <p className="font-medium">
+                                {`${selectedInspector.name || ''} ${selectedInspector.last_name || ''}`.trim() || 'Não informado'}
+                              </p>
+                            </div>
+                            
+                            <div>
+                              <Label className="text-xs text-muted-foreground">E-mail</Label>
+                              <p className="text-sm">{selectedInspector.email || 'Não informado'}</p>
+                            </div>
+                            
+                            <div>
+                              <Label className="text-xs text-muted-foreground">Telefone</Label>
+                              <p className="text-sm">{selectedInspector.phone || 'Não informado'}</p>
+                            </div>
+                            
+                            <div>
+                              <Label className="text-xs text-muted-foreground">Localização</Label>
+                              <p className="text-sm">
+                                {[selectedInspector.city, selectedInspector.state].filter(Boolean).join(', ') || 'Não informado'}
+                              </p>
+                            </div>
+                            
+                            {selectedInspector.specializations && selectedInspector.specializations.length > 0 && (
+                              <div className="md:col-span-2">
+                                <Label className="text-xs text-muted-foreground">Especializações</Label>
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {selectedInspector.specializations.map((spec, index) => (
+                                    <Badge key={index} variant="outline" className="text-xs">
+                                      {spec}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            
+                            {selectedInspector.is_verified && (
+                              <div>
+                                <Label className="text-xs text-muted-foreground">Status</Label>
+                                <div className="mt-1">
+                                  <Badge variant="default" className="text-xs">
+                                    ✓ Verificado
+                                  </Badge>
+                                </div>
+                              </div>
+                            )}
+                            
+                            <div>
+                              <Label className="text-xs text-muted-foreground">ID do Inspetor</Label>
+                              <p className="text-xs font-mono text-muted-foreground">
+                                {selectedInspector.id}
+                              </p>
+                            </div>
+                          </div>
+                          
+                          {selectedInspector.bio && (
+                            <div className="mt-4">
+                              <Label className="text-xs text-muted-foreground">Biografia</Label>
+                              <p className="text-sm mt-1 text-muted-foreground">
+                                {selectedInspector.bio}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
+                        <p className="text-sm text-destructive">
+                          ⚠️ Inspetor não encontrado (ID: {inspection.inspector_id})
+                        </p>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              {/* Status de Entrega */}
+              <div className="bg-card border rounded-lg p-6">
+                <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <Package className="h-5 w-5" />
+                  Status de Entrega
+                </h2>
+                
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-4 bg-accent/20 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-full ${
+                        inspection?.delivered_at 
+                          ? 'bg-green-100 text-green-600' 
+                          : 'bg-yellow-100 text-yellow-600'
+                      }`}>
+                        {inspection?.delivered_at ? (
+                          <CheckCircle className="h-5 w-5" />
+                        ) : (
+                          <Package className="h-5 w-5" />
+                        )}
+                      </div>
+                      <div>
+                        <h3 className="font-medium">
+                          {inspection?.delivered_at ? 'Inspeção Entregue' : 'Inspeção Não Entregue'}
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          {inspection?.delivered_at 
+                            ? `Entregue em ${new Date(inspection.delivered_at).toLocaleDateString('pt-BR')} às ${new Date(inspection.delivered_at).toLocaleTimeString('pt-BR')}`
+                            : 'Clique no botão para marcar como entregue'
+                          }
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <Button
+                      onClick={() => {
+                        if (inspection?.delivered_at) {
+                          setInspection(prev => unmarkAsDelivered(prev));
+                        } else {
+                          setInspection(prev => markAsDelivered(prev));
+                        }
+                      }}
+                      variant={inspection?.delivered_at ? 'outline' : 'default'}
+                      className="flex items-center gap-2"
+                    >
+                      {inspection?.delivered_at ? (
+                        <>
+                          <X className="h-4 w-4" />
+                          Desmarcar Entrega
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle className="h-4 w-4" />
+                          Marcar como Entregue
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                  
+                  {inspection?.delivered_at && (
+                    <div className="text-sm text-muted-foreground bg-green-50 p-3 rounded-lg border border-green-200">
+                      <p className="font-medium text-green-800 mb-1">✅ Status: Entregue</p>
+                      <p>Esta inspeção foi marcada como entregue e aparecerá com status "Entregue" em todas as listagens do sistema.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {/* Controle de Versionamento */}
+              <InspectionVersionControl 
+                inspectionId={inspectionId}
+                inspection={inspection}
+                onDataPulled={() => {
+                  // Recarregar dados da inspeção após pull
+                  fetchInspection();
+                  toast({
+                    title: "Inspeção atualizada",
+                    description: "Os dados foram sincronizados com sucesso."
+                  });
+                }}
+              />
             </TabsContent>
 
-            <TabsContent value="topics" className="space-y-4">
+            {inspectionData && (
+              <TabsContent value="topics" className="space-y-4">
               {/* Search and Filter Bar */}
               <div className="bg-card border rounded-lg p-4">
                 <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
@@ -1461,20 +1832,27 @@ const handleMoveMediaDrop = (item, destination) => {
                 {/* Topics Column */}
                 <div className="col-span-2 border rounded-lg">
                   <div className="p-3 border-b flex justify-between items-center">
-                    <h3 className="font-medium">Tópicos ({inspection.topics?.length || 0})</h3>
-                    <Button size="sm" onClick={addTopic}>
+                    <h3 className="font-medium">Tópicos ({inspectionData.topics?.length || 0})</h3>
+                    <Button size="sm" onClick={addTopic} disabled={true}>
                       <Plus className="h-3 w-3" />
                     </Button>
                   </div>
                   <ScrollArea className="h-[calc(100vh-280px)]">
                     <div className="p-2 space-y-1">
                       {filterTopics().map((topic, topicIndex) => {
-                        // Get the original topic index
-                        const originalTopicIndex = inspection.topics.findIndex(t => t === topic);
+                        // Get the original topic index more reliably
+                        const originalTopicIndex = inspectionData.topics.findIndex(t => 
+                          t.name === topic.name && 
+                          t.description === topic.description &&
+                          t.direct_details === topic.direct_details
+                        );
+                        // Use a fallback key if findIndex fails
+                        const safeKey = originalTopicIndex !== -1 ? originalTopicIndex : `filtered-${topicIndex}`;
+                        const safeIndex = originalTopicIndex !== -1 ? originalTopicIndex : topicIndex;
                         return (
                         <UniversalDropZone
-                          key={originalTopicIndex}
-                          topicIndex={originalTopicIndex}
+                          key={safeKey}
+                          topicIndex={safeIndex}
                           onDropMedia={handleMoveMediaDrop}
                           onDropTopic={handleMoveStructure}
                           onDropItem={handleMoveStructure}
@@ -1484,26 +1862,26 @@ const handleMoveMediaDrop = (item, destination) => {
                         >
                           <DraggableTopic
                             topic={topic}
-                            topicIndex={originalTopicIndex}
-                            isActive={activeTopicIndex === originalTopicIndex}
+                            topicIndex={safeIndex}
+                            isActive={activeTopicIndex === safeIndex}
                             onReorder={reorderTopic}
                             onDuplicate={duplicateTopic}
                             onRemove={removeTopic}
                           >
                             <div
                               className={`p-2 rounded cursor-pointer border space-y-2 ${
-                                activeTopicIndex === topicIndex 
+                                activeTopicIndex === safeIndex 
                                   ? 'bg-primary text-primary-foreground' 
                                   : 'hover:bg-accent'
                               }`}
                               onClick={() => {
-                                setActiveTopicIndex(originalTopicIndex);
+                                setActiveTopicIndex(safeIndex);
                                 setActiveItemIndex(null);
                               }}
                             >
                               <div className="flex justify-between items-center">
                                 <span className="text-sm font-medium truncate">
-                                  {topic.name || `Tópico ${originalTopicIndex + 1}`}
+                                  {topic.name || `Tópico ${safeIndex + 1}`}
                                 </span>
                                 <Button
                                   size="sm"
@@ -1511,8 +1889,9 @@ const handleMoveMediaDrop = (item, destination) => {
                                   className="h-6 w-6 p-0"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    removeTopic(originalTopicIndex);
+                                    removeTopic(safeIndex);
                                   }}
+                                  disabled={true}
                                 >
                                   <Trash2 className="h-3 w-3" />
                                 </Button>
@@ -1540,7 +1919,7 @@ const handleMoveMediaDrop = (item, destination) => {
                                       className="aspect-square border rounded overflow-hidden bg-gray-50 cursor-pointer hover:opacity-80"
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        openMediaViewer(mediaItem, originalTopicIndex, null, null, mediaIndex);
+                                        openMediaViewer(mediaItem, safeIndex, null, null, mediaIndex);
                                       }}
                                     >
                                       {mediaItem.type === 'image' ? (
@@ -2094,6 +2473,7 @@ const handleMoveMediaDrop = (item, destination) => {
                )}
              </div>
            </TabsContent>
+            )}
 
            <TabsContent value="media" className="space-y-4">
              <MediaManagementTab

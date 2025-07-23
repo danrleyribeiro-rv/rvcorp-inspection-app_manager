@@ -33,7 +33,6 @@ const defaultSettings = {
   notifications: {
     email: true,
     push: true,
-    
     orders: true,
     inspections: true,
   },
@@ -115,17 +114,7 @@ export default function SettingsPage() {
     saveSettings(newSettings);
   };
 
-  const handleAppSettingChange = (key, value) => {
-    const newSettings = {
-      ...settings,
-      app: {
-        ...settings.app,
-        [key]: value,
-      },
-    };
-    setSettings(newSettings);
-    saveSettings(newSettings);
-  };
+  // Removed handleAppSettingChange
 
   const updateThemeSetting = (newTheme) => {
     setTheme(newTheme);
@@ -249,10 +238,7 @@ export default function SettingsPage() {
             <Bell className="h-4 w-4" />
             Notificações
           </TabsTrigger>
-          <TabsTrigger value="app" className="flex items-center gap-2">
-            <SettingsIcon className="h-4 w-4" />
-            Aplicação
-          </TabsTrigger>
+          {/* Removed the "Aplicação" tab */}
           <TabsTrigger value="appearance" className="flex items-center gap-2">
             <Palette className="h-4 w-4" />
             Aparência
@@ -298,8 +284,6 @@ export default function SettingsPage() {
                 />
               </div>
 
-              
-
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                   <ClipboardList className="h-4 w-4" />
@@ -314,53 +298,7 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="app">
-          <Card>
-            <CardHeader>
-              <CardTitle>Configurações da Aplicação</CardTitle>
-              <CardDescription>
-                Personalize o comportamento da aplicação
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label>Formato de Data</Label>
-                <select
-                  className="w-full p-2 border border-gray-300 rounded-md"
-                  value={settings.app.dateFormat}
-                  onChange={(e) => handleAppSettingChange("dateFormat", e.target.value)}
-                >
-                  <option value="DD/MM/YYYY">DD/MM/YYYY</option>
-                  <option value="MM/DD/YYYY">MM/DD/YYYY</option>
-                  <option value="YYYY-MM-DD">YYYY-MM-DD</option>
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Visualização Padrão</Label>
-                <select
-                  className="w-full p-2 border border-gray-300 rounded-md"
-                  value={settings.app.defaultView}
-                  onChange={(e) => handleAppSettingChange("defaultView", e.target.value)}
-                >
-                  <option value="lista">Lista</option>
-                  <option value="kanban">Kanban</option>
-                </select>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <Search className="h-4 w-4" />
-                  <Label>Auto-salvamento</Label>
-                </div>
-                <Switch
-                  checked={settings.app.autoSave}
-                  onCheckedChange={(checked) => handleAppSettingChange("autoSave", checked)}
-                />
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+        {/* Removed the "app" tab content */}
 
         <TabsContent value="appearance">
           <Card>

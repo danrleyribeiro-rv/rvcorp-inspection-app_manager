@@ -1,8 +1,7 @@
 // src/components/MapView.jsx
 "use client";
 
-import { useState, useEffect, useMemo } from 'react';
-import dynamic from 'next/dynamic';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/context/auth-context';
@@ -19,144 +18,102 @@ import { MapPin, Users, ClipboardList, Star, Phone, Mail, Filter, X, Calendar, B
 import { useToast } from '@/hooks/use-toast';
 import InspectionListDialog from './InspectionListDialog';
 
-// Dynamically import MapContainer to avoid SSR issues
-const MapContainer = dynamic(
-  () => import('react-leaflet').then((mod) => mod.MapContainer),
-  { ssr: false }
-);
+// Google Maps imports
+import { APIProvider, Map, Marker, InfoWindow } from '@vis.gl/react-google-maps';
+import { getInternalStatus, getInternalStatusText, getInternalStatusColor, getInternalStatusHexColor, getInternalStatusEmoji } from '@/utils/inspection-status';
 
-const TileLayer = dynamic(
-  () => import('react-leaflet').then((mod) => mod.TileLayer),
-  { ssr: false }
-);
+// Removido - usando funções do utils/inspection-status.js
 
-const Marker = dynamic(
-  () => import('react-leaflet').then((mod) => mod.Marker),
-  { ssr: false }
-);
-
-const Popup = dynamic(
-  () => import('react-leaflet').then((mod) => mod.Popup),
-  { ssr: false }
-);
-
-// Custom icons for different marker types
-const createCustomIcon = (type, status = null, count = null) => {
-  if (typeof window === 'undefined') return null;
+// Custom marker icons for Google Maps
+const getMarkerIcon = (type, status = null, count = null) => {
+  // Check if we're in the browser and Google Maps is loaded
+  if (typeof window === 'undefined' || !window.google?.maps) {
+    return null; // Return null if Google Maps isn't loaded yet
+  }
   
-  const L = require('leaflet');
+  const baseUrl = 'data:image/svg+xml;charset=UTF-8,';
   
-  const getIconConfig = () => {
-    if (type === 'inspector') {
-      return {
-        html: `
-          <div style="
-            background-color: #3b82f6;
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            border: 2px solid white;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 12px;
-            font-weight: bold;
-          ">👤</div>
-        `,
-        iconSize: [28, 28],
-        iconAnchor: [14, 14],
-        popupAnchor: [0, -14],
-        className: 'inspector-marker'
-      };
-    } else if (type === 'inspection-group') {
-      return {
-        html: `
-          <div style="
-            background-color: #8b5cf6;
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            border: 3px solid white;
-            box-shadow: 0 3px 6px rgba(0,0,0,0.4);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 12px;
-            font-weight: bold;
-          ">${count}</div>
-        `,
-        iconSize: [38, 38],
-        iconAnchor: [19, 19],
-        popupAnchor: [0, -19],
-        className: 'inspection-group-marker'
-      };
-    } else {
-      // Single inspection marker with different colors based on status
-      const colors = {
-        pending: '#fbbf24',
-        in_progress: '#3b82f6',
-        completed: '#10b981',
-        canceled: '#ef4444'
-      };
-      
-      const color = colors[status] || '#6b7280';
-      const emojis = {
-        pending: '⏳',
-        in_progress: '🔄',
-        completed: '✅',
-        canceled: '❌'
-      };
-      const emoji = emojis[status] || '📋';
-      
-      return {
-        html: `
-          <div style="
-            background-color: ${color};
-            width: 24px;
-            height: 24px;
-            border-radius: 4px;
-            border: 2px solid white;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 12px;
-          ">${emoji}</div>
-        `,
-        iconSize: [28, 28],
-        iconAnchor: [14, 14],
-        popupAnchor: [0, -14],
-        className: 'inspection-marker'
-      };
+  if (type === 'inspector') {
+    const svg = `
+      <svg width="38" height="50" viewBox="0 0 38 50" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+            <dropShadow dx="2" dy="4" stdDeviation="3" flood-color="rgba(0,0,0,0.3)"/>
+          </filter>
+        </defs>
+        <!-- Pin shape -->
+        <path d="M19 5 C10 5, 3 12, 3 21 C3 30, 19 45, 19 45 C19 45, 35 30, 35 21 C35 12, 28 5, 19 5 Z" 
+              fill="#3b82f6" stroke="white" stroke-width="2" filter="url(#shadow)"/>
+        <!-- Circle for icon -->
+        <circle cx="19" cy="21" r="10" fill="white"/>
+        <!-- User icon -->
+        <text x="19" y="27" font-family="Arial" font-size="14" font-weight="bold" fill="#3b82f6" text-anchor="middle">🔍</text>
+      </svg>
+    `;
+    return {
+      url: baseUrl + encodeURIComponent(svg),
+      scaledSize: new window.google.maps.Size(38, 50),
+      anchor: new window.google.maps.Point(19, 45)
+    };
+  } else if (type === 'inspection-group') {
+    const svg = `
+      <svg width="44" height="58" viewBox="0 0 44 58" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <filter id="groupShadow" x="-50%" y="-50%" width="200%" height="200%">
+            <dropShadow dx="2" dy="4" stdDeviation="3" flood-color="rgba(0,0,0,0.3)"/>
+          </filter>
+        </defs>
+        <!-- Pin shape -->
+        <path d="M22 5 C12 5, 4 13, 4 23 C4 33, 22 53, 22 53 C22 53, 40 33, 40 23 C40 13, 32 5, 22 5 Z" 
+              fill="#8b5cf6" stroke="white" stroke-width="2" filter="url(#groupShadow)"/>
+        <!-- Circle for count -->
+        <circle cx="22" cy="23" r="12" fill="white"/>
+        <!-- Count text -->
+        <text x="22" y="29" font-family="Arial" font-size="14" font-weight="bold" fill="#8b5cf6" text-anchor="middle">${count}</text>
+      </svg>
+    `;
+    return {
+      url: baseUrl + encodeURIComponent(svg),
+      scaledSize: new window.google.maps.Size(44, 58),
+      anchor: new window.google.maps.Point(22, 53)
+    };
+  } else {
+    // Single inspection marker with different colors and better visibility based on internal status
+    const color = getInternalStatusHexColor(status);
+    const emoji = getInternalStatusEmoji(status);
+    
+    // Get better visual icons based on status
+    let statusIcon = emoji;
+    if (status === 'pendente') {
+      statusIcon = '⏳';
+    } else if (status === 'editada') {
+      statusIcon = '✏️';
+    } else if (status === 'entregue') {
+      statusIcon = '✅';
     }
-  };
-  
-  const config = getIconConfig();
-  return L.divIcon(config);
-};
-
-const getStatusText = (status) => {
-  const statusMap = {
-    pending: 'Pendente',
-    in_progress: 'Em Andamento',
-    completed: 'Concluída',
-    canceled: 'Cancelada'
-  };
-  return statusMap[status] || status;
-};
-
-const getStatusColor = (status) => {
-  const colorMap = {
-    pending: 'bg-yellow-100 text-yellow-800',
-    in_progress: 'bg-blue-100 text-blue-800',
-    completed: 'bg-green-100 text-green-800',
-    canceled: 'bg-red-100 text-red-800'
-  };
-  return colorMap[status] || 'bg-gray-100 text-gray-800';
+    
+    const svg = `
+      <svg width="36" height="48" viewBox="0 0 36 48" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <filter id="inspectionShadow${status}" x="-50%" y="-50%" width="200%" height="200%">
+            <dropShadow dx="2" dy="4" stdDeviation="3" flood-color="rgba(0,0,0,0.3)"/>
+          </filter>
+        </defs>
+        <!-- Pin shape -->
+        <path d="M18 3 C9 3, 2 10, 2 19 C2 28, 18 45, 18 45 C18 45, 34 28, 34 19 C34 10, 27 3, 18 3 Z" 
+              fill="${color}" stroke="white" stroke-width="2" filter="url(#inspectionShadow${status})"/>
+        <!-- Circle for icon -->
+        <circle cx="18" cy="19" r="9" fill="white"/>
+        <!-- Status icon -->
+        <text x="18" y="25" font-family="Arial" font-size="12" font-weight="bold" fill="${color}" text-anchor="middle">${statusIcon}</text>
+      </svg>
+    `;
+    return {
+      url: baseUrl + encodeURIComponent(svg),
+      scaledSize: new window.google.maps.Size(36, 48),
+      anchor: new window.google.maps.Point(18, 45)
+    };
+  }
 };
 
 export default function MapView() {
@@ -165,11 +122,13 @@ export default function MapView() {
   const [inspections, setInspections] = useState([]);
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [mapLoaded, setMapLoaded] = useState(false);
   const [selectedLocationInspections, setSelectedLocationInspections] = useState([]);
   const [selectedLocationCity, setSelectedLocationCity] = useState('');
   const [selectedLocationState, setSelectedLocationState] = useState('');
   const [showInspectionDialog, setShowInspectionDialog] = useState(false);
+  const [selectedInspector, setSelectedInspector] = useState(null);
+  const [selectedInspection, setSelectedInspection] = useState(null);
+  const [selectedLocationGroup, setSelectedLocationGroup] = useState(null);
   
   // Filters
   const [filters, setFilters] = useState({
@@ -185,7 +144,7 @@ export default function MapView() {
   const { toast } = useToast();
 
   // Center map on Brazil (approximate center)
-  const defaultCenter = [-14.2350, -51.9253];
+  const defaultCenter = { lat: -14.2350, lng: -51.9253 };
   const defaultZoom = 4;
 
   useEffect(() => {
@@ -193,13 +152,6 @@ export default function MapView() {
       fetchMapData();
     }
   }, [user]);
-
-  useEffect(() => {
-    // Set map loaded state
-    if (typeof window !== 'undefined') {
-      setMapLoaded(true);
-    }
-  }, []);
 
   const fetchMapData = async () => {
     setLoading(true);
@@ -241,9 +193,9 @@ export default function MapView() {
   const fetchInspections = async () => {
     try {
       // First get projects for this manager
+      // TODO: Restringir por manager_id quando necessário
       const projectsQuery = query(
         collection(db, 'projects'),
-        where('manager_id', '==', user.uid),
         where('deleted_at', '==', null)
       );
       
@@ -292,7 +244,6 @@ export default function MapView() {
     try {
       const projectsQuery = query(
         collection(db, 'projects'),
-        where('manager_id', '==', user.uid),
         where('deleted_at', '==', null)
       );
       
@@ -312,16 +263,16 @@ export default function MapView() {
   const getCoordinatesFromLocation = (city, state) => {
     // This is a simplified mapping - in production, use a proper geocoding service
     const locationMap = {
-      'Florianópolis,SC': [-27.5954, -48.5480],
-      'São Paulo,SP': [-23.5505, -46.6333],
-      'Rio de Janeiro,RJ': [-22.9068, -43.1729],
-      'Belo Horizonte,MG': [-19.9167, -43.9345],
-      'Brasília,DF': [-15.8267, -47.9218],
-      'Salvador,BA': [-12.9714, -38.5014],
-      'Curitiba,PR': [-25.4284, -49.2733],
-      'Porto Alegre,RS': [-30.0346, -51.2177],
-      'Recife,PE': [-8.0476, -34.8770],
-      'Fortaleza,CE': [-3.7319, -38.5267]
+      'Florianópolis,SC': { lat: -27.5954, lng: -48.5480 },
+      'São Paulo,SP': { lat: -23.5505, lng: -46.6333 },
+      'Rio de Janeiro,RJ': { lat: -22.9068, lng: -43.1729 },
+      'Belo Horizonte,MG': { lat: -19.9167, lng: -43.9345 },
+      'Brasília,DF': { lat: -15.8267, lng: -47.9218 },
+      'Salvador,BA': { lat: -12.9714, lng: -38.5014 },
+      'Curitiba,PR': { lat: -25.4284, lng: -49.2733 },
+      'Porto Alegre,RS': { lat: -30.0346, lng: -51.2177 },
+      'Recife,PE': { lat: -8.0476, lng: -34.8770 },
+      'Fortaleza,CE': { lat: -3.7319, lng: -38.5267 }
     };
     
     const key = `${city},${state}`;
@@ -400,8 +351,11 @@ export default function MapView() {
       }
       
       // Status filter
-      if (filters.status && filters.status !== 'all' && inspection.status !== filters.status) {
-        return false;
+      if (filters.status && filters.status !== 'all') {
+        const internalStatus = getInternalStatus(inspection);
+        if (internalStatus !== filters.status) {
+          return false;
+        }
       }
       
       // Date filters
@@ -425,12 +379,12 @@ export default function MapView() {
   const inspectionsByLocation = useMemo(() => {
     const grouped = {};
     filteredInspections.forEach(inspection => {
-      const [lat, lng] = getInspectionCoordinates(inspection);
-      const key = `${lat},${lng}`;
+      const coords = getInspectionCoordinates(inspection);
+      const key = `${coords.lat},${coords.lng}`;
       
       if (!grouped[key]) {
         grouped[key] = {
-          coordinates: [lat, lng],
+          coordinates: coords,
           inspections: [],
           city: inspection.address?.city || 'Cidade não informada',
           state: inspection.address?.state || 'Estado não informado'
@@ -497,7 +451,14 @@ export default function MapView() {
     }
   };
 
-  if (!mapLoaded) {
+  // Close info windows
+  const closeInfoWindows = () => {
+    setSelectedInspector(null);
+    setSelectedInspection(null);
+    setSelectedLocationGroup(null);
+  };
+
+  if (loading) {
     return (
       <div className="h-[500px] w-full flex items-center justify-center">
         <div className="text-center">
@@ -618,10 +579,9 @@ export default function MapView() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todos</SelectItem>
-                      <SelectItem value="pending">Pendente</SelectItem>
-                      <SelectItem value="in_progress">Em Andamento</SelectItem>
-                      <SelectItem value="completed">Concluída</SelectItem>
-                      <SelectItem value="canceled">Cancelada</SelectItem>
+                      <SelectItem value="pendente">Pendente</SelectItem>
+                      <SelectItem value="editada">Editada</SelectItem>
+                      <SelectItem value="entregue">Entregue</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -656,217 +616,250 @@ export default function MapView() {
           </Card>
         </div>
 
-        <div className="rounded-lg border overflow-hidden">
+        <div className="rounded-lg border overflow-hidden relative">
+          {/* Map Legend */}
+          <div className="absolute top-4 left-4 z-10 bg-white/95 backdrop-blur-sm rounded-lg border shadow-lg p-3 max-w-xs">
+            <h4 className="font-medium text-sm mb-2 flex items-center gap-2">
+              <MapPin className="h-4 w-4" />
+              <span className="hidden sm:inline">Legenda</span>
+              <span className="sm:hidden">•</span>
+            </h4>
+            {mapType === 'inspectors' ? (
+              <div className="space-y-1 text-xs">
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center text-white text-[8px]">🔍</div>
+                  <span>Lincers disponíveis</span>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-1 text-xs">
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded bg-amber-500 flex items-center justify-center text-white text-[8px]">⏳</div>
+                  <span>Pendente</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded bg-blue-500 flex items-center justify-center text-white text-[8px]">✏️</div>
+                  <span>Editada</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded bg-green-500 flex items-center justify-center text-white text-[8px]">✅</div>
+                  <span>Entregue</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded-full bg-purple-500 flex items-center justify-center text-white text-[8px]">+</div>
+                  <span>Múltiplas inspeções</span>
+                </div>
+              </div>
+            )}
+          </div>
+          
           <div className="h-[500px] w-full">
-            <MapContainer
-              center={defaultCenter}
-              zoom={defaultZoom}
-              style={{ height: '100%', width: '100%' }}
-              className="z-0"
-            >
-              <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              />
-              
-              <TabsContent value="inspectors" className="m-0">
-                {filteredInspectors.map((inspector) => {
-                  const [lat, lng] = getCoordinatesFromLocation(inspector.city, inspector.state);
-                  
-                  return (
-                    <Marker
-                      key={inspector.id}
-                      position={[lat, lng]}
-                      icon={createCustomIcon('inspector')}
-                    >
-                      <Popup maxWidth={300} className="inspector-popup">
-                        <div className="p-2">
-                          <div className="flex items-start gap-3">
-                            {inspector.profileImageUrl && (
-                              <img 
-                                src={inspector.profileImageUrl} 
-                                alt={`${inspector.name} ${inspector.last_name}`}
-                                className="w-12 h-12 rounded-full object-cover"
-                              />
-                            )}
-                            <div className="flex-1">
-                              <h3 className="font-semibold text-sm">
-                                {inspector.name} {inspector.last_name}
-                              </h3>
-                              <p className="text-xs text-muted-foreground mb-2">
-                                {inspector.profession}
-                              </p>
-                              
-                              <div className="space-y-1">
-                                <div className="flex items-center gap-1">
-                                  <MapPin className="h-3 w-3" />
-                                  <span className="text-xs">
-                                    {inspector.city}, {inspector.state}
-                                  </span>
-                                </div>
-                                
-                                {inspector.rating && (
-                                  <div className="flex items-center gap-1">
-                                    <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                                    <span className="text-xs">
-                                      {inspector.rating} ({inspector.rating_count || 0})
-                                    </span>
-                                  </div>
-                                )}
-                                
-                                {inspector.phonenumber && (
-                                  <div className="flex items-center gap-1">
-                                    <Phone className="h-3 w-3" />
-                                    <span className="text-xs">{inspector.phonenumber}</span>
-                                  </div>
-                                )}
-                                
-                                {inspector.email && (
-                                  <div className="flex items-center gap-1">
-                                    <Mail className="h-3 w-3" />
-                                    <span className="text-xs">{inspector.email}</span>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </Popup>
-                    </Marker>
-                  );
-                })}
-              </TabsContent>
-
-              <TabsContent value="inspections" className="m-0">
-                {Object.entries(inspectionsByLocation).map(([key, locationData]) => {
-                  const [lat, lng] = locationData.coordinates;
-                  const inspectionsCount = locationData.inspections.length;
-                  
-                  // If multiple inspections, show a grouped marker
-                  if (inspectionsCount > 1) {
-                    return (
-                      <Marker
-                        key={key}
-                        position={[lat, lng]}
-                        icon={createCustomIcon('inspection-group', null, inspectionsCount)}
-                        eventHandlers={{
-                          click: () => handleLocationClick(locationData)
-                        }}
-                      >
-                        <Popup maxWidth={300} className="inspection-popup">
-                          <div className="p-2">
-                            <h3 className="font-semibold text-sm mb-2 flex items-center gap-2">
-                              <Building2 className="h-4 w-4" />
-                              {inspectionsCount} Inspeções
-                            </h3>
-                            <p className="text-xs text-muted-foreground mb-3">
-                              {locationData.city}, {locationData.state}
-                            </p>
-                            
-                            <div className="space-y-2">
-                              {locationData.inspections.slice(0, 3).map((inspection, index) => (
-                                <div key={inspection.id} className="flex items-center justify-between text-xs">
-                                  <span className="truncate mr-2">{inspection.title || 'Inspeção'}</span>
-                                  <Badge 
-                                    variant="secondary" 
-                                    className={`${getStatusColor(inspection.status)} text-xs px-1 py-0`}
-                                  >
-                                    {getStatusText(inspection.status)}
-                                  </Badge>
-                                </div>
-                              ))}
-                              
-                              {inspectionsCount > 3 && (
-                                <p className="text-xs text-muted-foreground text-center">
-                                  +{inspectionsCount - 3} outras...
-                                </p>
-                              )}
-                            </div>
-                            
-                            <div className="mt-3 pt-2 border-t">
-                              <p className="text-xs text-center text-muted-foreground">
-                                Clique para ver todas as inspeções
-                              </p>
-                            </div>
-                          </div>
-                        </Popup>
-                      </Marker>
-                    );
-                  } else {
-                    // Single inspection marker
-                    const inspection = locationData.inspections[0];
-                    const displayLocation = inspection.address_string || 
-                      (inspection.address ? `${inspection.address.street}, ${inspection.address.number}, ${inspection.address.neighborhood}, ${inspection.address.city} - ${inspection.address.state}` : '') ||
-                      inspection.location || 
-                      'Localização não informada';
+            <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}>
+              <Map
+                center={defaultCenter}
+                zoom={defaultZoom}
+                style={{ width: '100%', height: '100%' }}
+                mapId="map"
+                onClick={closeInfoWindows}
+                options={{
+                  zoomControl: true,
+                  zoomControlOptions: {
+                    position: 9, // TOP_RIGHT
+                  },
+                  streetViewControl: true,
+                  mapTypeControl: true,
+                  fullscreenControl: true,
+                  gestureHandling: 'greedy', // Remove the need for Ctrl+scroll
+                  scaleControl: true,
+                }}
+              >
+                <TabsContent value="inspectors" className="m-0">
+                  {filteredInspectors.map((inspector) => {
+                    const position = getCoordinatesFromLocation(inspector.city, inspector.state);
+                    const icon = getMarkerIcon('inspector');
                     
                     return (
                       <Marker
-                        key={inspection.id}
-                        position={[lat, lng]}
-                        icon={createCustomIcon('inspection', inspection.status)}
-                      >
-                        <Popup maxWidth={300} className="inspection-popup">
-                          <div className="p-2">
-                            <h3 className="font-semibold text-sm mb-2">
-                              {inspection.title || 'Inspeção'}
-                            </h3>
-                            
-                            <div className="space-y-2">
-                              <div className="flex items-center justify-between">
-                                <span className="text-xs text-muted-foreground">Status:</span>
-                                <Badge 
-                                  variant="secondary" 
-                                  className={getStatusColor(inspection.status)}
-                                >
-                                  {getStatusText(inspection.status)}
-                                </Badge>
-                              </div>
-                              
-                              <div className="flex items-start gap-1">
-                                <MapPin className="h-3 w-3 mt-0.5" />
-                                <span className="text-xs">{displayLocation}</span>
-                              </div>
-                              
-                              {inspection.scheduled_date && (
-                                <div className="flex items-center gap-1">
-                                  <span className="text-xs text-muted-foreground">
-                                    Data: {new Date(inspection.scheduled_date).toLocaleDateString('pt-BR')}
-                                  </span>
-                                </div>
-                              )}
-                              
-                              {inspection.cod && (
-                                <div className="flex items-center gap-1">
-                                  <span className="text-xs text-muted-foreground">
-                                    Código: {inspection.cod}
-                                  </span>
-                                </div>
-                              )}
-                              
-                              {inspection.inspector_name && (
-                                <div className="flex items-center gap-1">
-                                  <Users className="h-3 w-3" />
-                                  <span className="text-xs">{inspection.inspector_name}</span>
-                                </div>
-                              )}
+                        key={inspector.id}
+                        position={position}
+                        icon={icon || undefined}
+                        onClick={() => {
+                          closeInfoWindows();
+                          setSelectedInspector(inspector);
+                        }}
+                      />
+                    );
+                  })}
 
-                              {inspection.area && (
+                  {/* Inspector Info Window */}
+                  {selectedInspector && (
+                    <InfoWindow
+                      position={getCoordinatesFromLocation(selectedInspector.city, selectedInspector.state)}
+                      onCloseClick={() => setSelectedInspector(null)}
+                    >
+                      <div className="p-2 max-w-xs">
+                        <div className="flex items-start gap-3">
+                          {selectedInspector.profileImageUrl && (
+                            <img 
+                              src={selectedInspector.profileImageUrl} 
+                              alt={`${selectedInspector.name} ${selectedInspector.last_name}`}
+                              className="w-12 h-12 rounded-full object-cover"
+                            />
+                          )}
+                          <div className="flex-1">
+                            <h3 className="font-semibold text-sm">
+                              {selectedInspector.name} {selectedInspector.last_name}
+                            </h3>
+                            <p className="text-xs text-muted-foreground mb-2">
+                              {selectedInspector.profession}
+                            </p>
+                            
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-1">
+                                <MapPin className="h-3 w-3" />
+                                <span className="text-xs">
+                                  {selectedInspector.city}, {selectedInspector.state}
+                                </span>
+                              </div>
+                              
+                              {selectedInspector.rating && (
                                 <div className="flex items-center gap-1">
-                                  <span className="text-xs text-muted-foreground">
-                                    Área: {inspection.area}m²
+                                  <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                                  <span className="text-xs">
+                                    {selectedInspector.rating} ({selectedInspector.rating_count || 0})
                                   </span>
+                                </div>
+                              )}
+                              
+                              {selectedInspector.phonenumber && (
+                                <div className="flex items-center gap-1">
+                                  <Phone className="h-3 w-3" />
+                                  <span className="text-xs">{selectedInspector.phonenumber}</span>
+                                </div>
+                              )}
+                              
+                              {selectedInspector.email && (
+                                <div className="flex items-center gap-1">
+                                  <Mail className="h-3 w-3" />
+                                  <span className="text-xs">{selectedInspector.email}</span>
                                 </div>
                               )}
                             </div>
                           </div>
-                        </Popup>
-                      </Marker>
-                    );
-                  }
-                })}
-              </TabsContent>
-            </MapContainer>
+                        </div>
+                      </div>
+                    </InfoWindow>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="inspections" className="m-0">
+                  {Object.entries(inspectionsByLocation).map(([key, locationData]) => {
+                    const position = locationData.coordinates;
+                    const inspectionsCount = locationData.inspections.length;
+                    
+                    // If multiple inspections, show a grouped marker
+                    if (inspectionsCount > 1) {
+                      const icon = getMarkerIcon('inspection-group', null, inspectionsCount);
+                      return (
+                        <Marker
+                          key={key}
+                          position={position}
+                          icon={icon || undefined}
+                          onClick={() => {
+                            closeInfoWindows();
+                            setSelectedLocationGroup(locationData);
+                            handleLocationClick(locationData);
+                          }}
+                        />
+                      );
+                    } else {
+                      // Single inspection marker
+                      const inspection = locationData.inspections[0];
+                      const internalStatus = getInternalStatus(inspection);
+                      const icon = getMarkerIcon('inspection', internalStatus);
+                      
+                      return (
+                        <Marker
+                          key={inspection.id}
+                          position={position}
+                          icon={icon || undefined}
+                          onClick={() => {
+                            closeInfoWindows();
+                            setSelectedInspection(inspection);
+                          }}
+                        />
+                      );
+                    }
+                  })}
+
+                  {/* Single Inspection Info Window */}
+                  {selectedInspection && (
+                    <InfoWindow
+                      position={getInspectionCoordinates(selectedInspection)}
+                      onCloseClick={() => setSelectedInspection(null)}
+                    >
+                      <div className="p-2 max-w-xs">
+                        <h3 className="font-semibold text-sm mb-2">
+                          {selectedInspection.title || 'Inspeção'}
+                        </h3>
+                        
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-muted-foreground">Status:</span>
+                            <Badge 
+                              className={getInternalStatusColor(getInternalStatus(selectedInspection))}
+                            >
+                              {getInternalStatusText(getInternalStatus(selectedInspection))}
+                            </Badge>
+                          </div>
+                          
+                          <div className="flex items-start gap-1">
+                            <MapPin className="h-3 w-3 mt-0.5" />
+                            <span className="text-xs">
+                              {selectedInspection.address_string || 
+                               (selectedInspection.address ? `${selectedInspection.address.street}, ${selectedInspection.address.number}, ${selectedInspection.address.neighborhood}, ${selectedInspection.address.city} - ${selectedInspection.address.state}` : '') ||
+                               selectedInspection.location || 
+                               'Localização não informada'}
+                            </span>
+                          </div>
+                          
+                          {selectedInspection.scheduled_date && (
+                            <div className="flex items-center gap-1">
+                              <span className="text-xs text-muted-foreground">
+                                Data: {new Date(selectedInspection.scheduled_date).toLocaleDateString('pt-BR')}
+                              </span>
+                            </div>
+                          )}
+                          
+                          {selectedInspection.cod && (
+                            <div className="flex items-center gap-1">
+                              <span className="text-xs text-muted-foreground">
+                                Código: {selectedInspection.cod}
+                              </span>
+                            </div>
+                          )}
+                          
+                          {selectedInspection.inspector_name && (
+                            <div className="flex items-center gap-1">
+                              <Users className="h-3 w-3" />
+                              <span className="text-xs">{selectedInspection.inspector_name}</span>
+                            </div>
+                          )}
+
+                          {selectedInspection.area && (
+                            <div className="flex items-center gap-1">
+                              <span className="text-xs text-muted-foreground">
+                                Área: {selectedInspection.area}m²
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </InfoWindow>
+                  )}
+                </TabsContent>
+              </Map>
+            </APIProvider>
           </div>
         </div>
       </Tabs>
@@ -879,15 +872,6 @@ export default function MapView() {
         city={selectedLocationCity}
         state={selectedLocationState}
       />
-
-      {loading && (
-        <div className="absolute inset-0 bg-background/50 flex items-center justify-center">
-          <div className="text-center">
-            <Skeleton className="h-8 w-32 mx-auto mb-2" />
-            <p className="text-sm text-muted-foreground">Carregando dados...</p>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

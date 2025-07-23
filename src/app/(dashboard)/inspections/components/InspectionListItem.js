@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { parseCode } from "@/utils/codeGenerator";
 import DeliveryStatus from "@/components/inspection/DeliveryStatus";
+import { getInternalStatus, getInternalStatusText, getInternalStatusColor } from "@/utils/inspection-status";
 import { 
   Pencil, 
   Calendar, 
@@ -52,25 +53,7 @@ const formatDateSafe = (dateStr) => {
   }
 };
 
-const getStatusColor = (status) => {
-  const statusColors = {
-    "pending": "yellow",
-    "in_progress": "blue",
-    "completed": "green",
-    "canceled": "red"
-  };
-  return statusColors[status] || "gray";
-};
-
-const getStatusText = (status) => {
-  const statusMap = {
-    "pending": "Pendente",
-    "in_progress": "Em Andamento",
-    "completed": "Concluída",
-    "canceled": "Cancelada"
-  };
-  return statusMap[status] || status;
-};
+// Removido - agora usando as funções do utils/inspection-status.js
 
 import { Eye } from "lucide-react"; // Add Eye icon import
 
@@ -206,8 +189,8 @@ export default function InspectionListItem({ inspection, onEdit, onDelete, onEdi
         </div>
         
         <div className="flex items-center gap-2">
-          <Badge variant={getStatusColor(inspection.status)}>
-            {getStatusText(inspection.status)}
+          <Badge className={getInternalStatusColor(getInternalStatus(inspection))}>
+            {getInternalStatusText(getInternalStatus(inspection))}
           </Badge>
           {nonConformitiesCount > 0 && (
             <Badge variant="destructive" className="text-xs">

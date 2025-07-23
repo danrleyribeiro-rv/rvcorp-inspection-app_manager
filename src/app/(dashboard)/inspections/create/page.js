@@ -216,6 +216,18 @@ export default function CreateInspectionPage() {
         throw new Error("Projeto é obrigatório.");
       }
 
+      // Validate and prepare address data
+      const hasAddressData = sharedData.address.street || sharedData.address.city || sharedData.address.state || sharedData.address.cep;
+      const structuredAddress = hasAddressData ? {
+        cep: sharedData.address.cep || '',
+        street: sharedData.address.street || '',
+        number: sharedData.address.number || '',
+        complement: sharedData.address.complement || '',
+        neighborhood: sharedData.address.neighborhood || '',
+        city: sharedData.address.city || '',
+        state: sharedData.address.state || ''
+      } : null;
+      
       const formattedAddress = sharedData.address.street ? 
         `${sharedData.address.street}${sharedData.address.number ? `, ${sharedData.address.number}` : ''}${sharedData.address.complement ? ` - ${sharedData.address.complement}` : ''}${sharedData.address.neighborhood ? `, ${sharedData.address.neighborhood}` : ''}${sharedData.address.city ? `, ${sharedData.address.city}` : ''}${sharedData.address.state ? ` - ${sharedData.address.state}` : ''}` : 
         null;
@@ -244,7 +256,7 @@ export default function CreateInspectionPage() {
             inspector_id: currentInspectorId,
             status: "pending",
             scheduled_date: sharedData.scheduled_date ? new Date(sharedData.scheduled_date) : null,
-            address: sharedData.address,
+            address: structuredAddress,
             address_string: formattedAddress,
             is_templated: !!currentTemplateId,
             area: currentArea,
@@ -277,7 +289,7 @@ export default function CreateInspectionPage() {
           inspector_id: sharedData.inspector_id || null, // From sharedData
           status: "pending",
           scheduled_date: sharedData.scheduled_date ? new Date(sharedData.scheduled_date) : null,
-          address: sharedData.address,
+          address: structuredAddress,
           address_string: formattedAddress,
           is_templated: !!sharedData.template_id,
           area: sharedData.area || "", // From sharedData

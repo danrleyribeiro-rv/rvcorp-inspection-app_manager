@@ -15,26 +15,7 @@ import {
   MapPin, Calendar, Users, FileText, Filter, X, 
   ExternalLink, Clock, Building, User
 } from 'lucide-react';
-
-const getStatusText = (status) => {
-  const statusMap = {
-    pending: 'Pendente',
-    in_progress: 'Em Andamento',
-    completed: 'Concluída',
-    canceled: 'Cancelada'
-  };
-  return statusMap[status] || status;
-};
-
-const getStatusColor = (status) => {
-  const colorMap = {
-    pending: 'bg-yellow-100 text-yellow-800',
-    in_progress: 'bg-blue-100 text-blue-800',
-    completed: 'bg-green-100 text-green-800',
-    canceled: 'bg-red-100 text-red-800'
-  };
-  return colorMap[status] || 'bg-gray-100 text-gray-800';
-};
+import { getInternalStatus, getInternalStatusText, getInternalStatusColor, getInternalStatusOptions } from '@/utils/inspection-status';
 
 export default function InspectionListDialog({ 
   open, 
@@ -50,8 +31,11 @@ export default function InspectionListDialog({
   const filteredInspections = useMemo(() => {
     return inspections.filter(inspection => {
       // Status filter
-      if (statusFilter !== 'all' && inspection.status !== statusFilter) {
-        return false;
+      if (statusFilter !== 'all') {
+        const internalStatus = getInternalStatus(inspection);
+        if (internalStatus !== statusFilter) {
+          return false;
+        }
       }
 
       // Search filter
@@ -72,7 +56,8 @@ export default function InspectionListDialog({
   const statusCounts = useMemo(() => {
     const counts = { all: inspections.length };
     inspections.forEach(inspection => {
-      counts[inspection.status] = (counts[inspection.status] || 0) + 1;
+      const internalStatus = getInternalStatus(inspection);
+      counts[internalStatus] = (counts[internalStatus] || 0) + 1;
     });
     return counts;
   }, [inspections]);
@@ -89,8 +74,8 @@ export default function InspectionListDialog({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
-        <DialogHeader>
+      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <MapPin className="h-5 w-5" />
             Inspeções em {city}, {state}
@@ -101,7 +86,7 @@ export default function InspectionListDialog({
         </DialogHeader>
 
         {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-4 py-4 border-b">
+        <div className="flex flex-col sm:flex-row gap-4 py-4 border-b flex-shrink-0">
           <div className="flex-1">
             <div className="relative">
               <Input
@@ -120,21 +105,11 @@ export default function InspectionListDialog({
                 <SelectValue placeholder="Filtrar por status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">
-                  Todos ({statusCounts.all || 0})
-                </SelectItem>
-                <SelectItem value="pending">
-                  Pendente ({statusCounts.pending || 0})
-                </SelectItem>
-                <SelectItem value="in_progress">
-                  Em Andamento ({statusCounts.in_progress || 0})
-                </SelectItem>
-                <SelectItem value="completed">
-                  Concluída ({statusCounts.completed || 0})
-                </SelectItem>
-                <SelectItem value="canceled">
-                  Cancelada ({statusCounts.canceled || 0})
-                </SelectItem>
+                {getInternalStatusOptions().map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label} ({statusCounts[option.value] || 0})
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
 
@@ -152,14 +127,15 @@ export default function InspectionListDialog({
         </div>
 
         {/* Results count */}
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground flex-shrink-0 pb-2">
           <Filter className="h-4 w-4" />
           Mostrando {filteredInspections.length} de {inspections.length} inspeções
         </div>
 
         {/* Inspections list */}
-        <ScrollArea className="flex-1 pr-4">
-          <div className="space-y-3">
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <ScrollArea className="h-full pr-4">
+            <div className="space-y-3 pb-4">
             {filteredInspections.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
@@ -187,10 +163,9 @@ export default function InspectionListDialog({
                         )}
                       </div>
                       <Badge 
-                        variant="secondary" 
-                        className={getStatusColor(inspection.status)}
+                        className={getInternalStatusColor(getInternalStatus(inspection))}
                       >
-                        {getStatusText(inspection.status)}
+                        {getInternalStatusText(getInternalStatus(inspection))}
                       </Badge>
                     </div>
                   </CardHeader>
@@ -262,11 +237,12 @@ export default function InspectionListDialog({
                 </Card>
               ))
             )}
-          </div>
-        </ScrollArea>
+            </div>
+          </ScrollArea>
+        </div>
 
         {/* Footer with actions */}
-        <div className="flex justify-between items-center pt-4 border-t">
+        <div className="flex justify-between items-center pt-4 border-t flex-shrink-0">
           <div className="text-sm text-muted-foreground">
             Clique em uma inspeção para abrir o editor
           </div>

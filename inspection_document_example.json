@@ -1,389 +1,426 @@
 {
-  "title": "Vistoria Teste 2",
+  "title": "Flexível 2",
   "observation": null,
   "project_id": "DQOFavelUHcuwdEuPE4I",
-  "template_id": "52SZ4PCYyvAU4yEyWFEC",
+  "template_id": "KrzoTXUdv1yRcYDWBND2",
   "inspector_id": "bSTmE0Ix6WbBMueqvZWfpKc3Ngy2",
+  "status": "pending",
   "address_string": "Rua Crisógono Vieira da Cruz, 233, Lagoa da Conceição, Florianópolis - SC",
   "is_templated": true,
-  "area": "101",
-  "cod": "INSP250714-001.TP0001",
+  "area": "0",
+  "cod": "INSP250718-002.TP0004",
   "deleted_at": null,
   "last_sync_at": null,
   "address": null,
   "finished_at": null,
   "city": null,
-  "created_at": "2025-07-14T21:24:32.921",
-  "scheduled_date": "2025-07-14T00:00:00.000",
+  "created_at": "2025-07-18T20:39:21.773",
+  "scheduled_date": "2025-07-18T00:00:00.000",
   "is_synced": true,
   "zip_code": null,
   "street": null,
   "has_local_changes": false,
   "neighborhood": null,
   "state": null,
-  "status": "in_progress",
-  "updated_at": "2025-07-14T22:53:33.017245",
+  "sync_history": null,
+  "updated_at": "2025-07-20T13:08:05.364450",
   "topics": [
     {
+      "direct_details": false,
       "observation": null,
-      "name": "Sala de Estar",
-      "description": "Inspeção da sala principal",
-      "non_conformities": [
-        {
-          "severity": "média",
-          "solved_media": [],
-          "corrective_action": null,
-          "description": "nnnnn",
-          "media": [
-            {
-              "createdAt": "2025-07-14T21:27:12.687866",
-              "filename": "baf592ee-73e5-4ebf-976a-320dc89da29e.jpg",
-              "isResolutionMedia": false,
-              "cloudUrl": "https://firebasestorage.googleapis.com/v0/b/inspection-app-2025.firebasestorage.app/o/inspections%2F9xFwRKDok1KEXl5eEvS6%2Fmedia%2Fimage%2Fbaf592ee-73e5-4ebf-976a-320dc89da29e.jpg?alt=media&token=33e535a8-c0c4-409d-aed4-59434d9a7e5a",
-              "fileSize": 80494,
-              "localPath": "/data/user/0/com.corp.inspection_app/app_flutter/media/baf592ee-73e5-4ebf-976a-320dc89da29e.jpg",
-              "thumbnailPath": "/data/user/0/com.corp.inspection_app/app_flutter/thumbnails/69c25c95-826a-41d2-93ee-655586e5e71a_thumb.jpg",
-              "isUploaded": true,
-              "mimeType": "image/jpeg",
-              "source": "camera",
-              "type": "image"
-            }
-          ],
-          "title": "nnnnn",
-          "createdAt": "2025-07-14T22:53:33.424960",
-          "is_resolved": false,
-          "resolved_at": null,
-          "id": "9923769b-c348-4c38-8371-6633279a7a13",
-          "deadline": null,
-          "status": "open",
-          "updatedAt": "2025-07-14T22:53:33.426581"
-        },
-        {
-          "severity": "média",
-          "solved_media": [
-            {
-              "createdAt": "2025-07-14T21:27:36.291225",
-              "filename": "34ee6d1b-7ca4-4eec-872c-5b02a8b5c5fe.jpg",
-              "isResolutionMedia": true,
-              "cloudUrl": "https://firebasestorage.googleapis.com/v0/b/inspection-app-2025.firebasestorage.app/o/inspections%2F9xFwRKDok1KEXl5eEvS6%2Fmedia%2Fimage%2F34ee6d1b-7ca4-4eec-872c-5b02a8b5c5fe.jpg?alt=media&token=4b34f74b-8ff5-41f6-9b3a-c97a6513a2c6",
-              "fileSize": 80738,
-              "localPath": "/data/user/0/com.corp.inspection_app/app_flutter/media/34ee6d1b-7ca4-4eec-872c-5b02a8b5c5fe.jpg",
-              "thumbnailPath": "/data/user/0/com.corp.inspection_app/app_flutter/thumbnails/11a1abe6-5718-4254-9729-45824600ce93_thumb.jpg",
-              "isUploaded": true,
-              "mimeType": "image/jpeg",
-              "source": "resolution_camera",
-              "type": "image"
-            },
-            {
-              "createdAt": "2025-07-14T21:27:29.766524",
-              "filename": "25c3bcf3-bf43-4eee-ae42-a3bdd3caeef8.jpg",
-              "isResolutionMedia": true,
-              "cloudUrl": "https://firebasestorage.googleapis.com/v0/b/inspection-app-2025.firebasestorage.app/o/inspections%2F9xFwRKDok1KEXl5eEvS6%2Fmedia%2Fimage%2F25c3bcf3-bf43-4eee-ae42-a3bdd3caeef8.jpg?alt=media&token=6f97412d-0ada-4381-adf9-b9c8bc29b4ce",
-              "fileSize": 80569,
-              "localPath": "/data/user/0/com.corp.inspection_app/app_flutter/media/25c3bcf3-bf43-4eee-ae42-a3bdd3caeef8.jpg",
-              "thumbnailPath": "/data/user/0/com.corp.inspection_app/app_flutter/thumbnails/a2c44f5a-650a-4e04-b04d-e85c63592872_thumb.jpg",
-              "isUploaded": true,
-              "mimeType": "image/jpeg",
-              "source": "resolution_camera",
-              "type": "image"
-            }
-          ],
-          "corrective_action": null,
-          "description": "nnnnn",
-          "media": [],
-          "title": "nnnnn",
-          "createdAt": "2025-07-14T22:53:33.414946",
-          "is_resolved": true,
-          "resolved_at": "2025-07-14T21:27:29.791216",
-          "id": "578bf7c6-f18c-4e71-ab48-c42943a3d0f3",
-          "deadline": null,
-          "status": "closed",
-          "updatedAt": "2025-07-14T22:53:33.417117"
-        }
-      ],
-      "media": [
-        {
-          "createdAt": "2025-07-14T22:53:24.911565",
-          "filename": "f7cd6311-c922-4e84-8aac-10e1542ae248.jpg",
-          "cloudUrl": "https://firebasestorage.googleapis.com/v0/b/inspection-app-2025.firebasestorage.app/o/inspections%2F9xFwRKDok1KEXl5eEvS6%2Fmedia%2Fimage%2Ff7cd6311-c922-4e84-8aac-10e1542ae248.jpg?alt=media&token=781c4722-7171-4c32-a0a6-f1b31d46e729",
-          "fileSize": 80797,
-          "localPath": "/data/user/0/com.corp.inspection_app/app_flutter/media/f7cd6311-c922-4e84-8aac-10e1542ae248.jpg",
-          "thumbnailPath": "/data/user/0/com.corp.inspection_app/app_flutter/thumbnails/ad2e13ae-4d7e-48a0-aa01-d4bf685df2b7_thumb.jpg",
-          "isUploaded": true,
-          "mimeType": "image/jpeg",
-          "type": "image"
-        },
-        {
-          "createdAt": "2025-07-14T22:53:18.080280",
-          "filename": "f626719f-7df1-4076-a6d9-3af1c28bbb68.jpg",
-          "cloudUrl": "https://firebasestorage.googleapis.com/v0/b/inspection-app-2025.firebasestorage.app/o/inspections%2F9xFwRKDok1KEXl5eEvS6%2Fmedia%2Fimage%2Ff626719f-7df1-4076-a6d9-3af1c28bbb68.jpg?alt=media&token=fca03916-a2dd-41f9-aca2-186d43777481",
-          "fileSize": 80715,
-          "localPath": "/data/user/0/com.corp.inspection_app/app_flutter/media/f626719f-7df1-4076-a6d9-3af1c28bbb68.jpg",
-          "thumbnailPath": "/data/user/0/com.corp.inspection_app/app_flutter/thumbnails/8ead5939-a7a4-4a16-8ce5-4d77b6daaed5_thumb.jpg",
-          "isUploaded": true,
-          "mimeType": "image/jpeg",
-          "type": "image"
-        },
-        {
-          "createdAt": "2025-07-14T22:03:31.961014",
-          "filename": "0a5fce46-40b7-4a99-804b-bdc8683f9ec0.jpg",
-          "cloudUrl": "https://firebasestorage.googleapis.com/v0/b/inspection-app-2025.firebasestorage.app/o/inspections%2F9xFwRKDok1KEXl5eEvS6%2Fmedia%2Fimage%2F0a5fce46-40b7-4a99-804b-bdc8683f9ec0.jpg?alt=media&token=51f63de2-5c27-45ab-ae74-d3285d9deb02",
-          "fileSize": 80621,
-          "localPath": "/data/user/0/com.corp.inspection_app/app_flutter/media/0a5fce46-40b7-4a99-804b-bdc8683f9ec0.jpg",
-          "thumbnailPath": "/data/user/0/com.corp.inspection_app/app_flutter/thumbnails/f2da63cc-0698-4e3a-bc9a-99ddfa222a53_thumb.jpg",
-          "isUploaded": true,
-          "mimeType": "image/jpeg",
-          "type": "image"
-        },
-        {
-          "createdAt": "2025-07-14T21:40:46.943848",
-          "filename": "91506f4b-937b-449c-a01c-90d342077a44.jpg",
-          "cloudUrl": "https://firebasestorage.googleapis.com/v0/b/inspection-app-2025.firebasestorage.app/o/inspections%2F9xFwRKDok1KEXl5eEvS6%2Fmedia%2Fimage%2F91506f4b-937b-449c-a01c-90d342077a44.jpg?alt=media&token=540ebea5-3c59-41ca-8e9f-c5df4aacc441",
-          "fileSize": 80656,
-          "localPath": "/data/user/0/com.corp.inspection_app/app_flutter/media/91506f4b-937b-449c-a01c-90d342077a44.jpg",
-          "thumbnailPath": "/data/user/0/com.corp.inspection_app/app_flutter/thumbnails/0bb6d49f-7649-46d1-ac25-92c963555aaa_thumb.jpg",
-          "isUploaded": true,
-          "mimeType": "image/jpeg",
-          "type": "image"
-        },
-        {
-          "createdAt": "2025-07-14T21:33:05.881429",
-          "filename": "f15ba144-ffff-4a44-a1b7-eb31b0b941b6.jpg",
-          "cloudUrl": "https://firebasestorage.googleapis.com/v0/b/inspection-app-2025.firebasestorage.app/o/inspections%2F9xFwRKDok1KEXl5eEvS6%2Fmedia%2Fimage%2Ff15ba144-ffff-4a44-a1b7-eb31b0b941b6.jpg?alt=media&token=b1d7a5ad-3c49-41ad-b603-15b116a9b14d",
-          "fileSize": 80525,
-          "localPath": "/data/user/0/com.corp.inspection_app/app_flutter/media/f15ba144-ffff-4a44-a1b7-eb31b0b941b6.jpg",
-          "thumbnailPath": "/data/user/0/com.corp.inspection_app/app_flutter/thumbnails/e9c2bb26-3a7d-43e1-9324-62b99b75b676_thumb.jpg",
-          "isUploaded": true,
-          "mimeType": "image/jpeg",
-          "type": "image"
-        },
-        {
-          "createdAt": "2025-07-14T21:26:54.193654",
-          "filename": "26e9c6d4-c2ff-4469-9de6-9b1bb0d63616.jpg",
-          "cloudUrl": "https://firebasestorage.googleapis.com/v0/b/inspection-app-2025.firebasestorage.app/o/inspections%2F9xFwRKDok1KEXl5eEvS6%2Fmedia%2Fimage%2F26e9c6d4-c2ff-4469-9de6-9b1bb0d63616.jpg?alt=media&token=7befebf3-807a-461c-9dbf-b229943b60fc",
-          "fileSize": 80652,
-          "localPath": "/data/user/0/com.corp.inspection_app/app_flutter/media/26e9c6d4-c2ff-4469-9de6-9b1bb0d63616.jpg",
-          "thumbnailPath": "/data/user/0/com.corp.inspection_app/app_flutter/thumbnails/dab2d0c2-e2e4-4b2f-9af2-8fccf542fea3_thumb.jpg",
-          "isUploaded": true,
-          "mimeType": "image/jpeg",
-          "type": "image"
-        },
-        {
-          "createdAt": "2025-07-14T21:25:24.250570",
-          "filename": "3e6b08a2-ede4-47d9-b33b-1b5022e9da0a.jpg",
-          "cloudUrl": "https://firebasestorage.googleapis.com/v0/b/inspection-app-2025.firebasestorage.app/o/inspections%2F9xFwRKDok1KEXl5eEvS6%2Fmedia%2Fimage%2F3e6b08a2-ede4-47d9-b33b-1b5022e9da0a.jpg?alt=media&token=34efa7b3-7ce1-4c93-a6e5-cebc83664d60",
-          "fileSize": 80881,
-          "localPath": "/data/user/0/com.corp.inspection_app/app_flutter/media/3e6b08a2-ede4-47d9-b33b-1b5022e9da0a.jpg",
-          "thumbnailPath": "/data/user/0/com.corp.inspection_app/app_flutter/thumbnails/2e1c92a0-7264-4920-9daa-081b89064c6a_thumb.jpg",
-          "isUploaded": true,
-          "mimeType": "image/jpeg",
-          "type": "image"
-        }
-      ],
+      "name": "Novo Tópico 1",
+      "description": null,
+      "non_conformities": [],
+      "media": [],
       "items": [
         {
+          "evaluable": true,
           "observation": null,
-          "name": "Paredes",
-          "description": "Verificação das condições das paredes",
+          "evaluation_value": null,
+          "name": "Novo Item 1",
+          "description": null,
           "non_conformities": [],
-          "details": [
-            {
-              "observation": null,
-              "name": "Condição Geral",
-              "options": [
-                "Ótima",
-                "Boa",
-                "Regular",
-                "Ruim"
-              ],
-              "non_conformities": [],
-              "media": [],
-              "type": "select",
-              "value": "Ótima",
-              "required": true,
-              "is_damaged": false
-            },
-            {
-              "observation": null,
-              "name": "Rachadurask",
-              "options": [],
-              "non_conformities": [],
-              "media": [],
-              "type": "boolean",
-              "value": "não",
-              "required": true,
-              "is_damaged": false
-            },
-            {
-              "observation": null,
-              "name": "Observações",
-              "options": [],
-              "non_conformities": [],
-              "media": [],
-              "type": "text",
-              "value": "nnnnn",
-              "required": false,
-              "is_damaged": false
-            },
-            {
-              "observation": null,
-              "name": "Medida",
-              "options": [],
-              "non_conformities": [],
-              "media": [],
-              "type": "measure",
-              "value": "hhh,h,j",
-              "required": false,
-              "is_damaged": false
-            }
-          ],
-          "media": [
-            {
-              "createdAt": "2025-07-14T22:53:24.911565",
-              "filename": "f7cd6311-c922-4e84-8aac-10e1542ae248.jpg",
-              "cloudUrl": "https://firebasestorage.googleapis.com/v0/b/inspection-app-2025.firebasestorage.app/o/inspections%2F9xFwRKDok1KEXl5eEvS6%2Fmedia%2Fimage%2Ff7cd6311-c922-4e84-8aac-10e1542ae248.jpg?alt=media&token=781c4722-7171-4c32-a0a6-f1b31d46e729",
-              "fileSize": 80797,
-              "localPath": "/data/user/0/com.corp.inspection_app/app_flutter/media/f7cd6311-c922-4e84-8aac-10e1542ae248.jpg",
-              "thumbnailPath": "/data/user/0/com.corp.inspection_app/app_flutter/thumbnails/ad2e13ae-4d7e-48a0-aa01-d4bf685df2b7_thumb.jpg",
-              "isUploaded": true,
-              "mimeType": "image/jpeg",
-              "type": "image"
-            },
-            {
-              "createdAt": "2025-07-14T22:53:18.080280",
-              "filename": "f626719f-7df1-4076-a6d9-3af1c28bbb68.jpg",
-              "cloudUrl": "https://firebasestorage.googleapis.com/v0/b/inspection-app-2025.firebasestorage.app/o/inspections%2F9xFwRKDok1KEXl5eEvS6%2Fmedia%2Fimage%2Ff626719f-7df1-4076-a6d9-3af1c28bbb68.jpg?alt=media&token=fca03916-a2dd-41f9-aca2-186d43777481",
-              "fileSize": 80715,
-              "localPath": "/data/user/0/com.corp.inspection_app/app_flutter/media/f626719f-7df1-4076-a6d9-3af1c28bbb68.jpg",
-              "thumbnailPath": "/data/user/0/com.corp.inspection_app/app_flutter/thumbnails/8ead5939-a7a4-4a16-8ce5-4d77b6daaed5_thumb.jpg",
-              "isUploaded": true,
-              "mimeType": "image/jpeg",
-              "type": "image"
-            }
-          ]
-        },
-        {
-          "observation": null,
-          "name": "Piso",
-          "description": "Análise do piso",
-          "non_conformities": [],
-          "details": [
-            {
-              "observation": null,
-              "name": "Tipo",
-              "options": [
-                "Cerâmica",
-                "Porcelanato",
-                "Madeira",
-                "Laminado"
-              ],
-              "non_conformities": [],
-              "media": [],
-              "type": "select",
-              "value": "Porcelanato",
-              "required": true,
-              "is_damaged": false
-            },
-            {
-              "observation": null,
-              "name": "Estado",
-              "options": [
-                "Ótimo",
-                "Bom",
-                "Regular",
-                "Ruim"
-              ],
-              "non_conformities": [],
-              "media": [],
-              "type": "select",
-              "value": "Ótimo",
-              "required": true,
-              "is_damaged": false
-            }
-          ],
-          "media": [
-            {
-              "createdAt": "2025-07-14T21:33:05.881429",
-              "filename": "f15ba144-ffff-4a44-a1b7-eb31b0b941b6.jpg",
-              "cloudUrl": "https://firebasestorage.googleapis.com/v0/b/inspection-app-2025.firebasestorage.app/o/inspections%2F9xFwRKDok1KEXl5eEvS6%2Fmedia%2Fimage%2Ff15ba144-ffff-4a44-a1b7-eb31b0b941b6.jpg?alt=media&token=b1d7a5ad-3c49-41ad-b603-15b116a9b14d",
-              "fileSize": 80525,
-              "localPath": "/data/user/0/com.corp.inspection_app/app_flutter/media/f15ba144-ffff-4a44-a1b7-eb31b0b941b6.jpg",
-              "thumbnailPath": "/data/user/0/com.corp.inspection_app/app_flutter/thumbnails/e9c2bb26-3a7d-43e1-9324-62b99b75b676_thumb.jpg",
-              "isUploaded": true,
-              "mimeType": "image/jpeg",
-              "type": "image"
-            }
+          "details": [],
+          "media": [],
+          "evaluation_options": [
+            "a",
+            "b",
+            "c"
           ]
         }
       ]
     },
     {
+      "direct_details": true,
       "observation": null,
-      "name": "Cozinha",
-      "description": "Inspeção da cozinha",
+      "name": "Novo Tópico 2",
+      "description": null,
       "non_conformities": [],
-      "media": [],
-      "items": [
+      "details": [
         {
           "observation": null,
-          "name": "Pia",
-          "description": "Verificação da pia e bancada",
+          "name": "Novo Detalhe 1",
+          "options": [
+            "a",
+            "b",
+            "c"
+          ],
+          "non_conformities": [],
+          "media": [],
+          "type": "select",
+          "value": null,
+          "required": false,
+          "is_damaged": false
+        }
+      ],
+      "media": []
+    },
+    {
+      "direct_details": true,
+      "observation": null,
+      "name": "Novo Tópico 3",
+      "description": null,
+      "non_conformities": [],
+      "details": [
+        {
+          "observation": null,
+          "name": "Novo Detalhe 1",
+          "options": [],
+          "non_conformities": [],
+          "media": [],
+          "type": "boolean",
+          "value": null,
+          "required": false,
+          "is_damaged": false
+        }
+      ],
+      "media": []
+    },
+    {
+      "direct_details": true,
+      "observation": null,
+      "name": "Novo Tópico 4",
+      "description": null,
+      "non_conformities": [],
+      "details": [
+        {
+          "observation": null,
+          "name": "Novo Detalhe 1",
+          "options": [],
+          "non_conformities": [],
+          "media": [],
+          "type": "measure",
+          "value": null,
+          "required": false,
+          "is_damaged": false
+        }
+      ],
+      "media": [
+        {
+          "createdAt": "2025-07-20T13:07:42.214421",
+          "filename": "58cf816d-6782-4aff-84b3-e1cbc97e819f.jpg",
+          "cloudUrl": "https://firebasestorage.googleapis.com/v0/b/inspection-app-2025.firebasestorage.app/o/inspections%2FFkLveYr3pEbNLJhbAbCh%2Fmedia%2Fimage%2F58cf816d-6782-4aff-84b3-e1cbc97e819f.jpg?alt=media&token=b5acafe8-b635-4f54-a591-560263acba78",
+          "fileSize": 160665,
+          "localPath": "/data/user/0/com.corp.inspection_app/app_flutter/media/58cf816d-6782-4aff-84b3-e1cbc97e819f.jpg",
+          "thumbnailPath": null,
+          "capturedAt": "2025-07-20T13:07:42.214421",
+          "orderIndex": 0,
+          "isUploaded": true,
+          "mimeType": "image/jpeg",
+          "type": "image"
+        },
+        {
+          "createdAt": "2025-07-20T13:07:43.460561",
+          "filename": "1e5ee4b0-2480-411c-ba61-7e7b0634bd20.jpg",
+          "cloudUrl": "https://firebasestorage.googleapis.com/v0/b/inspection-app-2025.firebasestorage.app/o/inspections%2FFkLveYr3pEbNLJhbAbCh%2Fmedia%2Fimage%2F1e5ee4b0-2480-411c-ba61-7e7b0634bd20.jpg?alt=media&token=86a928b8-a7d3-48e4-a6e7-ec730f9e3428",
+          "fileSize": 159269,
+          "localPath": "/data/user/0/com.corp.inspection_app/app_flutter/media/1e5ee4b0-2480-411c-ba61-7e7b0634bd20.jpg",
+          "thumbnailPath": null,
+          "capturedAt": "2025-07-20T13:07:43.460561",
+          "orderIndex": 0,
+          "isUploaded": true,
+          "mimeType": "image/jpeg",
+          "type": "image"
+        },
+        {
+          "createdAt": "2025-07-20T13:07:44.752201",
+          "filename": "6b3bfdd1-e5de-438d-9442-e206dac2cda2.jpg",
+          "cloudUrl": "https://firebasestorage.googleapis.com/v0/b/inspection-app-2025.firebasestorage.app/o/inspections%2FFkLveYr3pEbNLJhbAbCh%2Fmedia%2Fimage%2F6b3bfdd1-e5de-438d-9442-e206dac2cda2.jpg?alt=media&token=6f0df444-bc8c-495b-9cfa-94b2c351f05d",
+          "fileSize": 160713,
+          "localPath": "/data/user/0/com.corp.inspection_app/app_flutter/media/6b3bfdd1-e5de-438d-9442-e206dac2cda2.jpg",
+          "thumbnailPath": null,
+          "capturedAt": "2025-07-20T13:07:44.752201",
+          "orderIndex": 0,
+          "isUploaded": true,
+          "mimeType": "image/jpeg",
+          "type": "image"
+        },
+        {
+          "createdAt": "2025-07-20T13:07:45.873543",
+          "filename": "8862afbe-5788-49d3-a319-d890877705d2.jpg",
+          "cloudUrl": "https://firebasestorage.googleapis.com/v0/b/inspection-app-2025.firebasestorage.app/o/inspections%2FFkLveYr3pEbNLJhbAbCh%2Fmedia%2Fimage%2F8862afbe-5788-49d3-a319-d890877705d2.jpg?alt=media&token=e568b856-b7f4-40e4-8d22-b129ea391eb8",
+          "fileSize": 159831,
+          "localPath": "/data/user/0/com.corp.inspection_app/app_flutter/media/8862afbe-5788-49d3-a319-d890877705d2.jpg",
+          "thumbnailPath": null,
+          "capturedAt": "2025-07-20T13:07:45.873543",
+          "orderIndex": 0,
+          "isUploaded": true,
+          "mimeType": "image/jpeg",
+          "type": "image"
+        },
+        {
+          "createdAt": "2025-07-20T13:07:47.206205",
+          "filename": "29da0f46-340b-4863-98ce-8f4540f42093.jpg",
+          "cloudUrl": "https://firebasestorage.googleapis.com/v0/b/inspection-app-2025.firebasestorage.app/o/inspections%2FFkLveYr3pEbNLJhbAbCh%2Fmedia%2Fimage%2F29da0f46-340b-4863-98ce-8f4540f42093.jpg?alt=media&token=8593ddc0-8355-4a1e-a004-0fd4606bec57",
+          "fileSize": 159286,
+          "localPath": "/data/user/0/com.corp.inspection_app/app_flutter/media/29da0f46-340b-4863-98ce-8f4540f42093.jpg",
+          "thumbnailPath": null,
+          "capturedAt": "2025-07-20T13:07:47.206205",
+          "orderIndex": 0,
+          "isUploaded": true,
+          "mimeType": "image/jpeg",
+          "type": "image"
+        },
+        {
+          "createdAt": "2025-07-20T13:07:48.361601",
+          "filename": "701fd41c-1d84-4288-ae61-2253e3169354.jpg",
+          "cloudUrl": "https://firebasestorage.googleapis.com/v0/b/inspection-app-2025.firebasestorage.app/o/inspections%2FFkLveYr3pEbNLJhbAbCh%2Fmedia%2Fimage%2F701fd41c-1d84-4288-ae61-2253e3169354.jpg?alt=media&token=0ed56b53-aa4e-4b46-8d3a-05671aa4b641",
+          "fileSize": 159192,
+          "localPath": "/data/user/0/com.corp.inspection_app/app_flutter/media/701fd41c-1d84-4288-ae61-2253e3169354.jpg",
+          "thumbnailPath": null,
+          "capturedAt": "2025-07-20T13:07:48.361601",
+          "orderIndex": 0,
+          "isUploaded": true,
+          "mimeType": "image/jpeg",
+          "type": "image"
+        },
+        {
+          "createdAt": "2025-07-20T13:07:49.672037",
+          "filename": "d25b364c-2702-41ba-a1e8-b5759ec83ffc.jpg",
+          "cloudUrl": "https://firebasestorage.googleapis.com/v0/b/inspection-app-2025.firebasestorage.app/o/inspections%2FFkLveYr3pEbNLJhbAbCh%2Fmedia%2Fimage%2Fd25b364c-2702-41ba-a1e8-b5759ec83ffc.jpg?alt=media&token=897f6d15-5404-47a4-906c-6291c71bcc00",
+          "fileSize": 160475,
+          "localPath": "/data/user/0/com.corp.inspection_app/app_flutter/media/d25b364c-2702-41ba-a1e8-b5759ec83ffc.jpg",
+          "thumbnailPath": null,
+          "capturedAt": "2025-07-20T13:07:49.672037",
+          "orderIndex": 0,
+          "isUploaded": true,
+          "mimeType": "image/jpeg",
+          "type": "image"
+        }
+      ]
+    },
+    {
+      "direct_details": false,
+      "observation": null,
+      "name": "Novo Tópico 5",
+      "description": null,
+      "non_conformities": [],
+      "media": [
+        {
+          "createdAt": "2025-07-20T13:07:50.850667",
+          "filename": "cafc3cb4-0d08-4351-84a4-b91f7c7f6f94.jpg",
+          "cloudUrl": "https://firebasestorage.googleapis.com/v0/b/inspection-app-2025.firebasestorage.app/o/inspections%2FFkLveYr3pEbNLJhbAbCh%2Fmedia%2Fimage%2Fcafc3cb4-0d08-4351-84a4-b91f7c7f6f94.jpg?alt=media&token=d8eedbcc-7912-4f2f-b66f-3640632307f5",
+          "fileSize": 162348,
+          "localPath": "/data/user/0/com.corp.inspection_app/app_flutter/media/cafc3cb4-0d08-4351-84a4-b91f7c7f6f94.jpg",
+          "thumbnailPath": null,
+          "capturedAt": "2025-07-20T13:07:50.850667",
+          "orderIndex": 0,
+          "isUploaded": true,
+          "mimeType": "image/jpeg",
+          "type": "image"
+        },
+        {
+          "createdAt": "2025-07-20T13:07:52.193121",
+          "filename": "53e7279e-12fd-448e-976c-8f6466c6ad8d.jpg",
+          "cloudUrl": "https://firebasestorage.googleapis.com/v0/b/inspection-app-2025.firebasestorage.app/o/inspections%2FFkLveYr3pEbNLJhbAbCh%2Fmedia%2Fimage%2F53e7279e-12fd-448e-976c-8f6466c6ad8d.jpg?alt=media&token=58f59e39-6ae9-4893-8da2-e1bc50e245d8",
+          "fileSize": 162282,
+          "localPath": "/data/user/0/com.corp.inspection_app/app_flutter/media/53e7279e-12fd-448e-976c-8f6466c6ad8d.jpg",
+          "thumbnailPath": null,
+          "capturedAt": "2025-07-20T13:07:52.193121",
+          "orderIndex": 0,
+          "isUploaded": true,
+          "mimeType": "image/jpeg",
+          "type": "image"
+        },
+        {
+          "createdAt": "2025-07-20T13:07:53.398566",
+          "filename": "b7df698a-836e-4d50-8ebc-f05eb8a860c6.jpg",
+          "cloudUrl": "https://firebasestorage.googleapis.com/v0/b/inspection-app-2025.firebasestorage.app/o/inspections%2FFkLveYr3pEbNLJhbAbCh%2Fmedia%2Fimage%2Fb7df698a-836e-4d50-8ebc-f05eb8a860c6.jpg?alt=media&token=b30d97f2-9591-4efb-a186-3edc3e9bbd05",
+          "fileSize": 162984,
+          "localPath": "/data/user/0/com.corp.inspection_app/app_flutter/media/b7df698a-836e-4d50-8ebc-f05eb8a860c6.jpg",
+          "thumbnailPath": null,
+          "capturedAt": "2025-07-20T13:07:53.398566",
+          "orderIndex": 0,
+          "isUploaded": true,
+          "mimeType": "image/jpeg",
+          "type": "image"
+        },
+        {
+          "createdAt": "2025-07-20T13:07:54.594278",
+          "filename": "5dfc3a5e-8dbf-4459-9693-f711bb7ca0ea.jpg",
+          "cloudUrl": "https://firebasestorage.googleapis.com/v0/b/inspection-app-2025.firebasestorage.app/o/inspections%2FFkLveYr3pEbNLJhbAbCh%2Fmedia%2Fimage%2F5dfc3a5e-8dbf-4459-9693-f711bb7ca0ea.jpg?alt=media&token=355b90f9-0849-4ed8-accf-d3523b676b4e",
+          "fileSize": 161854,
+          "localPath": "/data/user/0/com.corp.inspection_app/app_flutter/media/5dfc3a5e-8dbf-4459-9693-f711bb7ca0ea.jpg",
+          "thumbnailPath": null,
+          "capturedAt": "2025-07-20T13:07:54.594278",
+          "orderIndex": 0,
+          "isUploaded": true,
+          "mimeType": "image/jpeg",
+          "type": "image"
+        },
+        {
+          "createdAt": "2025-07-20T13:07:55.901740",
+          "filename": "9006b834-b4ef-47a7-b2dc-4e41d88e765b.jpg",
+          "cloudUrl": "https://firebasestorage.googleapis.com/v0/b/inspection-app-2025.firebasestorage.app/o/inspections%2FFkLveYr3pEbNLJhbAbCh%2Fmedia%2Fimage%2F9006b834-b4ef-47a7-b2dc-4e41d88e765b.jpg?alt=media&token=a7cd4db7-1e08-4d9d-b087-1692d17c9364",
+          "fileSize": 162469,
+          "localPath": "/data/user/0/com.corp.inspection_app/app_flutter/media/9006b834-b4ef-47a7-b2dc-4e41d88e765b.jpg",
+          "thumbnailPath": null,
+          "capturedAt": "2025-07-20T13:07:55.901740",
+          "orderIndex": 0,
+          "isUploaded": true,
+          "mimeType": "image/jpeg",
+          "type": "image"
+        },
+        {
+          "createdAt": "2025-07-20T13:07:57.283323",
+          "filename": "0f830aa4-6c80-4cc8-97c5-73b3a854507d.jpg",
+          "cloudUrl": "https://firebasestorage.googleapis.com/v0/b/inspection-app-2025.firebasestorage.app/o/inspections%2FFkLveYr3pEbNLJhbAbCh%2Fmedia%2Fimage%2F0f830aa4-6c80-4cc8-97c5-73b3a854507d.jpg?alt=media&token=58777689-0d22-42b7-a701-1ec870d0488b",
+          "fileSize": 162654,
+          "localPath": "/data/user/0/com.corp.inspection_app/app_flutter/media/0f830aa4-6c80-4cc8-97c5-73b3a854507d.jpg",
+          "thumbnailPath": null,
+          "capturedAt": "2025-07-20T13:07:57.283323",
+          "orderIndex": 0,
+          "isUploaded": true,
+          "mimeType": "image/jpeg",
+          "type": "image"
+        },
+        {
+          "createdAt": "2025-07-20T13:07:58.572887",
+          "filename": "2014064d-471e-4183-8f10-10aa067795ed.jpg",
+          "cloudUrl": "https://firebasestorage.googleapis.com/v0/b/inspection-app-2025.firebasestorage.app/o/inspections%2FFkLveYr3pEbNLJhbAbCh%2Fmedia%2Fimage%2F2014064d-471e-4183-8f10-10aa067795ed.jpg?alt=media&token=c375f973-6b51-4400-885e-4ac3fa99a651",
+          "fileSize": 162446,
+          "localPath": "/data/user/0/com.corp.inspection_app/app_flutter/media/2014064d-471e-4183-8f10-10aa067795ed.jpg",
+          "thumbnailPath": null,
+          "capturedAt": "2025-07-20T13:07:58.572887",
+          "orderIndex": 0,
+          "isUploaded": true,
+          "mimeType": "image/jpeg",
+          "type": "image"
+        },
+        {
+          "createdAt": "2025-07-20T13:07:59.762054",
+          "filename": "1269ca04-78f0-478f-a0af-09017ee306cd.jpg",
+          "cloudUrl": "https://firebasestorage.googleapis.com/v0/b/inspection-app-2025.firebasestorage.app/o/inspections%2FFkLveYr3pEbNLJhbAbCh%2Fmedia%2Fimage%2F1269ca04-78f0-478f-a0af-09017ee306cd.jpg?alt=media&token=29c26111-0749-470f-ab45-59538b97d2cb",
+          "fileSize": 162534,
+          "localPath": "/data/user/0/com.corp.inspection_app/app_flutter/media/1269ca04-78f0-478f-a0af-09017ee306cd.jpg",
+          "thumbnailPath": null,
+          "capturedAt": "2025-07-20T13:07:59.762054",
+          "orderIndex": 0,
+          "isUploaded": true,
+          "mimeType": "image/jpeg",
+          "type": "image"
+        },
+        {
+          "createdAt": "2025-07-20T13:08:01.392639",
+          "filename": "fdb164a8-89ed-4cd3-8f4c-70bc98e5da43.jpg",
+          "cloudUrl": "https://firebasestorage.googleapis.com/v0/b/inspection-app-2025.firebasestorage.app/o/inspections%2FFkLveYr3pEbNLJhbAbCh%2Fmedia%2Fimage%2Ffdb164a8-89ed-4cd3-8f4c-70bc98e5da43.jpg?alt=media&token=d811efa6-f49e-4a54-8e48-f10a24bfc57f",
+          "fileSize": 162138,
+          "localPath": "/data/user/0/com.corp.inspection_app/app_flutter/media/fdb164a8-89ed-4cd3-8f4c-70bc98e5da43.jpg",
+          "thumbnailPath": null,
+          "capturedAt": "2025-07-20T13:08:01.392639",
+          "orderIndex": 0,
+          "isUploaded": true,
+          "mimeType": "image/jpeg",
+          "type": "image"
+        },
+        {
+          "createdAt": "2025-07-20T13:08:03.457584",
+          "filename": "f2b60ce3-1b4b-4e85-874d-6deba23756a9.mp4",
+          "cloudUrl": "https://firebasestorage.googleapis.com/v0/b/inspection-app-2025.firebasestorage.app/o/inspections%2FFkLveYr3pEbNLJhbAbCh%2Fmedia%2Fvideo%2Ff2b60ce3-1b4b-4e85-874d-6deba23756a9.mp4?alt=media&token=edaaf18e-aef0-4afa-a91f-325821bfe7e3",
+          "fileSize": 3119924,
+          "localPath": "/data/user/0/com.corp.inspection_app/app_flutter/media/f2b60ce3-1b4b-4e85-874d-6deba23756a9.mp4",
+          "thumbnailPath": null,
+          "capturedAt": "2025-07-20T13:08:03.457584",
+          "orderIndex": 0,
+          "isUploaded": true,
+          "mimeType": "video/mp4",
+          "type": "video"
+        },
+        {
+          "createdAt": "2025-07-20T13:08:04.805138",
+          "filename": "1ad59cc3-495e-4150-abce-2c5aa311199d.jpg",
+          "cloudUrl": "https://firebasestorage.googleapis.com/v0/b/inspection-app-2025.firebasestorage.app/o/inspections%2FFkLveYr3pEbNLJhbAbCh%2Fmedia%2Fimage%2F1ad59cc3-495e-4150-abce-2c5aa311199d.jpg?alt=media&token=0303034f-618d-44b8-98da-d03065a5aedf",
+          "fileSize": 288498,
+          "localPath": "/data/user/0/com.corp.inspection_app/app_flutter/media/1ad59cc3-495e-4150-abce-2c5aa311199d.jpg",
+          "thumbnailPath": null,
+          "capturedAt": "2025-07-20T13:08:04.805138",
+          "orderIndex": 0,
+          "isUploaded": true,
+          "mimeType": "image/jpeg",
+          "type": "image"
+        }
+      ],
+      "items": [
+        {
+          "evaluable": false,
+          "observation": null,
+          "evaluation_value": null,
+          "name": "Novo Item 1",
+          "description": null,
           "non_conformities": [],
           "details": [
             {
               "observation": null,
-              "name": "Material",
-              "options": [
-                "Inox",
-                "Granito",
-                "Mármore",
-                "Outro"
-              ],
-              "non_conformities": [],
-              "media": [],
-              "type": "select",
-              "value": "Inox",
-              "required": true,
-              "is_damaged": false
-            },
-            {
-              "observation": null,
-              "name": "Vazamentos",
+              "name": "Novo Detalhe 1",
               "options": [],
               "non_conformities": [],
               "media": [],
               "type": "boolean",
-              "value": "não",
-              "required": true,
+              "value": null,
+              "required": false,
+              "is_damaged": false
+            },
+            {
+              "observation": null,
+              "name": "Novo Detalhe 2",
+              "options": [],
+              "non_conformities": [],
+              "media": [],
+              "type": "number",
+              "value": null,
+              "required": false,
               "is_damaged": false
             }
           ],
-          "media": []
+          "media": [],
+          "evaluation_options": []
         },
         {
+          "evaluable": true,
           "observation": null,
-          "name": "Armários",
-          "description": "Verificação dos armários",
+          "evaluation_value": null,
+          "name": "Novo Item 2",
+          "description": null,
           "non_conformities": [],
           "details": [
             {
               "observation": null,
-              "name": "Estado",
-              "options": [
-                "Ótimo",
-                "Bom",
-                "Regular",
-                "Ruim"
-              ],
+              "name": "Novo Detalhe 1",
+              "options": [],
               "non_conformities": [],
               "media": [],
-              "type": "select",
+              "type": "number",
               "value": null,
-              "required": true,
+              "required": false,
               "is_damaged": false
             }
           ],
-          "media": []
+          "media": [],
+          "evaluation_options": [
+            "a",
+            "b",
+            "c"
+          ]
         }
       ]
     }

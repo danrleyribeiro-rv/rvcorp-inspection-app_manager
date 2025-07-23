@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { useToast } from "@/hooks/use-toast";
+import { getInternalStatus } from "@/utils/inspection-status";
 import ReportFilters from "./components/ReportFilters";
 import InspectionReportCard from "./components/InspectionReportCard";
 import ReportViewer from "./components/ReportViewer";
@@ -58,9 +59,14 @@ export default function ReportsPage() {
   const fetchInspections = async () => {
     try {
       // Buscar projetos do gerente
+      // TODO: Restringir por manager_id quando necessário
+      // const projectsQuery = query(
+      //   collection(db, 'projects'),
+      //   where('manager_id', '==', user.uid),
+      //   where('deleted_at', '==', null)
+      // );
       const projectsQuery = query(
         collection(db, 'projects'),
-        where('manager_id', '==', user.uid),
         where('deleted_at', '==', null)
       );
       
@@ -273,7 +279,7 @@ export default function ReportsPage() {
 
     // Filtro de status
     if (filters.status !== "all") {
-      filtered = filtered.filter(inspection => inspection.status === filters.status);
+      filtered = filtered.filter(inspection => getInternalStatus(inspection) === filters.status);
     }
 
     // Filtro de completude

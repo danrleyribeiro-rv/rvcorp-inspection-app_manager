@@ -42,6 +42,7 @@ import {
   Package,
   ChevronDown
 } from "lucide-react";
+import { getInternalStatus, getInternalStatusText, getInternalStatusColor } from "@/utils/inspection-status";
 
 export default function ReportViewer({ inspection, open, onClose, onGeneratePreview, onGenerateNCPDF, onGenerateHTMLReport, onViewHTMLReport }) {
   const formatDate = (dateString) => {
@@ -240,11 +241,8 @@ export default function ReportViewer({ inspection, open, onClose, onGeneratePrev
 
                    <div>
                      <span className="font-medium">Status:</span>
-                     <Badge variant="outline" className="ml-2">
-                       {inspection.status === 'pending' && 'Pendente'}
-                       {inspection.status === 'in_progress' && 'Em Andamento'}
-                       {inspection.status === 'completed' && 'Concluída'}
-                       {inspection.status === 'canceled' && 'Cancelada'}
+                     <Badge className={`ml-2 ${getInternalStatusColor(getInternalStatus(inspection))}`}>
+                       {getInternalStatusText(getInternalStatus(inspection))}
                      </Badge>
                    </div>
                  </div>

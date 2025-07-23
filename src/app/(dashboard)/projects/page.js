@@ -4,11 +4,9 @@
 import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase";
 import { collection, query, where, orderBy, getDocs, doc, getDoc } from "firebase/firestore";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EnhancedButton } from "@/components/ui/enhanced-button";
 import { Plus } from "lucide-react";
 import TableView from "./components/TableView";
-import KanbanView from "./components/KanbanView";
 import { CreateProjectDialog } from "./components/CreateProjectDialog";
 import { ResponsiveContainer } from "@/components/ui/responsive-container";
 import { useToast } from "@/hooks/use-toast";
@@ -17,7 +15,6 @@ import { useRouter } from "next/navigation";
 
 
 export default function ProjectsPage() {
-  const [activeView, setActiveView] = useState("lista");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -28,24 +25,9 @@ export default function ProjectsPage() {
   useEffect(() => {
     if (user) {
       fetchProjects();
-      loadDefaultView();
     }
   }, [user]);
 
-  const loadDefaultView = async () => {
-    try {
-      if (!user?.uid) return;
-      
-      const userSettingsRef = doc(db, 'user_settings', user.uid);
-      const settingsDoc = await getDoc(userSettingsRef);
-      
-      if (settingsDoc.exists() && settingsDoc.data()?.settings?.app?.defaultView) {
-        setActiveView(settingsDoc.data().settings.app.defaultView);
-      }
-    } catch (error) {
-      console.error("Error loading default view:", error);
-    }
-  };
 
   const fetchProjects = async () => {
     setLoading(true);
@@ -55,9 +37,15 @@ export default function ProjectsPage() {
       }
 
       // Fetch projects for this manager
+      // TODO: Restringir por manager_id quando necessário
+      // const projectsQuery = query(
+      //   collection(db, 'projects'),
+      //   where('manager_id', '==', user.uid),
+      //   where('deleted_at', '==', null),
+      //   orderBy('created_at', 'desc')
+      // );
       const projectsQuery = query(
         collection(db, 'projects'),
-        where('manager_id', '==', user.uid),
         where('deleted_at', '==', null),
         orderBy('created_at', 'desc')
       );
@@ -119,20 +107,9 @@ export default function ProjectsPage() {
         </EnhancedButton>
       </div>
 
-      <Tabs value={activeView} onValueChange={setActiveView} className="space-y-4 animate-in slide-in-from-bottom-4 duration-500 delay-200">
-        <TabsList>
-          <TabsTrigger value="lista">Lista</TabsTrigger>
-          <TabsTrigger value="kanban">Kanban</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="lista" className="animate-in fade-in-0 duration-300">
-          <TableView projects={projects} isLoading={loading} onRefresh={fetchProjects} />
-        </TabsContent>
-
-        <TabsContent value="kanban" className="animate-in fade-in-0 duration-300">
-          <KanbanView projects={projects} isLoading={loading} onRefresh={fetchProjects} />
-        </TabsContent>
-      </Tabs>
+      <div className="animate-in slide-in-from-bottom-4 duration-500 delay-200">
+        <TableView projects={projects} isLoading={loading} onRefresh={fetchProjects} />
+      </div>
 
       {showCreateModal && (
         <CreateProjectDialog

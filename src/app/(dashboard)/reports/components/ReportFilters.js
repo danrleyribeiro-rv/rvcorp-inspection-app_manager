@@ -16,6 +16,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { getInternalStatusOptions } from "@/utils/inspection-status";
 
 export default function ReportFilters({ filters, onFiltersChange, inspections }) {
   const [projects, setProjects] = useState([]);
@@ -57,11 +58,11 @@ export default function ReportFilters({ filters, onFiltersChange, inspections })
               <SelectValue placeholder="Todos os status" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="pending">Pendente</SelectItem>
-              <SelectItem value="in_progress">Em Andamento</SelectItem>
-              <SelectItem value="completed">Concluída</SelectItem>
-              <SelectItem value="canceled">Cancelada</SelectItem>
+              {getInternalStatusOptions().map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>

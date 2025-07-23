@@ -1,24 +1,17 @@
-// components/clients/components/CreateClientDialog.js
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { db, auth } from "@/lib/firebase";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogDescription,
-    DialogFooter,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, ArrowLeft, Save, AlertTriangle } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 
 const SEGMENT_OPTIONS = [
@@ -29,7 +22,8 @@ const SEGMENT_OPTIONS = [
     "Outro"
 ];
 
-export default function CreateClientDialog({ open, onClose, onSuccess }) {
+export default function CreateClientPage() {
+    const router = useRouter();
     const [formData, setFormData] = useState({
         name: "",
         email: "",
@@ -48,8 +42,26 @@ export default function CreateClientDialog({ open, onClose, onSuccess }) {
     });
     const [loading, setLoading] = useState(false);
     const [cepLoading, setCepLoading] = useState(false);
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+    const [confirmExitDialog, setConfirmExitDialog] = useState(false);
     const { toast } = useToast();
     const { user } = useAuth();
+
+    useEffect(() => {
+        const hasChanges = Object.values(formData).some(value => value.trim() !== "");
+        setHasUnsavedChanges(hasChanges);
+    }, [formData]);
+
+    useEffect(() => {
+        const handleBeforeUnload = (e) => {
+            if (hasUnsavedChanges) {
+                e.preventDefault();
+                e.returnValue = "";
+            }
+        };
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    }, [hasUnsavedChanges]);
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
@@ -159,8 +171,8 @@ export default function CreateClientDialog({ open, onClose, onSuccess }) {
                 description: "Cliente criado com sucesso!",
             });
             
-            onSuccess();
-            onClose();
+            setHasUnsavedChanges(false);
+            router.push('/clients');
         } catch (error) {
             console.error("Erro ao criar cliente:", error);
             
@@ -195,18 +207,77 @@ export default function CreateClientDialog({ open, onClose, onSuccess }) {
         }
     };
 
-    return (
-        <Dialog open={open} onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-md">
+    const handleBack = () => {
+        if (hasUnsavedChanges) {
+            setConfirmExitDialog(true);
+        } else {
+            router.back();
+        }
+    };
+
+    const ConfirmExitDialog = () => (
+        <Dialog open={confirmExitDialog} onOpenChange={setConfirmExitDialog}>
+            <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Novo Cliente</DialogTitle>
+                    <DialogTitle>Alterações não salvas</DialogTitle>
                     <DialogDescription>
-                        Adicione um novo cliente ao seu painel.
+                        Você tem alterações não salvas. Deseja sair sem salvar?
                     </DialogDescription>
                 </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <DialogFooter className="flex justify-end gap-2 mt-4">
+                    <Button variant="outline" onClick={() => setConfirmExitDialog(false)}>
+                        Cancelar
+                    </Button>
+                    <Button variant="destructive" onClick={() => router.back()}>
+                        Sair sem salvar
+                    </Button>
+                    <Button onClick={async () => {
+                        await handleSubmit(new Event('submit'));
+                        if (!loading) {
+                            router.back();
+                        }
+                    }} disabled={loading}>
+                        {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                        Salvar e sair
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+
+    return (
+        <div className="min-h-screen bg-background">
+            <div className="sticky top-0 z-10 bg-background border-b shadow-sm">
+                <div className="container mx-auto flex items-center justify-between p-4">
+                    <div className="flex items-center gap-3">
+                        <Button variant="ghost" size="sm" onClick={handleBack}>
+                            <ArrowLeft className="h-4 w-4" />
+                            Voltar
+                        </Button>
+                        <div>
+                            <h1 className="text-xl font-bold">Novo Cliente</h1>
+                            <p className="text-xs text-muted-foreground">
+                                Adicione um novo cliente ao seu painel
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        {hasUnsavedChanges && (
+                            <span className="text-sm text-amber-500 flex items-center">
+                                <AlertTriangle className="h-4 w-4 mr-1" />
+                                Alterações não salvas
+                            </span>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            <div className="container mx-auto p-6">
+                <form onSubmit={handleSubmit} className="space-y-6">
+                    <div className="bg-card border rounded-lg p-6">
+                        <h2 className="text-lg font-semibold mb-4">Informações do Cliente</h2>
                     {/* Informações básicas */}
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <Label htmlFor="name">Nome*</Label>
                             <Input
@@ -252,7 +323,7 @@ export default function CreateClientDialog({ open, onClose, onSuccess }) {
                             onChange={handleInputChange}
                         />
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <Label htmlFor="responsible_name">Nome do Responsável</Label>
                             <Input
@@ -276,7 +347,7 @@ export default function CreateClientDialog({ open, onClose, onSuccess }) {
                     {/* CEP e endereço */}
                     <div className="space-y-2">
                         <Label htmlFor="cep">CEP</Label>
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 items-center">
                             <Input
                                 id="cep"
                                 name="cep"
@@ -284,12 +355,13 @@ export default function CreateClientDialog({ open, onClose, onSuccess }) {
                                 onChange={handleInputChange}
                                 onBlur={handleCepBlur}
                                 placeholder="00000-000"
+                                className="flex-1"
                             />
                             {cepLoading && <Loader2 className="animate-spin h-5 w-5" />}
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <Label htmlFor="street">Rua</Label>
                             <Input
@@ -310,7 +382,7 @@ export default function CreateClientDialog({ open, onClose, onSuccess }) {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <Label htmlFor="city">Cidade</Label>
                             <Input
@@ -331,7 +403,7 @@ export default function CreateClientDialog({ open, onClose, onSuccess }) {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <Label htmlFor="phonenumber">Telefone</Label>
                             <Input
@@ -360,17 +432,22 @@ export default function CreateClientDialog({ open, onClose, onSuccess }) {
                             </Select>
                         </div>
                     </div>
-                    <DialogFooter>
-                        <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
+
+                    </div>
+
+                    <div className="flex justify-end gap-4">
+                        <Button type="button" variant="outline" onClick={handleBack} disabled={loading}>
                             Cancelar
                         </Button>
                         <Button type="submit" disabled={loading}>
-                            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                             {loading ? "Criando..." : "Criar Cliente"}
                         </Button>
-                    </DialogFooter>
+                    </div>
                 </form>
-            </DialogContent>
-        </Dialog>
+            </div>
+            
+            <ConfirmExitDialog />
+        </div>
     );
 }

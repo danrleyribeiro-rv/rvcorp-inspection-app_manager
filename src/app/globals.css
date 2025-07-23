@@ -1,5 +1,4 @@
 @import '../styles/animations.css';
-@import 'leaflet/dist/leaflet.css';
 
 @tailwind base;
 @tailwind components;

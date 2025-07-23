@@ -20,6 +20,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { useAuth } from "@/context/auth-context";
+import { getInternalStatusOptions } from "@/utils/inspection-status";
 
 export default function FilterPanel({ filterState, onFilterChange, inspections }) {
   const [projects, setProjects] = useState([]);
@@ -36,9 +37,14 @@ export default function FilterPanel({ filterState, onFilterChange, inspections }
 
   const fetchProjects = async () => {
     try {
+      // TODO: Restringir por manager_id quando necessário
+      // const projectsQuery = query(
+      //   collection(db, 'projects'),
+      //   where('manager_id', '==', user.uid),
+      //   where('deleted_at', '==', null)
+      // );
       const projectsQuery = query(
         collection(db, 'projects'),
-        where('manager_id', '==', user.uid),
         where('deleted_at', '==', null)
       );
       
@@ -153,11 +159,11 @@ export default function FilterPanel({ filterState, onFilterChange, inspections }
               <SelectValue placeholder="Todos os status" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="pending">Pendente</SelectItem>
-              <SelectItem value="in_progress">Em Andamento</SelectItem>
-              <SelectItem value="completed">Concluída</SelectItem>
-              <SelectItem value="canceled">Cancelada</SelectItem>
+              {getInternalStatusOptions().map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>

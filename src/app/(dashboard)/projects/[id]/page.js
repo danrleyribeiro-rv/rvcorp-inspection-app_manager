@@ -29,6 +29,7 @@ import {
   ClockIcon, MailIcon, PhoneIcon, ClipboardListIcon, BriefcaseIcon, InfoIcon, ExternalLinkIcon, Shield,
   Settings, Trash2, AlertTriangle
 } from "lucide-react";
+import { getInternalStatus, getInternalStatusText, getInternalStatusColor } from "@/utils/inspection-status";
 
 const projectStatusConfig = {
   "Aguardando": { text: "Aguardando", badgeClass: "bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900/50 dark:text-yellow-300 dark:border-yellow-700" },
@@ -62,25 +63,7 @@ const formatDateSafe = (dateInput, dateFormat = "PPP") => {
   }
 };
 
-const getInspectionStatusBadgeVariant = (status) => {
-  switch (status?.toLowerCase()) {
-    case 'pending': return 'warning';
-    case 'in_progress': return 'info';
-    case 'completed': return 'success';
-    case 'canceled': return 'destructive';
-    default: return 'secondary';
-  }
-};
-
-const getInspectionStatusText = (status) => {
-  const map = {
-    pending: 'Pendente',
-    in_progress: 'Em Andamento',
-    completed: 'Concluída',
-    canceled: 'Cancelada',
-  };
-  return map[status?.toLowerCase()] || status || 'Desconhecido';
-};
+// Removido - usando funções do utils/inspection-status.js
 
 // Progress calculation function from reports
 const calculateCompletion = (inspection) => {
@@ -735,8 +718,8 @@ export default function ProjectViewPage() {
                               {inspection.title || "Inspeção Sem Título"}
                               <ExternalLinkIcon className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                             </p>
-                            <Badge variant={getInspectionStatusBadgeVariant(inspection.status)} className="text-xs px-2 py-0.5">
-                              {getInspectionStatusText(inspection.status)}
+                            <Badge className={`text-xs px-2 py-0.5 ${getInternalStatusColor(getInternalStatus(inspection))}`}>
+                              {getInternalStatusText(getInternalStatus(inspection))}
                             </Badge>
                           </div>
                           <p className="text-xs text-muted-foreground">
