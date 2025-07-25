@@ -245,32 +245,37 @@ export class InspectionVersioningService {
    */
   static async getVersionSnapshot(inspectionId, version) {
     try {
-      // Buscar no histórico de pull a versão específica
-      const historyQuery = query(
-        collection(db, 'inspection_pull_history'),
-        where('inspection_id', '==', inspectionId),
-        where('version', '==', version)
-      );
+      // Se a versão solicitada é a atual, buscar de inspections_data
+      const dataRef = doc(db, 'inspections_data', inspectionId);
+      const dataDoc = await getDoc(dataRef);
       
-      const historySnapshot = await getDocs(historyQuery);
-      if (historySnapshot.empty) {
-        throw new Error(`Versão ${version} não encontrada no histórico`);
+      if (dataDoc.exists() && dataDoc.data().version === version) {
+        // É a versão atual, retornar dados completos
+        return dataDoc.data();
       }
       
-      const versionDoc = historySnapshot.docs[0];
-      const versionData = versionDoc.data();
+      // Para versões antigas, buscar no histórico
+      // Mas como o histórico não tem os dados completos, vamos buscar de inspections_data_snapshots
+      // se existir, senão retornar os dados atuais (limitação do sistema atual)
+      const snapshotRef = doc(db, 'inspections_data_snapshots', `${inspectionId}_v${version}`);
+      const snapshotDoc = await getDoc(snapshotRef);
       
-      // Para encontrar o snapshot da versão, precisamos acessar uma coleção de snapshots
-      // ou reconstruir baseado no histórico
-      // Por enquanto, vamos usar os dados disponíveis no histórico
-      return {
-        id: versionDoc.id,
-        version: versionData.version,
-        pulled_at: versionData.pulled_at?.toDate?.() || new Date(versionData.pulled_at),
-        pulled_by: versionData.pulled_by,
-        pull_notes: versionData.pull_notes,
-        source_version_timestamp: versionData.source_version_timestamp
-      };
+      if (snapshotDoc.exists()) {
+        return snapshotDoc.data();
+      }
+      
+      // Se não há snapshot, usar os dados atuais como fallback
+      // (limitação: não podemos reconstruir versões antigas sem snapshots)
+      if (dataDoc.exists()) {
+        const currentData = dataDoc.data();
+        return {
+          ...currentData,
+          version: version,
+          _isCurrentDataFallback: true
+        };
+      }
+      
+      throw new Error(`Dados da versão ${version} não encontrados`);
     } catch (error) {
       console.error('Erro ao buscar snapshot da versão:', error);
       throw error;

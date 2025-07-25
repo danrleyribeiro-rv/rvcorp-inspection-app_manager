@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import InspectionPreviewModal from "./InspectionPreviewModal";
+import InspectionComparisonModal from "./InspectionComparisonModal";
 import FirestoreSetupAlert from "./FirestoreSetupAlert";
 import { useInspectionVersioning } from "@/hooks/use-inspection-versioning";
 import { generateInspectionPDF, generateNonConformitiesPDF } from "@/services/pdf-service";
@@ -37,13 +37,14 @@ export default function InspectionVersionControl({
   onDataPulled,
   inspection 
 }) {
-  const [showPreview, setShowPreview] = useState(false);
   const [showSetupAlert, setShowSetupAlert] = useState(false);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [showRestoreDialog, setShowRestoreDialog] = useState(false);
   const [selectedVersionToRestore, setSelectedVersionToRestore] = useState(null);
   const [restoreNotes, setRestoreNotes] = useState('');
   const [isRestoring, setIsRestoring] = useState(false);
+  const [showCompareDialog, setShowCompareDialog] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
   
   const { toast } = useToast();
   
@@ -55,7 +56,9 @@ export default function InspectionVersionControl({
     checkForChanges,
     restoreVersion,
     loadPullHistory,
-    loadCurrentVersion
+    loadCurrentVersion,
+    pullInspection,
+    generatePreview
   } = useInspectionVersioning(inspectionId);
 
   // Mostrar alerta de configuração se necessário
@@ -65,12 +68,32 @@ export default function InspectionVersionControl({
     }
   }, [changeInfo]);
 
-  const handlePreviewAndPull = () => {
-    setShowPreview(true);
+  const handleDirectImport = async () => {
+    if (!changeInfo?.hasChanges && !changeInfo?.isFirstPull) return;
+    
+    setIsImporting(true);
+    try {
+      const result = await pullInspection(`Importação automática - ${formatDate(new Date())}`);
+      if (result) {
+        onDataPulled?.();
+        toast({
+          title: "Importação concluída",
+          description: `Dados atualizados para versão ${result.version}`
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Erro na importação",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setIsImporting(false);
+    }
   };
 
-  const handlePullConfirmed = () => {
-    onDataPulled?.();
+  const handleShowComparison = () => {
+    setShowCompareDialog(true);
   };
 
   const handleGenerateReport = async (reportGenerator, type) => {
@@ -320,19 +343,36 @@ export default function InspectionVersionControl({
 
           {/* Botões de Ação */}
           <div className="flex gap-2">
+            {/* Botão de Importação Direta */}
             <Button
-              onClick={handlePreviewAndPull}
-              disabled={checkingChanges}
+              onClick={handleDirectImport}
+              disabled={checkingChanges || isImporting || (!changeInfo?.hasChanges && !changeInfo?.isFirstPull)}
               variant={changeInfo?.hasChanges || changeInfo?.isFirstPull ? "default" : "outline"}
               className="flex-1"
             >
-              <Eye className="h-4 w-4 mr-2" />
-              {changeInfo?.isFirstPull 
-                ? 'Importar Inspeção' 
-                : changeInfo?.hasChanges 
-                  ? 'Visualizar e Atualizar'
-                  : 'Visualizar Dados'
+              {isImporting ? (
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <GitPullRequest className="h-4 w-4 mr-2" />
+              )}
+              {isImporting 
+                ? 'Importando...'
+                : changeInfo?.isFirstPull 
+                  ? 'Importar Inspeção' 
+                  : changeInfo?.hasChanges 
+                    ? 'Importar/Copiar Vistoria'
+                    : 'Copiar Dados'
               }
+            </Button>
+            
+            {/* Botão de Comparação - sempre visível */}
+            <Button
+              onClick={handleShowComparison}
+              disabled={checkingChanges}
+              variant="outline"
+            >
+              <Eye className="h-4 w-4 mr-2" />
+              Comparar Versões
             </Button>
             
             {/* Preview PDFs Dropdown */}
@@ -559,11 +599,13 @@ export default function InspectionVersionControl({
       </Dialog>
 
       {/* Modal de Preview */}
-      <InspectionPreviewModal
-        open={showPreview}
-        onClose={() => setShowPreview(false)}
+      <InspectionComparisonModal
+        open={showCompareDialog}
+        onClose={() => setShowCompareDialog(false)}
         inspectionId={inspectionId}
-        onPullConfirmed={handlePullConfirmed}
+        pullHistory={pullHistory}
+        currentVersion={currentVersion}
+        changeInfo={changeInfo}
       />
     </>
   );

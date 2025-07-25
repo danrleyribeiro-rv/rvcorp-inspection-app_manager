@@ -32,9 +32,10 @@ export function generateReportDownloadUrl(inspection, type = 'complete') {
  * @returns {string} HTML content
  */
 function generateCompleteReport(inspection) {
-  const template = getReportTemplate();
+  const template = getReportTemplate(inspection);
   
-  // Extract basic inspection data
+  const nonConformities = getAllNonConformities(inspection);
+
   const inspectionData = {
     title: inspection.title || 'Vistoria sem título',
     cod: inspection.cod || 'SEM-CÓDIGO',
@@ -47,11 +48,12 @@ function generateCompleteReport(inspection) {
     topicsCount: inspection.topics?.length || 0,
     itemsCount: getTotalItemsCount(inspection),
     detailsCount: getTotalDetailsCount(inspection),
-    nonConformitiesCount: getTotalNonConformitiesCount(inspection),
+    nonConformitiesCount: nonConformities.length,
     detailedContent: generateDetailedInspectionContent(inspection)
   };
   
-  // Replace template placeholders
+  const totalPages = (inspection.topics?.length || 0) + 1;
+  
   let html = template
     .replace(/{{INSPECTION_TITLE}}/g, inspectionData.title)
     .replace(/{{INSPECTION_CODE}}/g, inspectionData.cod)
@@ -65,7 +67,8 @@ function generateCompleteReport(inspection) {
     .replace(/{{DETAILS_COUNT}}/g, inspectionData.detailsCount)
     .replace(/{{NON_CONFORMITIES_COUNT}}/g, inspectionData.nonConformitiesCount)
     .replace(/{{GENERAL_OBSERVATION}}/g, inspectionData.observation)
-    .replace(/{{DETAILED_CONTENT}}/g, inspectionData.detailedContent);
+    .replace(/{{DETAILED_CONTENT}}/g, inspectionData.detailedContent)
+    .replace(/{{TOTAL_PAGES}}/g, totalPages);
   
   return html;
 }
@@ -76,15 +79,11 @@ function generateCompleteReport(inspection) {
  * @returns {string} HTML content
  */
 function generateNonConformitiesReport(inspection) {
-  const template = getReportTemplate();
+  const template = getReportTemplate(inspection);
   
-  // Extract non-conformities
   const nonConformities = getAllNonConformities(inspection);
+  const ncContent = generateNonConformitiesContent(inspection, nonConformities);
   
-  // Generate NC-specific content
-  const ncContent = generateNonConformitiesContent(nonConformities);
-  
-  // Extract basic inspection data
   const inspectionData = {
     title: `${inspection.title || 'Vistoria sem título'} - Relatório de Não Conformidades`,
     cod: inspection.cod || 'SEM-CÓDIGO',
@@ -94,14 +93,15 @@ function generateNonConformitiesReport(inspection) {
     address: inspection.address_string || 'Endereço não informado',
     inspector: inspection.inspectors?.name || 'Não atribuído',
     project: inspection.projects?.title || 'Projeto não informado',
-    topicsCount: inspection.topics?.length || 0,
-    itemsCount: getTotalItemsCount(inspection),
-    detailsCount: getTotalDetailsCount(inspection),
+    topicsCount: 0,
+    itemsCount: 0,
+    detailsCount: 0,
     nonConformitiesCount: nonConformities.length,
     detailedContent: ncContent
   };
   
-  // Replace template placeholders
+  const totalPages = 2;
+  
   let html = template
     .replace(/{{INSPECTION_TITLE}}/g, inspectionData.title)
     .replace(/{{INSPECTION_CODE}}/g, inspectionData.cod)
@@ -115,230 +115,527 @@ function generateNonConformitiesReport(inspection) {
     .replace(/{{DETAILS_COUNT}}/g, inspectionData.detailsCount)
     .replace(/{{NON_CONFORMITIES_COUNT}}/g, inspectionData.nonConformitiesCount)
     .replace(/{{GENERAL_OBSERVATION}}/g, inspectionData.observation)
-    .replace(/{{DETAILED_CONTENT}}/g, inspectionData.detailedContent);
+    .replace(/{{DETAILED_CONTENT}}/g, inspectionData.detailedContent)
+    .replace(/{{TOTAL_PAGES}}/g, totalPages);
   
   return html;
 }
 
 /**
  * Get the report template HTML
+ * @param {Object} inspection - Inspection data
  * @returns {string} Template HTML
  */
-function getReportTemplate() {
-  return `<!DOCTYPE html>
-<html lang="pt-BR">
+function getReportTemplate(inspection) {
+    const logoSvg = `<svg viewBox="0 0 195 53" fill="none" xmlns="http://www.w3.org/2000/svg" class="h-full w-auto"><path d="M0 0H14.98V38.45H37.4V51.18H0V0Z" fill="currentColor"/><path d="M55.75 10.23V51.18H41.58V10.23H55.75Z" fill="currentColor"/><path d="M175.24 40.8C170.13 40.58 167.37 38.79 165.95 36.18L191.31 27.1C190.36 20.64 187.46 8.50999 171.2 8.50999C162.7 8.50999 152.72 12.29 149.81 23.99C149.19 26.47 148.8 30.08 147.29 32.14C144.17 36.43 138.23 40.33 131.4 40.33C122.79 40.33 120.72 35.13 120.72 29.43C120.72 24.17 123.36 20.5 128.24 20.5C134.84 20.5 136.01 28.09 136.01 28.12L146.61 22.52C146.61 22.52 144.67 8.48999 127.36 8.48999C119.1 8.48999 105.17 13.1 105.17 30.16C105.17 45.2 115.67 51.97 129.54 51.97C143.4 51.97 150.05 44.08 151.62 41.89C155.57 49.08 163.64 52.42 173.37 52.42C181.87 52.42 190.63 48.71 194.53 45.14L189.45 35.34C187.32 38.61 180.65 41.01 175.24 40.78V40.8ZM179.46 23.29L163.6 28.88C162.9 24.54 163.58 20.54 167.57 18.69C174.28 15.57 178.15 20.68 179.46 23.29Z" fill="currentColor"/><path d="M89.26 9.94999C81.78 9.48999 77.39 12.7 74.83 15.55L73.6 10.21H60.62V51.17H74.98V30.33C74.98 29.07 75.01 21.98 81.85 21.98C89.54 21.98 89.45 30.35 89.45 38.9V51.17H103.35V35.12C103.35 17.73 97.85 10.48 89.27 9.94999H89.26Z" fill="currentColor"/></svg>`;
 
+    return `<!DOCTYPE html>
+<html lang="pt-BR">
 <head>
   <meta charset="utf-8" />
-  <meta content="width=device-width, initial-scale=1.0" name="viewport" />
   <title>{{INSPECTION_TITLE}}</title>
-  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
   <style>
-        /* Bricolage Grotesque - Para títulos */
-        @font-face {
-            font-family: 'Bricolage Grotesque';
-            src: url('./fonts/BricolageGrotesque_24pt-Regular.ttf') format('truetype');
-            font-weight: 400;
-            font-style: normal;
-        }
-        @font-face {
-            font-family: 'Bricolage Grotesque';
-            src: url('./fonts/BricolageGrotesque_24pt-Medium.ttf') format('truetype');
-            font-weight: 500;
-            font-style: normal;
-        }
-        @font-face {
-            font-family: 'Bricolage Grotesque';
-            src: url('./fonts/BricolageGrotesque_24pt-SemiBold.ttf') format('truetype');
-            font-weight: 600;
-            font-style: normal;
-        }
-        @font-face {
-            font-family: 'Bricolage Grotesque';
-            src: url('./fonts/BricolageGrotesque_24pt-Bold.ttf') format('truetype');
-            font-weight: 700;
-            font-style: normal;
-        }
+    :root {
+        --font-heading: 'Bricolage Grotesque', sans-serif;
+        --font-body: 'Inter', sans-serif;
+        --brand-color: #312456;
+        --text-primary: #1f2937;
+        --text-secondary: #4b5563;
+        --border-color: #e5e7eb;
+        --page-margin: 15mm;
+    }
 
-        /* Inter - Para corpo do texto */
-        @font-face {
-            font-family: 'Inter';
-            src: url('./fonts/Inter-Regular.ttf') format('truetype');
-            font-weight: 400;
-            font-style: normal;
-        }
-        @font-face {
-            font-family: 'Inter';
-            src: url('./fonts/Inter-Medium.ttf') format('truetype');
-            font-weight: 500;
-            font-style: normal;
-        }
-        @font-face {
-            font-family: 'Inter';
-            src: url('./fonts/Inter-Bold.ttf') format('truetype');
-            font-weight: 700;
-            font-style: normal;
-        }
+    * {
+        box-sizing: border-box;
+    }
 
-        :root {
-            --font-heading: 'Bricolage Grotesque', sans-serif;
-            --font-body: 'Inter', sans-serif;
-        }
+    body {
+        font-family: var(--font-body);
+        background-color: #f9fafb;
+        margin: 0;
+        padding: 0;
+        line-height: 1.5;
+    }
 
-        body {
-            font-family: var(--font-body);
-        }
+    h1, h2, h3, h4, h5, h6 {
+        font-family: var(--font-heading);
+        font-weight: 700;
+        color: var(--text-primary);
+        margin: 0;
+    }
 
-        h1, h2, h3, h4, h5, h6 {
-            font-family: var(--font-heading);
-        }
+    .severity-baixa { background-color: #fef3c7; color: #92400e; }
+    .severity-media { background-color: #ffedd5; color: #9a3412; }
+    .severity-alta { background-color: #fee2e2; color: #991b1b; }
+    .severity-critica { background-color: #e0e7ff; color: #3730a3; }
+    .severity-resolvida { background-color: #d1fae5; color: #065f46; }
 
-        .severity-baixa { background-color: #fbbf24; color: #92400e; }
-        .severity-media { background-color: #f97316; color: #ea580c; }
-        .severity-alta { background-color: #ef4444; color: #dc2626; }
-        .severity-critica { background-color: #8b5cf6; color: #7c3aed; }
-        .severity-resolvida { background-color: #10b981; color: #047857; }
+    /* Screen styles */
+    @media screen {
+      .print-container {
+        margin: 2rem auto;
+        max-width: 210mm;
+        background: #f9fafb;
+        padding: 1rem;
+      }
+      .print-page {
+        margin-bottom: 2rem;
+        box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+    }
 
+    /* Print styles - THE MOST IMPORTANT */
     @media print {
+      @page {
+        size: A4;
+        margin: 20mm 15mm 20mm 15mm;
+      }
+
       body {
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
+        background: white !important;
+        font-size: 9pt;
+        line-height: 1.4;
+        color: #000;
+        margin: 0;
+        padding: 0;
       }
 
-      .page-break {
-        page-break-before: always;
-      }
-
-      .no-print {
-        display: none;
+      .print-container {
+        margin: 0;
+        padding: 0;
+        max-width: none;
+        background: white;
       }
 
       .print-page {
-        width: 210mm;
-        height: 297mm;
-        margin: 0 auto;
-        padding: 15mm;
-        box-shadow: none;
+        width: 100%;
+        min-height: calc(297mm - 40mm);
+        background: white !important;
         page-break-after: always;
+        margin: 0;
+        padding: 0;
+        box-shadow: none;
+        border-radius: 0;
+        position: relative;
+        display: flex;
+        flex-direction: column;
       }
 
       .print-page:last-child {
         page-break-after: auto;
       }
+
+      /* Cover page styling */
+      .cover-page {
+        padding: 0;
+      }
+
+      .cover-page .page-header {
+        background-color: var(--brand-color) !important;
+        color: white !important;
+        margin: -20mm -15mm 20mm -15mm;
+        padding: 8mm 15mm;
+        width: calc(100% + 30mm);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      /* Content pages get no header */
+      .content-page {
+        padding: 0;
+      }
+
+      .content-page .page-header {
+        display: none !important;
+      }
+
+      /* All pages get footer */
+      .page-footer {
+        background-color: var(--brand-color) !important;
+        color: white !important;
+        margin: 20mm -15mm -20mm -15mm;
+        padding: 5mm 15mm;
+        width: calc(100% + 30mm);
+        margin-top: auto;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .page-main {
+        flex-grow: 1;
+        padding: 0;
+      }
+    }
+    
+    /* Common page styles */
+    .print-page {
+        background-color: white;
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+    }
+    
+    .page-header {
+        color: white;
+        background-color: var(--brand-color);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 13px;
+        padding: 12px 20px;
+    }
+
+    .page-footer {
+        color: white;
+        background-color: var(--brand-color);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 11px;
+        padding: 8px 20px;
+    }
+    
+    .page-header .logo-container {
+        height: 8mm;
+        flex-shrink: 0;
+    }
+    
+    .page-footer .logo-container {
+        height: 6mm;
+        flex-shrink: 0;
+    }
+    
+    .page-header .logo-container svg,
+    .page-footer .logo-container svg {
+        height: 100%;
+        width: auto;
+        color: white;
+    }
+    
+    /* Detail text styling */
+    .detail-text, .detail-value, .detail-observation {
+        font-weight: 400;
+        font-family: var(--font-body);
+    }
+    
+    .page-main {
+        flex-grow: 1;
+        padding: 20px;
+    }
+    
+    @media print {
+      .page-main {
+        padding: 10px 0;
+        flex-grow: 1;
+      }
+    }
+    
+    /* Cover page grid */
+    .cover-grid {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 20px;
+        height: 100%;
+        align-items: start;
+    }
+    
+    .cover-details {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+    
+    .cover-section {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 16px;
+    }
+    
+    .cover-section h2 {
+        font-size: 18px;
+        margin-bottom: 12px;
+        color: var(--brand-color);
+        border-bottom: 2px solid var(--brand-color);
+        padding-bottom: 6px;
+    }
+    
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+    
+    .info-grid.single {
+        grid-template-columns: 1fr;
+    }
+    
+    .info-item {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+    
+    .info-label {
+        font-size: 11px;
+        font-weight: 600;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .info-value {
+        font-size: 13px;
+        font-weight: 500;
+        color: #1e293b;
+    }
+    
+    .cover-map-container {
+        border: 2px solid var(--brand-color);
+        border-radius: 12px;
+        overflow: hidden;
+        aspect-ratio: 1;
+        background: #f1f5f9;
+    }
+    
+    .cover-map-container img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    
+    .map-fallback {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        font-size: 14px;
+        color: #64748b;
+        flex-direction: column;
+        height: 100%;
+        gap: 8px;
+    }
+
+    /* Content page styles */
+    .content-section {
+        margin-bottom: 24px;
+    }
+
+    .topic-header {
+        background: linear-gradient(135deg, var(--brand-color), #4c1d95);
+        color: white;
+        padding: 12px 16px;
+        border-radius: 8px 8px 0 0;
+        margin-bottom: 0;
+    }
+
+    .topic-content {
+        border: 1px solid #e2e8f0;
+        border-top: none;
+        border-radius: 0 0 8px 8px;
+        padding: 16px;
+        background: white;
+    }
+
+    .item-container {
+        border-left: 4px solid var(--brand-color);
+        margin: 16px 0;
+        padding-left: 16px;
+        background: #f8fafc;
+        border-radius: 0 8px 8px 0;
+        padding-top: 12px;
+        padding-bottom: 12px;
+        padding-right: 12px;
+    }
+
+    .detail-container {
+        margin: 12px 0 12px 20px;
+        padding: 10px;
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        border-left: 3px solid #64748b;
+    }
+
+    .media-grid {
+        display: grid;
+        gap: 8px;
+        margin-top: 12px;
+    }
+
+    .media-grid.grid-3 { grid-template-columns: repeat(3, 1fr); }
+    .media-grid.grid-4 { grid-template-columns: repeat(4, 1fr); }
+    .media-grid.grid-5 { grid-template-columns: repeat(5, 1fr); }
+
+    .media-item {
+        aspect-ratio: 1;
+        border-radius: 6px;
+        overflow: hidden;
+        border: 1px solid #e2e8f0;
+        background: #f1f5f9;
+    }
+
+    .media-item img, .media-item video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .nc-container {
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        border-radius: 8px;
+        padding: 12px;
+        margin: 12px 0;
+    }
+
+    .nc-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 8px;
+    }
+
+    .nc-badges {
+        display: flex;
+        gap: 6px;
+        flex-shrink: 0;
+    }
+
+    .badge {
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    @media print {
+      .cover-grid {
+        height: auto;
+        min-height: calc(100vh - 180px);
+      }
+      
+      .media-grid.grid-3 { grid-template-columns: repeat(2, 1fr); }
+      .media-grid.grid-4 { grid-template-columns: repeat(3, 1fr); }
+      .media-grid.grid-5 { grid-template-columns: repeat(3, 1fr); }
+      
+      /* Ensure content doesn't overflow into margins */
+      .content-section {
+        margin-bottom: 16px;
+      }
+      
+      .topic-header, .topic-content {
+        page-break-inside: avoid;
+      }
     }
   </style>
 </head>
-
-<body class="bg-gray-100 print:bg-white">
-  <div class="min-h-screen flex flex-col">
-    <div class="container mx-auto p-4 md:p-8 print:p-0">
-      <div class="bg-white shadow-lg print:shadow-none print-page">
-        <header style="background-color: #312456;" class="text-white p-6 print:p-4">
-          <div class="flex justify-between items-center">
-            <div class="flex items-center">
-              <img alt="Lince Logo" class="h-12 mr-4 print:h-10" src="./logo.png" />
-              <div>
-                <p class="text-sm print:text-xs">Em algum lugar Bacana - 777, Último Andar</p>
-                <p class="text-sm print:text-xs">Edifício HeavenTouch, Magic Island/BR</p>
+<body>
+  <div class="print-container">
+    <!-- Cover Page -->
+    <div class="print-page cover-page">
+      <header class="page-header">
+        <div class="logo-container">
+          ${logoSvg}
+        </div>
+        <div style="text-align: right;">
+          <h1 style="font-size: 16px; margin: 0; font-weight: bold;">{{INSPECTION_TITLE}}</h1>
+          <p style="font-size: 13px; margin: 4px 0 0 0; opacity: 0.9;">Código: {{INSPECTION_CODE}}</p>
+        </div>
+      </header>
+      
+      <main class="page-main">
+        <div class="cover-grid">
+          <div class="cover-details">
+            <div class="cover-section">
+              <h2>Informações da Inspeção</h2>
+              <div class="info-grid">
+                <div class="info-item">
+                  <span class="info-label">Projeto</span>
+                  <span class="info-value">{{PROJECT_TITLE}}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Data da Inspeção</span>
+                  <span class="info-value">{{INSPECTION_DATE}}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Inspetor Responsável</span>
+                  <span class="info-value">{{INSPECTOR_NAME}}</span>
+                </div>
+                ${inspection.area && parseFloat(inspection.area) > 0 ? `<div class="info-item"><span class="info-label">Área Total</span><span class="info-value">{{INSPECTION_AREA}} m²</span></div>` : ''}
               </div>
-            </div>
-            <div class="text-right">
-              <h2 class="text-xl font-semibold print:text-lg">{{INSPECTION_TITLE}} <span
-                  class="material-icons align-middle text-3xl print:text-2xl">home_work</span></h2>
-              <p class="text-sm print:text-xs font-bold">{{INSPECTION_CODE}}</p>
-              <p class="text-xs print:text-[10px]"><strong>Realizado em:</strong> {{INSPECTION_DATE}}</p>
-            </div>
-          </div>
-        </header>
-        <main class="p-6 flex-grow print:p-4">
-          <section class="mb-8 print:mb-6">
-            <div class="flex flex-col md:flex-row gap-x-8">
-              <div class="flex-grow md:w-2/3">
-                <h2 class="text-3xl font-semibold text-slate-700 mb-4 print:text-2xl print:mb-3">Sobre a Inspeção</h2>
-                <div class="border-t border-slate-300 pt-4 print:pt-3">
-                  <div
-                    class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 print:grid-cols-2 print:gap-x-6 print:gap-y-3">
-                    <div>
-                      <p class="text-sm text-slate-500 print:text-xs">Título</p>
-                      <p class="text-slate-700 font-medium print:text-sm">{{INSPECTION_TITLE}}</p>
-                    </div>
-                    <div>
-                      <p class="text-sm text-slate-500 print:text-xs">Tipo da Unidade</p>
-                      <p class="text-slate-700 font-medium print:text-sm">{{PROJECT_TITLE}}</p>
-                    </div>
-                    <div class="md:col-span-2 print:col-span-2 border-t border-slate-200 pt-4 print:pt-3">
-                      <p class="text-sm text-slate-500 print:text-xs">Lincer</p>
-                      <p class="text-slate-700 font-medium print:text-sm">{{INSPECTOR_NAME}}</p>
-                    </div>
-                    <div class="md:col-span-2 print:col-span-2 border-t border-slate-200 pt-4 print:pt-3">
-                      <p class="text-sm text-slate-500 print:text-xs">Endereço</p>
-                      <p class="text-slate-700 font-medium print:text-sm">{{INSPECTION_ADDRESS}}</p>
-                    </div>
-                  </div>
-                  <div class="mt-4 pt-4 border-t border-slate-200">
-                  </div>
+              <div class="info-grid single" style="margin-top: 12px;">
+                <div class="info-item">
+                  <span class="info-label">Endereço da Propriedade</span>
+                  <span class="info-value">{{INSPECTION_ADDRESS}}</span>
                 </div>
               </div>
             </div>
-          </section>
-          <section class="mb-8 print:mb-6">
-            <h2
-              class="text-2xl font-semibold text-slate-700 mb-4 border-b border-slate-300 pb-2 print:text-xl print:mb-3 print:pb-1">
-              Detalhes</h2>
-            <div class="grid grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-4 print:grid-cols-3 print:gap-x-6 print:gap-y-3">
-              <div>
-                <p class="text-sm text-slate-500 print:text-xs">Área</p>
-                <p class="text-slate-700 font-medium print:text-sm">{{INSPECTION_AREA}} m²</p>
-              </div>
-              <div>
-                <p class="text-sm text-slate-500 print:text-xs">Nº de Tópicos</p>
-                <p class="text-slate-700 font-medium print:text-sm">{{TOPICS_COUNT}}</p>
-              </div>
-              <div>
-                <p class="text-sm text-slate-500 print:text-xs">Nº de Itens</p>
-                <p class="text-slate-700 font-medium print:text-sm">{{ITEMS_COUNT}}</p>
-              </div>
-              <div>
-                <p class="text-sm text-slate-500 print:text-xs">Nº de Detalhes</p>
-                <p class="text-slate-700 font-medium print:text-sm">{{DETAILS_COUNT}}</p>
-              </div>
-              <div>
-                <p class="text-sm text-slate-500 print:text-xs">Versão do Documento</p>
-                <p class="text-slate-700 font-medium print:text-sm">1.0.0</p>
-              </div>
-              <div>
-                <p class="text-sm text-slate-500 print:text-xs">Não Conformidades Encontradas</p>
-                <p class="text-slate-700 font-medium print:text-sm">{{NON_CONFORMITIES_COUNT}}</p>
+            
+            <div class="cover-section">
+              <h2>Resumo Executivo</h2>
+              <div class="info-grid">
+                <div class="info-item">
+                  <span class="info-label">Total de Tópicos</span>
+                  <span class="info-value">{{TOPICS_COUNT}} tópicos avaliados</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Total de Itens</span>
+                  <span class="info-value">{{ITEMS_COUNT}} itens verificados</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Pontos de Verificação</span>
+                  <span class="info-value">{{DETAILS_COUNT}} detalhes analisados</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Não Conformidades</span>
+                  <span class="info-value" style="color: {{NON_CONFORMITIES_COUNT}} > 0 ? '#dc2626' : '#059669';">{{NON_CONFORMITIES_COUNT}} identificadas</span>
+                </div>
               </div>
             </div>
-          </section>
-          <section class="mb-8 print:mb-6">
-            <h2
-              class="text-2xl font-semibold text-slate-700 mb-4 border-b border-slate-300 pb-2 print:text-xl print:mb-3 print:pb-1">
-              Observações Gerais</h2>
-            <p class="text-slate-600 print:text-sm">{{GENERAL_OBSERVATION}}</p>
-          </section>
-        </main>
-        <footer style="background-color: #312456;" class="text-white text-xs p-4 print:p-2 mt-auto">
-          <div class="container mx-auto flex justify-between items-center">
-            <div class="flex items-center">
-              <span class="material-icons text-lg mr-2 print:text-base">home_work</span>
-              <span>{{INSPECTION_TITLE}} - {{INSPECTION_CODE}}</span>
+            
+            <div class="cover-section">
+              <h2>Observações Gerais</h2>
+              <div style="font-size: 12px; line-height: 1.6; color: #475569;">
+                {{GENERAL_OBSERVATION}}
+              </div>
             </div>
-            <span>Capa</span>
           </div>
-        </footer>
-      </div>
+          
+          <div class="cover-map-container">
+            <img 
+              src="https://maps.googleapis.com/maps/api/staticmap?center={{INSPECTION_ADDRESS}}&zoom=15&size=500x500&maptype=roadmap&markers=color:red%7C{{INSPECTION_ADDRESS}}&key=AIzaSyAKinxQeDtM7Ri_q71aQ6AF85sIYX0b_b4"
+              alt="Localização da Inspeção"
+              onerror="this.outerHTML='&lt;div class=&quot;map-fallback&quot;&gt;&lt;div style=&quot;font-size: 24px; margin-bottom: 8px;&quot;&gt;📍&lt;/div&gt;&lt;div style=&quot;font-weight: 600; margin-bottom: 4px;&quot;&gt;Localização&lt;/div&gt;&lt;div style=&quot;font-size: 12px; text-align: center; padding: 0 12px;&quot;&gt;{{INSPECTION_ADDRESS}}&lt;/div&gt;&lt;/div&gt;'"
+            />
+          </div>
+        </div>
+      </main>
       
-      <!-- Páginas de Conteúdo Detalhado -->
-      {{DETAILED_CONTENT}}
-      
+      <footer class="page-footer">
+        <div class="logo-container">
+          ${logoSvg}
+        </div>
+        <span>Página 1 de {{TOTAL_PAGES}}</span>
+      </footer>
     </div>
+    
+    <!-- Detailed Content Pages -->
+    {{DETAILED_CONTENT}}
   </div>
-
 </body>
-
 </html>`;
 }
 
@@ -349,39 +646,51 @@ function getReportTemplate() {
  */
 function generateDetailedInspectionContent(inspection) {
   if (!inspection.topics || inspection.topics.length === 0) {
-    return '<div class="text-center py-8 text-gray-500"><p>Nenhum tópico encontrado na inspeção.</p></div>';
+    return '';
   }
   
-  let html = '<div class="space-y-8">';
+  const logoSvg = `<svg viewBox="0 0 195 53" fill="none" xmlns="http://www.w3.org/2000/svg" class="h-full w-auto"><path d="M0 0H14.98V38.45H37.4V51.18H0V0Z" fill="currentColor"/><path d="M55.75 10.23V51.18H41.58V10.23H55.75Z" fill="currentColor"/><path d="M175.24 40.8C170.13 40.58 167.37 38.79 165.95 36.18L191.31 27.1C190.36 20.64 187.46 8.50999 171.2 8.50999C162.7 8.50999 152.72 12.29 149.81 23.99C149.19 26.47 148.8 30.08 147.29 32.14C144.17 36.43 138.23 40.33 131.4 40.33C122.79 40.33 120.72 35.13 120.72 29.43C120.72 24.17 123.36 20.5 128.24 20.5C134.84 20.5 136.01 28.09 136.01 28.12L146.61 22.52C146.61 22.52 144.67 8.48999 127.36 8.48999C119.1 8.48999 105.17 13.1 105.17 30.16C105.17 45.2 115.67 51.97 129.54 51.97C143.4 51.97 150.05 44.08 151.62 41.89C155.57 49.08 163.64 52.42 173.37 52.42C181.87 52.42 190.63 48.71 194.53 45.14L189.45 35.34C187.32 38.61 180.65 41.01 175.24 40.78V40.8ZM179.46 23.29L163.6 28.88C162.9 24.54 163.58 20.54 167.57 18.69C174.28 15.57 178.15 20.68 179.46 23.29Z" fill="currentColor"/><path d="M89.26 9.94999C81.78 9.48999 77.39 12.7 74.83 15.55L73.6 10.21H60.62V51.17H74.98V30.33C74.98 29.07 75.01 21.98 81.85 21.98C89.54 21.98 89.45 30.35 89.45 38.9V51.17H103.35V35.12C103.35 17.73 97.85 10.48 89.27 9.94999H89.26Z" fill="currentColor"/></svg>`;
+  let html = '';
+  const totalPages = (inspection.topics?.length || 0) + 1;
   
   inspection.topics.forEach((topic, topicIndex) => {
+    const currentPage = topicIndex + 2;
+    
     html += `
-      <div class="page-break">
-        <section class="mb-8 print:mb-6">
-          <h2 class="text-2xl font-semibold text-slate-700 mb-4 border-b border-slate-300 pb-2 print:text-xl print:mb-3 print:pb-1">
-            ${topic.name || `Tópico ${topicIndex + 1}`}
-          </h2>
-          
-          ${topic.description ? `
-            <p class="text-slate-600 mb-4 print:text-sm">${topic.description}</p>
-          ` : ''}
-          
-          ${topic.observation ? `
-            <div class="mb-4">
-              <h4 class="font-medium text-sm mb-2 text-slate-600">Observações do Tópico:</h4>
-              <p class="text-slate-600 print:text-sm">${topic.observation}</p>
+      <div class="print-page content-page">
+        <main class="page-main">
+          <div class="content-section">
+            <div class="topic-header">
+              <h2 style="font-size: 20px; margin: 0; font-family: var(--font-heading);">${topic.name || `Tópico ${topicIndex + 1}`}</h2>
+              ${topic.description ? `<p style="font-size: 13px; margin: 6px 0 0 0; opacity: 0.9; font-weight: 400;">${topic.description}</p>` : ''}
             </div>
-          ` : ''}
-          
-          ${generateTopicMedia(topic)}
-          ${generateTopicNonConformities(topic.non_conformities)}
-          ${generateTopicItems(topic.items)}
-        </section>
+            
+            <div class="topic-content">
+              ${topic.observation ? `
+                <div style="background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 6px; padding: 12px; margin-bottom: 16px;">
+                  <h4 style="font-size: 12px; font-weight: 600; color: var(--brand-color); margin: 0 0 6px 0; text-transform: uppercase;">Observações do Tópico</h4>
+                  <p style="font-size: 13px; color: #475569; margin: 0; line-height: 1.5;">${topic.observation}</p>
+                </div>
+              ` : ''}
+              
+              ${generateTopicMedia(topic)}
+              ${generateTopicNonConformities(topic.non_conformities)}
+              ${generateTopicItems(topic.items)}
+            </div>
+          </div>
+        </main>
+        
+        <footer class="page-footer">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div class="logo-container">${logoSvg}</div>
+            <span style="font-weight: 500;">${inspection.cod || 'SEM-CÓDIGO'}</span>
+          </div>
+          <span>Página ${currentPage} de ${totalPages}</span>
+        </footer>
       </div>
     `;
   });
   
-  html += '</div>';
   return html;
 }
 
@@ -391,19 +700,11 @@ function generateDetailedInspectionContent(inspection) {
  * @returns {string} HTML content
  */
 function generateTopicMedia(topic) {
-  if (!topic.media || topic.media.length === 0) {
-    return '';
-  }
-  
+  if (!topic.media || topic.media.length === 0) return '';
   return `
-    <div class="mb-6">
-      <h4 class="font-medium text-lg mb-3 text-slate-700">Fotos do Tópico</h4>
-      <div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-3 print:grid-cols-4">
-        ${topic.media.filter(m => m.type === 'image').map(media => `
-          <div class="aspect-square">
-            <img src="${media.cloudUrl}" alt="Foto do tópico" class="w-full h-full object-cover rounded-lg shadow-sm" />
-          </div>
-        `).join('')}
+    <div style="margin-bottom: 16px;">
+      <div class="media-grid grid-3">
+        ${topic.media.map(media => generateMediaElement(media, "Evidência do tópico")).join('')}
       </div>
     </div>
   `;
@@ -415,27 +716,19 @@ function generateTopicMedia(topic) {
  * @returns {string} HTML content
  */
 function generateTopicItems(items) {
-  if (!items || items.length === 0) {
-    return '';
-  }
-  
-  let html = '<div class="space-y-6">';
-  
+  if (!items || items.length === 0) return '';
+  let html = '';
   items.forEach((item, itemIndex) => {
     html += `
-      <div class="border-l-4 border-blue-200 pl-4">
-        <h3 class="text-xl font-semibold text-slate-700 mb-3">
+      <div class="item-container">
+        <h3 style="font-size: 16px; font-weight: 700; color: var(--brand-color); margin: 0 0 8px 0; font-family: var(--font-heading);">
           ${item.name || `Item ${itemIndex + 1}`}
         </h3>
-        
-        ${item.description ? `
-          <p class="text-slate-600 mb-3 print:text-sm">${item.description}</p>
-        ` : ''}
-        
+        ${item.description ? `<p style="font-size: 13px; color: #64748b; margin: 0 0 12px 0; line-height: 1.5; font-weight: 400;">${item.description}</p>` : ''}
         ${item.observation ? `
-          <div class="mb-3">
-            <h5 class="font-medium text-sm mb-1 text-slate-600">Observações do Item:</h5>
-            <p class="text-slate-600 print:text-sm">${item.observation}</p>
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 10px; margin-bottom: 12px;">
+            <h5 style="font-size: 11px; font-weight: 600; color: #475569; margin: 0 0 4px 0; text-transform: uppercase;">Observações do Item</h5>
+            <p style="font-size: 12px; color: #64748b; margin: 0; line-height: 1.4;">${item.observation}</p>
           </div>
         ` : ''}
         
@@ -445,8 +738,6 @@ function generateTopicItems(items) {
       </div>
     `;
   });
-  
-  html += '</div>';
   return html;
 }
 
@@ -456,19 +747,12 @@ function generateTopicItems(items) {
  * @returns {string} HTML content
  */
 function generateItemMedia(item) {
-  if (!item.media || item.media.length === 0) {
-    return '';
-  }
-  
+  if (!item.media || item.media.length === 0) return '';
   return `
-    <div class="mb-4">
-      <h5 class="font-medium text-base mb-2 text-slate-700">Fotos do Item</h5>
-      <div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-2 print:grid-cols-4">
-        ${item.media.filter(m => m.type === 'image').map(media => `
-          <div class="aspect-square">
-            <img src="${media.cloudUrl}" alt="Foto do item" class="w-full h-full object-cover rounded shadow-sm" />
-          </div>
-        `).join('')}
+    <div style="margin-bottom: 12px;">
+      <h5 style="font-size: 12px; font-weight: 600; color: #475569; margin: 0 0 6px 0; text-transform: uppercase;">Registros Fotográficos do Item</h5>
+      <div class="media-grid grid-4">
+        ${item.media.map(media => generateMediaElement(media, "Registro do item")).join('')}
       </div>
     </div>
   `;
@@ -480,38 +764,29 @@ function generateItemMedia(item) {
  * @returns {string} HTML content
  */
 function generateItemDetails(details) {
-  if (!details || details.length === 0) {
-    return '';
-  }
-  
-  let html = '<div class="space-y-4 ml-4">';
-  
+  if (!details || details.length === 0) return '';
+  let html = '';
   details.forEach((detail, detailIndex) => {
     html += `
-      <div class="border-l-2 border-gray-200 pl-3">
-        <h4 class="text-lg font-medium text-slate-700 mb-2">
-          ${detail.name || `Detalhe ${detailIndex + 1}`}
+      <div class="detail-container">
+        <h4 style="font-size: 14px; font-weight: 600; color: #1e293b; margin: 0 0 8px 0; font-family: var(--font-heading);">
+          ${detail.name || `Ponto de Verificação ${detailIndex + 1}`}
         </h4>
-        
         ${detail.observation ? `
-          <div class="mb-2">
-            <h6 class="font-medium text-xs mb-1 text-slate-600 uppercase">Observações:</h6>
-            <p class="text-slate-600 text-sm">${detail.observation}</p>
+          <div style="margin-bottom: 8px;">
+            <span style="font-size: 10px; font-weight: 600; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 2px;">Observação</span>
+            <p style="font-size: 12px; color: #475569; margin: 0; line-height: 1.4; font-weight: 400;">${detail.observation}</p>
           </div>
         ` : ''}
-        
         ${detail.value ? `
-          <div class="mb-2">
-            <h6 class="font-medium text-xs mb-1 text-slate-600 uppercase">Valor:</h6>
-            <p class="text-slate-700 text-sm font-medium">${detail.value}</p>
+          <div style="margin-bottom: 8px;">
+            <span style="font-size: 10px; font-weight: 600; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 2px;">Valor Registrado</span>
+            <p style="font-size: 12px; color: #1e293b; margin: 0; font-weight: 500; background: #f1f5f9; padding: 4px 8px; border-radius: 4px; display: inline-block;">${detail.value}</p>
           </div>
         ` : ''}
-        
         ${detail.is_damaged ? `
-          <div class="mb-2">
-            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-              ⚠️ Danos Identificados
-            </span>
+          <div style="margin-bottom: 8px;">
+            <span style="background: #fef2f2; color: #dc2626; font-size: 10px; font-weight: 600; padding: 4px 8px; border-radius: 12px; text-transform: uppercase;">⚠️ Danos Identificados</span>
           </div>
         ` : ''}
         
@@ -520,8 +795,6 @@ function generateItemDetails(details) {
       </div>
     `;
   });
-  
-  html += '</div>';
   return html;
 }
 
@@ -531,19 +804,12 @@ function generateItemDetails(details) {
  * @returns {string} HTML content
  */
 function generateDetailMedia(detail) {
-  if (!detail.media || detail.media.length === 0) {
-    return '';
-  }
-  
+  if (!detail.media || detail.media.length === 0) return '';
   return `
-    <div class="mb-3">
-      <h6 class="font-medium text-sm mb-2 text-slate-700">Fotos do Detalhe</h6>
-      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 print:grid-cols-3">
-        ${detail.media.filter(m => m.type === 'image').map(media => `
-          <div class="aspect-square">
-            <img src="${media.cloudUrl}" alt="Foto do detalhe" class="w-full h-full object-cover rounded shadow-sm" />
-          </div>
-        `).join('')}
+    <div style="margin-top: 8px;">
+      <span style="font-size: 10px; font-weight: 600; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 4px;">Registros Fotográficos</span>
+      <div class="media-grid grid-5">
+        ${detail.media.map(media => generateMediaElement(media, "Registro do detalhe")).join('')}
       </div>
     </div>
   `;
@@ -583,16 +849,11 @@ function generateDetailNonConformities(nonConformities) {
  * @returns {string} HTML content
  */
 function generateNonConformitiesSection(nonConformities, title) {
-  if (!nonConformities || nonConformities.length === 0) {
-    return '';
-  }
-  
+  if (!nonConformities || nonConformities.length === 0) return '';
   let html = `
-    <div class="mb-4">
-      <h5 class="font-medium text-base mb-3 text-slate-700">${title}</h5>
-      <div class="space-y-3">
+    <div style="margin-top: 16px;">
+      <h5 style="font-size: 14px; font-weight: 600; color: #dc2626; margin: 0 0 12px 0; text-transform: uppercase; letter-spacing: 0.5px;">${title}</h5>
   `;
-  
   nonConformities.forEach((nc, index) => {
     const severityClass = getSeverityClass(nc.severity);
     const severityText = getSeverityText(nc.severity);
@@ -600,67 +861,50 @@ function generateNonConformitiesSection(nonConformities, title) {
     const statusClass = nc.is_resolved ? 'severity-resolvida' : 'severity-alta';
     
     html += `
-      <div class="border rounded-lg p-3 bg-gray-50 shadow-sm">
-        <div class="flex justify-between items-start mb-2">
-          <h6 class="font-semibold text-sm">${nc.title || 'Não Conformidade ' + (index + 1)}</h6>
-          <div class="flex gap-1">
-            <span class="px-2 py-1 rounded text-xs font-medium ${severityClass}">${severityText}</span>
-            <span class="px-2 py-1 rounded text-xs font-medium ${statusClass}">${statusText}</span>
+      <div class="nc-container">
+        <div class="nc-header">
+          <h6 style="font-size: 13px; font-weight: 600; color: #1e293b; margin: 0; flex-grow: 1;">${nc.title || 'Não Conformidade ' + (index + 1)}</h6>
+          <div class="nc-badges">
+            <span class="badge ${severityClass}">${severityText}</span>
+            <span class="badge ${statusClass}">${statusText}</span>
           </div>
         </div>
         
-        ${nc.description ? `
-          <p class="text-sm text-gray-700 mb-2">${nc.description}</p>
-        ` : ''}
-        
+        ${nc.description ? `<p style="font-size: 12px; color: #475569; margin: 0 0 8px 0; line-height: 1.4;">${nc.description}</p>` : ''}
         ${nc.corrective_action ? `
-          <div class="mb-2">
-            <p class="text-xs text-gray-600 mb-1">Ação Corretiva:</p>
-            <p class="text-sm text-gray-700">${nc.corrective_action}</p>
+          <div style="margin-bottom: 8px;">
+            <span style="font-size: 10px; font-weight: 600; color: #059669; text-transform: uppercase; display: block; margin-bottom: 2px;">Ação Corretiva</span>
+            <p style="font-size: 11px; color: #374151; margin: 0; line-height: 1.3;">${nc.corrective_action}</p>
           </div>
         ` : ''}
-        
         ${nc.deadline ? `
-          <div class="mb-2">
-            <p class="text-xs text-gray-600 mb-1">Prazo:</p>
-            <p class="text-sm text-gray-700">${formatDate(nc.deadline)}</p>
+          <div style="margin-bottom: 8px;">
+            <span style="font-size: 10px; font-weight: 600; color: #ea580c; text-transform: uppercase; display: block; margin-bottom: 2px;">Prazo para Correção</span>
+            <p style="font-size: 11px; color: #374151; margin: 0; font-weight: 500;">${formatDate(nc.deadline)}</p>
           </div>
         ` : ''}
         
-        ${nc.media && nc.media.length > 0 ? `
-          <div class="mb-2">
-            <p class="text-xs text-gray-600 mb-1">Evidências:</p>
-            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1 print:grid-cols-3">
-              ${nc.media.map(media => `
-                <div class="aspect-square">
-                  <img src="${media.cloudUrl}" alt="Evidência" class="w-full h-full object-cover rounded border" />
-                </div>
-              `).join('')}
+        ${(nc.media && nc.media.length > 0) ? `
+          <div style="margin-top: 8px;">
+            <span style="font-size: 10px; font-weight: 600; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 4px;">Evidências do Problema</span>
+            <div class="media-grid grid-4">
+              ${nc.media.map(media => generateMediaElement(media, "Evidência")).join('')}
             </div>
           </div>
         ` : ''}
         
-        ${nc.solved_media && nc.solved_media.length > 0 ? `
-          <div class="mb-2">
-            <p class="text-xs text-gray-600 mb-1">Evidências da Resolução:</p>
-            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1 print:grid-cols-3">
-              ${nc.solved_media.map(media => `
-                <div class="aspect-square">
-                  <img src="${media.cloudUrl}" alt="Resolução" class="w-full h-full object-cover rounded border-2 border-green-500" />
-                </div>
-              `).join('')}
+        ${(nc.solved_media && nc.solved_media.length > 0) ? `
+          <div style="margin-top: 8px;">
+            <span style="font-size: 10px; font-weight: 600; color: #059669; text-transform: uppercase; display: block; margin-bottom: 4px;">Evidências da Correção</span>
+            <div class="media-grid grid-4">
+              ${nc.solved_media.map(media => generateMediaElement(media, "Resolução", "border-2 border-green-500")).join('')}
             </div>
           </div>
         ` : ''}
       </div>
     `;
   });
-  
-  html += `
-      </div>
-    </div>
-  `;
-  
+  html += `</div>`;
   return html;
 }
 
@@ -671,155 +915,123 @@ function generateNonConformitiesSection(nonConformities, title) {
  */
 function getAllNonConformities(inspection) {
   const nonConformities = [];
-  
   if (!inspection.topics) return nonConformities;
   
   inspection.topics.forEach((topic, topicIndex) => {
-    // Topic-level non-conformities
     if (topic.non_conformities) {
-      topic.non_conformities.forEach(nc => {
-        nonConformities.push({
-          ...nc,
-          context: {
-            topic: topic.name,
-            item: null,
-            detail: null,
-            topicIndex,
-            itemIndex: null,
-            detailIndex: null
-          }
-        });
-      });
+      topic.non_conformities.forEach(nc => nonConformities.push({ ...nc, context: { topic: topic.name, item: null, detail: null }}));
     }
-    
     if (topic.items) {
       topic.items.forEach((item, itemIndex) => {
-        // Item-level non-conformities
         if (item.non_conformities) {
-          item.non_conformities.forEach(nc => {
-            nonConformities.push({
-              ...nc,
-              context: {
-                topic: topic.name,
-                item: item.name,
-                detail: null,
-                topicIndex,
-                itemIndex,
-                detailIndex: null
-              }
-            });
-          });
+          item.non_conformities.forEach(nc => nonConformities.push({ ...nc, context: { topic: topic.name, item: item.name, detail: null }}));
         }
-        
         if (item.details) {
           item.details.forEach((detail, detailIndex) => {
-            // Detail-level non-conformities
             if (detail.non_conformities) {
-              detail.non_conformities.forEach(nc => {
-                nonConformities.push({
-                  ...nc,
-                  context: {
-                    topic: topic.name,
-                    item: item.name,
-                    detail: detail.name,
-                    topicIndex,
-                    itemIndex,
-                    detailIndex
-                  }
-                });
-              });
+              detail.non_conformities.forEach(nc => nonConformities.push({ ...nc, context: { topic: topic.name, item: item.name, detail: detail.name }}));
             }
           });
         }
       });
     }
   });
-  
   return nonConformities;
 }
 
 /**
- * Generate non-conformities content HTML
+ * Generate non-conformities content HTML for the dedicated report
+ * @param {Object} inspection - The full inspection object
  * @param {Array} nonConformities - Array of non-conformities
  * @returns {string} HTML content
  */
-function generateNonConformitiesContent(nonConformities) {
-  if (nonConformities.length === 0) {
-    return '<div class="text-center py-8 text-gray-500"><p>Nenhuma não conformidade encontrada.</p></div>';
-  }
-  
-  let html = '<div class="space-y-6">';
-  
-  nonConformities.forEach((nc, index) => {
-    const severityClass = getSeverityClass(nc.severity);
-    const severityText = getSeverityText(nc.severity);
-    const statusText = nc.is_resolved ? 'Resolvida' : 'Aberta';
-    const statusClass = nc.is_resolved ? 'severity-resolvida' : 'severity-alta';
-    
-    html += `
-      <div class="border rounded-lg p-4 bg-white shadow-sm">
-        <div class="flex justify-between items-start mb-3">
-          <h3 class="font-semibold text-lg">${nc.title || 'Não Conformidade ' + (index + 1)}</h3>
-          <div class="flex gap-2">
-            <span class="px-2 py-1 rounded text-xs font-medium ${severityClass}">${severityText}</span>
-            <span class="px-2 py-1 rounded text-xs font-medium ${statusClass}">${statusText}</span>
-          </div>
+function generateNonConformitiesContent(inspection, nonConformities) {
+    const logoSvg = `<svg viewBox="0 0 195 53" fill="none" xmlns="http://www.w3.org/2000/svg" class="h-full w-auto"><path d="M0 0H14.98V38.45H37.4V51.18H0V0Z" fill="currentColor"/><path d="M55.75 10.23V51.18H41.58V10.23H55.75Z" fill="currentColor"/><path d="M175.24 40.8C170.13 40.58 167.37 38.79 165.95 36.18L191.31 27.1C190.36 20.64 187.46 8.50999 171.2 8.50999C162.7 8.50999 152.72 12.29 149.81 23.99C149.19 26.47 148.8 30.08 147.29 32.14C144.17 36.43 138.23 40.33 131.4 40.33C122.79 40.33 120.72 35.13 120.72 29.43C120.72 24.17 123.36 20.5 128.24 20.5C134.84 20.5 136.01 28.09 136.01 28.12L146.61 22.52C146.61 22.52 144.67 8.48999 127.36 8.48999C119.1 8.48999 105.17 13.1 105.17 30.16C105.17 45.2 115.67 51.97 129.54 51.97C143.4 51.97 150.05 44.08 151.62 41.89C155.57 49.08 163.64 52.42 173.37 52.42C181.87 52.42 190.63 48.71 194.53 45.14L189.45 35.34C187.32 38.61 180.65 41.01 175.24 40.78V40.8ZM179.46 23.29L163.6 28.88C162.9 24.54 163.58 20.54 167.57 18.69C174.28 15.57 178.15 20.68 179.46 23.29Z" fill="currentColor"/><path d="M89.26 9.94999C81.78 9.48999 77.39 12.7 74.83 15.55L73.6 10.21H60.62V51.17H74.98V30.33C74.98 29.07 75.01 21.98 81.85 21.98C89.54 21.98 89.45 30.35 89.45 38.9V51.17H103.35V35.12C103.35 17.73 97.85 10.48 89.27 9.94999H89.26Z" fill="currentColor"/></svg>`;
+
+    let contentHtml;
+
+    if (nonConformities.length === 0) {
+        contentHtml = '<div class="text-center py-8 text-slate-500"><p>Nenhuma não conformidade encontrada na vistoria.</p></div>';
+    } else {
+        contentHtml = '<div class="space-y-4">';
+        nonConformities.forEach((nc, index) => {
+            const severityClass = getSeverityClass(nc.severity);
+            const severityText = getSeverityText(nc.severity);
+            const statusText = nc.is_resolved ? 'Resolvida' : 'Aberta';
+            const statusClass = nc.is_resolved ? 'severity-resolvida' : 'severity-alta';
+            
+            contentHtml += `
+              <div class="border border-slate-200 rounded-lg p-4 bg-white shadow-sm">
+                <div class="flex justify-between items-start mb-3">
+                  <h3 class="font-bold text-base text-slate-800">${nc.title || 'Não Conformidade ' + (index + 1)}</h3>
+                  <div class="flex gap-2 text-xs font-medium">
+                    <span class="px-2 py-0.5 rounded-full ${severityClass}">${severityText}</span>
+                    <span class="px-2 py-0.5 rounded-full ${statusClass}">${statusText}</span>
+                  </div>
+                </div>
+                
+                <div class="mb-3 text-sm"><p class="text-xs text-slate-500 mb-0.5">Localização:</p><p class="font-medium text-slate-700">${nc.context.topic}${nc.context.item ? ' > ' + nc.context.item : ''}${nc.context.detail ? ' > ' + nc.context.detail : ''}</p></div>
+                ${nc.description ? `<div class="mb-3 text-sm"><p class="text-xs text-slate-500 mb-0.5">Descrição:</p><p class="text-slate-700">${nc.description}</p></div>` : ''}
+                ${nc.corrective_action ? `<div class="mb-3 text-sm"><p class="text-xs text-slate-500 mb-0.5">Ação Corretiva:</p><p class="text-slate-700">${nc.corrective_action}</p></div>` : ''}
+                ${nc.deadline ? `<div class="mb-3 text-sm"><p class="text-xs text-slate-500 mb-0.5">Prazo:</p><p class="text-slate-700">${formatDate(nc.deadline)}</p></div>` : ''}
+                
+                ${(nc.media && nc.media.length > 0) ? `<div class="mt-3"><p class="text-xs font-bold text-slate-600 mb-1">Evidências:</p><div class="grid grid-cols-5 gap-2">${nc.media.map(media => generateMediaElement(media, "Evidência")).join('')}</div></div>` : ''}
+                ${(nc.solved_media && nc.solved_media.length > 0) ? `<div class="mt-3"><p class="text-xs font-bold text-slate-600 mb-1">Evidências da Resolução:</p><div class="grid grid-cols-5 gap-2">${nc.solved_media.map(media => generateMediaElement(media, "Resolução", "border-2 border-green-500")).join('')}</div></div>` : ''}
+              </div>
+            `;
+        });
+        contentHtml += '</div>';
+    }
+
+    return `
+    <div class="print-page">
+      <main class="page-main">
+        <h2 class="text-2xl font-bold mb-4 border-b-2 border-slate-200 pb-2">Relatório de Não Conformidades</h2>
+        ${contentHtml}
+      </main>
+      <footer class="page-footer flex justify-between items-center">
+        <div class="flex items-center gap-2">
+            <div class="logo-container">${logoSvg}</div>
+            <span class="text-sm font-medium">${inspection.cod || 'SEM-CÓDIGO'}</span>
         </div>
-        
-        <div class="mb-3">
-          <p class="text-sm text-gray-600 mb-1">Localização:</p>
-          <p class="text-sm">${nc.context.topic}${nc.context.item ? ' > ' + nc.context.item : ''}${nc.context.detail ? ' > ' + nc.context.detail : ''}</p>
-        </div>
-        
-        ${nc.description ? `
-          <div class="mb-3">
-            <p class="text-sm text-gray-600 mb-1">Descrição:</p>
-            <p class="text-sm">${nc.description}</p>
-          </div>
-        ` : ''}
-        
-        ${nc.corrective_action ? `
-          <div class="mb-3">
-            <p class="text-sm text-gray-600 mb-1">Ação Corretiva:</p>
-            <p class="text-sm">${nc.corrective_action}</p>
-          </div>
-        ` : ''}
-        
-        ${nc.deadline ? `
-          <div class="mb-3">
-            <p class="text-sm text-gray-600 mb-1">Prazo:</p>
-            <p class="text-sm">${formatDate(nc.deadline)}</p>
-          </div>
-        ` : ''}
-        
-        ${nc.media && nc.media.length > 0 ? `
-          <div class="mb-3">
-            <p class="text-sm text-gray-600 mb-2">Evidências:</p>
-            <div class="grid grid-cols-3 gap-2">
-              ${nc.media.map(media => `
-                <img src="${media.cloudUrl}" alt="Evidência" class="w-full h-20 object-cover rounded" />
-              `).join('')}
-            </div>
-          </div>
-        ` : ''}
-        
-        ${nc.solved_media && nc.solved_media.length > 0 ? `
-          <div class="mb-3">
-            <p class="text-sm text-gray-600 mb-2">Evidências da Resolução:</p>
-            <div class="grid grid-cols-3 gap-2">
-              ${nc.solved_media.map(media => `
-                <img src="${media.cloudUrl}" alt="Resolução" class="w-full h-20 object-cover rounded border-2 border-green-500" />
-              `).join('')}
-            </div>
-          </div>
-        ` : ''}
+        <span class="text-sm">Página 2 de 2</span>
+      </footer>
+    </div>
+  `;
+}
+
+/**
+ * Generates a self-contained HTML element for media (image or video).
+ * @param {object} media - Media object with cloudUrl and type
+ * @param {string} altText - Alt text for the media
+ * @param {string} extraClasses - Extra classes to add to the container
+ * @returns {string} HTML string for the media element
+ */
+function generateMediaElement(media, altText, extraClasses = '') {
+  if (media.type === 'image') {
+    return `
+      <div class="media-item ${extraClasses}" style="position: relative;">
+        <img src="${media.cloudUrl}" alt="${altText}" style="width: 100%; height: 100%; object-fit: cover;" />
+        <div style="position: absolute; bottom: 2px; right: 2px; background: rgba(0,0,0,0.7); color: white; padding: 1px 4px; border-radius: 2px; font-size: 8px;">📷</div>
       </div>
     `;
-  });
+  }
   
-  html += '</div>';
-  return html;
+  if (media.type === 'video') {
+    return `
+      <div class="media-item ${extraClasses}" style="position: relative; background: #000;">
+        <video style="width: 100%; height: 100%; object-fit: cover;"><source src="${media.cloudUrl}" type="video/mp4"></video>
+        <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.3);">
+          <span style="color: white; font-size: 16px;">▶</span>
+        </div>
+        <div style="position: absolute; bottom: 2px; right: 2px; background: rgba(0,0,0,0.7); color: white; padding: 1px 4px; border-radius: 2px; font-size: 8px;">🎬</div>
+      </div>
+    `;
+  }
+  
+  return '';
 }
+
 
 /**
  * Get severity CSS class
@@ -833,7 +1045,8 @@ function getSeverityClass(severity) {
     'alta': 'severity-alta',
     'crítica': 'severity-critica'
   };
-  return severityMap[severity?.toLowerCase()] || 'severity-baixa';
+  if (!severity || !severity.trim()) return 'bg-gray-100 text-gray-600';
+  return severityMap[severity.toLowerCase()] || 'severity-baixa';
 }
 
 /**
@@ -848,56 +1061,31 @@ function getSeverityText(severity) {
     'alta': 'Alta', 
     'crítica': 'Crítica'
   };
-  return severityMap[severity?.toLowerCase()] || 'Baixa';
+  if (!severity || !severity.trim()) return 'Não Definida';
+  return severityMap[severity.toLowerCase()] || 'Baixa';
 }
 
-
-/**
- * Get total items count
- * @param {Object} inspection - Inspection data
- * @returns {number} Total items count
- */
 function getTotalItemsCount(inspection) {
   if (!inspection.topics) return 0;
   return inspection.topics.reduce((total, topic) => total + (topic.items?.length || 0), 0);
 }
 
-/**
- * Get total details count
- * @param {Object} inspection - Inspection data
- * @returns {number} Total details count
- */
 function getTotalDetailsCount(inspection) {
   if (!inspection.topics) return 0;
-  let total = 0;
-  inspection.topics.forEach(topic => {
-    if (topic.items) {
-      topic.items.forEach(item => {
-        total += item.details?.length || 0;
-      });
-    }
-  });
-  return total;
+  return inspection.topics.reduce((topicTotal, topic) => 
+    topicTotal + (topic.items ? topic.items.reduce((itemTotal, item) => 
+      itemTotal + (item.details?.length || 0), 0) : 0), 0);
 }
 
-/**
- * Get total non-conformities count
- * @param {Object} inspection - Inspection data
- * @returns {number} Total non-conformities count
- */
 function getTotalNonConformitiesCount(inspection) {
   return getAllNonConformities(inspection).length;
 }
 
-/**
- * Format date for display
- * @param {string} dateString - Date string
- * @returns {string} Formatted date
- */
 function formatDate(dateString) {
   if (!dateString) return 'N/A';
   try {
     const date = new Date(dateString);
+    if (isNaN(date.getTime())) return 'Data inválida';
     return date.toLocaleDateString('pt-BR', {
       year: 'numeric',
       month: 'long', 

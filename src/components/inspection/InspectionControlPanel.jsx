@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useInspectionReleases } from "@/hooks/use-inspection-releases";
 import { formatDateSafe } from "@/utils/dateFormater";
+import { getInternalStatus, getInternalStatusText } from "@/utils/inspection-status";
 import { db } from "@/lib/firebase";
 import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import {
@@ -88,23 +89,29 @@ export default function InspectionControlPanel({ inspection, onUpdate }) {
     }
   };
 
-  const isCompleted = inspection.status === 'completed';
+  const internalStatus = getInternalStatus(inspection);
   const isDelivered = inspection.delivered;
   const isEditBlocked = inspection.inspection_edit_blocked;
   const availableReleases = releases.filter(r => !r.is_delivered);
   const deliveredRelease = releases.find(r => r.id === inspection.delivered_release_id);
 
   const handleToggleCompletion = async () => {
-    const newStatus = isCompleted ? 'in_progress' : 'completed';
+    const currentStatus = internalStatus;
+    const newStatus = currentStatus === 'entregue' ? 'editada' : 'entregue';
     
     try {
       const inspectionRef = doc(db, 'inspections', inspection.id);
-      await updateDoc(inspectionRef, {
-        status: newStatus,
-        updated_at: serverTimestamp(),
-        ...(newStatus === 'completed' && { completed_at: serverTimestamp() }),
-        ...(newStatus === 'in_progress' && { completed_at: null })
-      });
+      const updateData = {
+        updated_at: serverTimestamp()
+      };
+      
+      if (newStatus === 'entregue') {
+        updateData.delivered_at = serverTimestamp();
+      } else {
+        updateData.delivered_at = null;
+      }
+      
+      await updateDoc(inspectionRef, updateData);
       
       onUpdate();
     } catch (error) {
@@ -125,8 +132,8 @@ export default function InspectionControlPanel({ inspection, onUpdate }) {
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <Label className="text-sm font-medium">Status da Inspeção</Label>
-            <Badge variant={isCompleted ? "default" : "secondary"}>
-              {isCompleted ? "Concluída" : "Em Andamento"}
+            <Badge variant={internalStatus === 'entregue' ? "default" : "secondary"}>
+              {getInternalStatusText(internalStatus)}
             </Badge>
           </div>
           
@@ -207,18 +214,18 @@ export default function InspectionControlPanel({ inspection, onUpdate }) {
           <div className="flex items-center justify-between">
             <div className="space-y-1">
               <Label className="text-sm font-medium flex items-center gap-2">
-                {isCompleted ? <Package className="h-4 w-4" /> : <Edit3 className="h-4 w-4" />}
-                Finalizar Inspeção
+                {internalStatus === 'entregue' ? <Package className="h-4 w-4" /> : <Edit3 className="h-4 w-4" />}
+                Marcar como Entregue
               </Label>
               <p className="text-xs text-muted-foreground">
-                {isCompleted 
-                  ? "Inspeção concluída - pode reativar para edição" 
-                  : "Finalizar e marcar como concluída"
+                {internalStatus === 'entregue'
+                  ? "Inspeção marcada como entregue - pode reverter" 
+                  : "Marcar inspeção como entregue ao cliente"
                 }
               </p>
             </div>
             <Switch
-              checked={isCompleted}
+              checked={internalStatus === 'entregue'}
               onCheckedChange={handleToggleCompletion}
               disabled={loading}
             />

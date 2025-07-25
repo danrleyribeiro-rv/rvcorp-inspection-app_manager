@@ -82,11 +82,11 @@ export default function InspectionEditorPage({ params }) {
       setHasUnsavedChanges(hasChanges);
       
       // Lógica automática de status baseada nas alterações
-      if (hasChanges && inspection.status === 'pending') {
-        // Se há alterações e está pendente, muda para em andamento
+      if (hasChanges && inspection.status === 'pendente') {
+        // Se há alterações e está pendente, muda para editada
         setInspection(prev => ({
           ...prev,
-          status: 'in_progress'
+          status: 'editada'
         }));
       }
     }
@@ -1354,13 +1354,13 @@ const handleMoveMediaDrop = (item, destination) => {
               <div className="flex items-center gap-2">
                 <span className="text-sm text-muted-foreground">Status:</span>
                 <Badge variant={
-                  inspection?.status === 'completed' ? 'default' :
-                  inspection?.status === 'in_progress' ? 'secondary' :
+                  getInternalStatus(inspection) === 'entregue' ? 'default' :
+                  getInternalStatus(inspection) === 'editada' ? 'secondary' :
                   'outline'
                 }>
-                  {inspection?.status === 'pending' ? 'Pendente' :
-                   inspection?.status === 'in_progress' ? 'Em Andamento' :
-                   inspection?.status === 'completed' ? 'Concluída' : 'Indefinido'}
+                  {getInternalStatus(inspection) === 'pendente' ? 'Pendente' :
+                   getInternalStatus(inspection) === 'editada' ? 'Editada' :
+                   getInternalStatus(inspection) === 'entregue' ? 'Entregue' : 'Indefinido'}
                 </Badge>
               </div>
               <Button size="sm" onClick={saveInspection} disabled={saving || !hasUnsavedChanges}>
@@ -1385,14 +1385,12 @@ const handleMoveMediaDrop = (item, destination) => {
                   Estrutura da Inspeção
                 </TabsTrigger>
               )}
-              <TabsTrigger value="media" className="flex items-center gap-2">
-                <Images className="h-4 w-4" />
-                Mídias
-              </TabsTrigger>
-              <TabsTrigger value="control" className="flex items-center gap-2">
-                <Settings className="h-4 w-4" />
-                Controle
-              </TabsTrigger>
+              {inspectionData && (
+                <TabsTrigger value="media" className="flex items-center gap-2">
+                  <Images className="h-4 w-4" />
+                  Mídias
+                </TabsTrigger>
+              )}
             </TabsList>
             <TabsContent value="general" className="space-y-4">
               <div className="bg-card border rounded-lg p-6">
@@ -1764,6 +1762,7 @@ const handleMoveMediaDrop = (item, destination) => {
                   });
                 }}
               />
+
             </TabsContent>
 
             {inspectionData && (
@@ -2488,14 +2487,6 @@ const handleMoveMediaDrop = (item, destination) => {
            </TabsContent>
 
            {/* Novo conteúdo da aba Controle */}
-           <TabsContent value="control" className="space-y-4">
-              {inspectionControlData && (
-                <InspectionControlPanel 
-                  inspection={inspectionControlData}
-                  onUpdate={handleControlUpdate}
-                />
-              )}
-            </TabsContent>
          </Tabs>
        </div>
        
